@@ -391,7 +391,7 @@ export const calculateSavingThrows = (
 export const getDefaultPathfinderCombatSettings = (character?: Partial<CharacterData> | null): PathfinderCombatSettings => {
   const hasFinesse = hasWeaponFinesse(character);
   const hasDexDmg = hasDexToDamage(character);
-  const defaultWeapon = character?.weapons?.melee?.[0]?.name || "Dolch des Eises +2";
+  const defaultWeapon = character?.weapons?.melee?.[0]?.name || character?.weapons?.ranged?.[0]?.name || "Unbewaffnet";
 
   return {
     attackAttr: hasFinesse ? 'GE' : 'ST',
