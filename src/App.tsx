@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { CheckCircle2 } from "lucide-react";
-import { CharacterData, GameSystem, AiConfig, LocalCharacterMeta } from "./types";
+import { CharacterData, GameSystem, LocalCharacterMeta } from "./types";
 import { FLOKI_DATA } from "./data";
 import {
   isPathfinder,
@@ -11,7 +11,6 @@ import {
   getOrInitializePathfinderCharacteristics,
   recalculatePathfinderCharacter
 } from "./utils/pathfinder";
-import { getSavedAiConfig } from "./services/aiService";
 import { listLocalCharacters, saveLocalCharacter } from "./services/characterStorageService";
 import { initializeCharacterInventory, syncInventoryToWeapons, extractDailyUsesFromText } from "./utils/inventorySync";
 
@@ -28,8 +27,7 @@ import { FloatingActionButtons } from "./components/dashboard/FloatingActionButt
 import { Launcher, PRESET_CHARACTERS } from "./components/launcher/Launcher";
 
 // Modals
-import { ImportModal } from "./components/ImportModal";
-import { AiSettingsModal } from "./components/AiSettingsModal";
+import { CreateCharacterModal } from "./components/CreateCharacterModal";
 import { CurrencyCalculatorModal } from "./components/CurrencyCalculatorModal";
 import { BackupModal } from "./components/BackupModal";
 import { LocalCharacterVaultModal } from "./components/LocalCharacterVaultModal";
@@ -42,11 +40,9 @@ import { RestAndRecoveryModal } from "./components/RestAndRecoveryModal";
 export default function App() {
   const [data, setData] = useState<CharacterData | null>(FLOKI_DATA);
   const [isEditing, setIsEditing] = useState(false);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
-  const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
-  const [aiConfig, setAiConfig] = useState<AiConfig>(getSavedAiConfig());
   const [view, setView] = useState<'launcher' | 'dashboard' | 'onboarding'>('launcher');
   const [dashboardTab, setDashboardTab] = useState<'sheet' | 'skills' | 'calc' | 'original' | 'combat'>('sheet');
   const [selectedSystem, setSelectedSystem] = useState<GameSystem>('pathfinder');
@@ -82,14 +78,13 @@ export default function App() {
     setData(prev => prev ? ({ ...prev, ...updates }) : null);
   };
 
-  // Ensure Pathfinder saving throws and characteristics (Grundwerte) are always synchronized
+  // Ensure Pathfinder saving throws and characteristics are always synchronized
   useEffect(() => {
     if (!data || !isPathfinder(data)) return;
 
     const charsNeedInit = !data.characteristics || data.characteristics.length < 6;
     const currentChars = charsNeedInit ? getOrInitializePathfinderCharacteristics(data) : data.characteristics;
-    
-    // Compute what saving throws should be based on current characteristics and existing bases/magic mods
+
     const expectedSaves = calculateSavingThrows({ ...data, characteristics: currentChars }, data.savingThrows);
 
     const savesNeedUpdate = !data.savingThrows ||
@@ -133,7 +128,7 @@ export default function App() {
     }
   }, [data?.system, data?.characteristics, data?.savingThrows]);
 
-  // Ensure Shadowrun Essenz in overview stats is always identical to the calculated remaining essence from body modifications
+  // Ensure Shadowrun Essenz is always synced with body modifications
   useEffect(() => {
     if (!data || data.system !== 'shadowrun' || !data.bodyMods) return;
     const totalSpent = data.bodyMods.reduce((acc, mod) => acc + (Number(mod.essenceCost) || 0), 0);
@@ -144,7 +139,7 @@ export default function App() {
         if (!prev) return null;
         return {
           ...prev,
-          stats: prev.stats.map(s => 
+          stats: prev.stats.map(s =>
             (s.label.toLowerCase() === 'essenz' || s.label.toLowerCase() === 'essence')
               ? { ...s, value: remaining }
               : s
@@ -154,7 +149,7 @@ export default function App() {
     }
   }, [data?.bodyMods, data?.system]);
 
-  // Ensure inventory is initialized and synchronized with weapons, and daily uses are active
+  // Ensure inventory is initialized and synchronized
   useEffect(() => {
     if (!data) return;
 
@@ -165,7 +160,6 @@ export default function App() {
       updatedInventory = initializeCharacterInventory(data);
       needsUpdate = true;
     } else {
-      // Check if any inventory item has usage notes but no maxUses set yet (e.g. Fanghandschuhe 2x/Tag)
       const scannedInventory = data.inventory.map(item => {
         if (item.maxUses === undefined) {
           const detected = extractDailyUsesFromText(item.notes, item.name);
@@ -179,19 +173,13 @@ export default function App() {
           }
         } else if (item.currentUses === undefined) {
           needsUpdate = true;
-          return {
-            ...item,
-            currentUses: item.maxUses
-          };
+          return { ...item, currentUses: item.maxUses };
         }
         return item;
       });
-      if (needsUpdate) {
-        updatedInventory = scannedInventory;
-      }
+      if (needsUpdate) updatedInventory = scannedInventory;
     }
 
-    // Also check if any ability has 1x/Tag, 2x/Tag in usage/effect but no maxUses set yet (e.g. Zauber oder Schurkentrick)
     let updatedAbilities = data.abilities;
     if (data.abilities) {
       let abilitiesChanged = false;
@@ -208,10 +196,7 @@ export default function App() {
           }
         } else if (ab.currentUses === undefined) {
           abilitiesChanged = true;
-          return {
-            ...ab,
-            currentUses: ab.maxUses
-          };
+          return { ...ab, currentUses: ab.maxUses };
         }
         return ab;
       });
@@ -258,7 +243,6 @@ export default function App() {
     });
     setTimeout(() => setSaveToast(null), 4000);
 
-    // Auto-save to local vault if available
     try {
       const res = await saveLocalCharacter(updatedCharacter);
       if (res.success && res.relativePath) {
@@ -278,19 +262,11 @@ export default function App() {
     if (!data) return;
     const updatedCharacter = { ...data, ...updates };
     setData(updatedCharacter);
-
-    setSaveToast({
-      message: 'Rast abgeschlossen!',
-      subMessage: summaryMessage
-    });
+    setSaveToast({ message: 'Rast abgeschlossen!', subMessage: summaryMessage });
     setTimeout(() => setSaveToast(null), 5000);
-
-    // Auto-save to local vault if available
     try {
       const res = await saveLocalCharacter(updatedCharacter);
-      if (res.success && res.relativePath) {
-        refreshLocalCharacters();
-      }
+      if (res.success && res.relativePath) refreshLocalCharacters();
     } catch (e) {
       console.warn("Auto-save after rest skipped:", e);
     }
@@ -320,24 +296,74 @@ export default function App() {
   // 1. LAUNCHER VIEW
   if (view === 'launcher' || view === 'onboarding') {
     return (
-      <Launcher
-        selectedSystem={selectedSystem}
-        setSelectedSystem={setSelectedSystem}
-        onSelectCharacter={(newChar) => {
-          setData(newChar);
-          setSelectedSystem(newChar.system || 'pathfinder');
-          setView('dashboard');
-        }}
-        currentCharacter={data}
-        onOpenDashboard={() => setView('dashboard')}
-        localCharactersList={localCharactersList}
-        refreshLocalCharacters={refreshLocalCharacters}
-        isLoadingLocalChars={isLoadingLocalChars}
-        onOpenVaultModal={() => setIsVaultModalOpen(true)}
-        onOpenBackupModal={() => setIsBackupModalOpen(true)}
-        aiConfig={aiConfig}
-        onOpenAiSettings={() => setIsAiSettingsOpen(true)}
-      />
+      <>
+        <Launcher
+          selectedSystem={selectedSystem}
+          setSelectedSystem={setSelectedSystem}
+          onSelectCharacter={(newChar) => {
+            setData(newChar);
+            setSelectedSystem(newChar.system || 'pathfinder');
+            setView('dashboard');
+          }}
+          currentCharacter={data}
+          onOpenDashboard={() => setView('dashboard')}
+          localCharactersList={localCharactersList}
+          refreshLocalCharacters={refreshLocalCharacters}
+          isLoadingLocalChars={isLoadingLocalChars}
+          onOpenVaultModal={() => setIsVaultModalOpen(true)}
+          onOpenBackupModal={() => setIsBackupModalOpen(true)}
+          onOpenCreateModal={() => setIsCreateModalOpen(true)}
+        />
+
+        <CreateCharacterModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          onCreateCharacter={(newChar) => {
+            setData(newChar);
+            setSelectedSystem(newChar.system);
+            setView('dashboard');
+            setIsCreateModalOpen(false);
+          }}
+        />
+
+        <LocalCharacterVaultModal
+          isOpen={isVaultModalOpen}
+          onClose={() => {
+            setIsVaultModalOpen(false);
+            refreshLocalCharacters();
+          }}
+          currentData={data}
+          onLoadCharacter={(char) => {
+            if (isPathfinder(char)) {
+              char.stats = syncPathfinderStats(char.stats, char.savingThrows);
+            }
+            setData(char);
+            setSelectedSystem(char.system || 'pathfinder');
+            setView('dashboard');
+            refreshLocalCharacters();
+          }}
+          onSaveCurrentSuccess={(savedPath) => {
+            setSaveToast({
+              message: 'Erfolgreich lokal gespeichert!',
+              subMessage: savedPath,
+            });
+            setActiveHistoryRelativePath(savedPath);
+            refreshLocalCharacters();
+            setTimeout(() => setSaveToast(null), 4000);
+          }}
+          onOpenHistoryForCharacter={(charMeta) => {
+            setActiveHistoryRelativePath(charMeta.relativePath);
+            setIsHistoryModalOpen(true);
+          }}
+        />
+
+        <BackupModal
+          isOpen={isBackupModalOpen}
+          onClose={() => setIsBackupModalOpen(false)}
+          currentCharacter={data}
+          selectedSystem={selectedSystem}
+        />
+      </>
     );
   }
 
@@ -365,7 +391,6 @@ export default function App() {
       </div>
 
       <div className="max-w-7xl mx-auto relative z-10">
-        {/* Top Navigation, Character Title, and Tab Switcher */}
         <DashboardHeader
           data={data}
           isEditing={isEditing}
@@ -384,8 +409,7 @@ export default function App() {
           onOpenVault={() => setIsVaultModalOpen(true)}
           onOpenBackup={() => setIsBackupModalOpen(true)}
           onOpenLauncher={() => setView('launcher')}
-          onOpenImport={() => setIsImportModalOpen(true)}
-          onOpenAiSettings={() => setIsAiSettingsOpen(true)}
+          onOpenImport={() => setIsCreateModalOpen(true)}
           onOpenRestModal={() => setIsRestModalOpen(true)}
           presetCharacters={PRESET_CHARACTERS}
           onSelectPreset={(preset) => {
@@ -397,7 +421,6 @@ export default function App() {
           }}
         />
 
-        {/* Tab View Contents */}
         {dashboardTab === 'sheet' ? (
           <DashboardView
             character={data}
@@ -419,13 +442,13 @@ export default function App() {
             isEditing={isEditing}
           />
         ) : dashboardTab === 'skills' ? (
-          <SkillsPage 
+          <SkillsPage
             data={data}
             isEditing={isEditing}
             onUpdateData={updateData}
           />
         ) : dashboardTab === 'calc' ? (
-          <DiceCalculator 
+          <DiceCalculator
             data={data}
           />
         ) : (
@@ -437,7 +460,6 @@ export default function App() {
         )}
       </div>
 
-      {/* Floating Action Buttons */}
       <FloatingActionButtons
         dashboardTab={dashboardTab}
         onToggleOriginalSheet={() => setDashboardTab(dashboardTab === 'original' ? 'sheet' : 'original')}
@@ -447,31 +469,21 @@ export default function App() {
         onOpenRestModal={() => setIsRestModalOpen(true)}
       />
 
-      {/* Footer Branding */}
       <footer className="border-t border-zinc-900 py-12 text-center mt-16">
         <p className="text-[10px] uppercase tracking-[0.4em] text-zinc-700 font-mono">
           Character Reference System // {data.name} v9.0 • Modular Architecture
         </p>
       </footer>
 
-      {/* Modals */}
-      <ImportModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        currentData={data}
-        onConfirmOverwrite={(newData) => {
-          setData(newData);
-          setIsImportModalOpen(false);
+      <CreateCharacterModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreateCharacter={(newChar) => {
+          setData(newChar);
+          setSelectedSystem(newChar.system);
+          setView('dashboard');
+          setIsCreateModalOpen(false);
         }}
-      />
-
-      <AiSettingsModal
-        isOpen={isAiSettingsOpen}
-        onClose={() => {
-          setIsAiSettingsOpen(false);
-          setAiConfig(getSavedAiConfig());
-        }}
-        onSaved={(cfg) => setAiConfig(cfg)}
       />
 
       <CurrencyCalculatorModal
@@ -572,7 +584,6 @@ export default function App() {
         />
       )}
 
-      {/* Save Toast Notification */}
       <AnimatePresence>
         {saveToast && (
           <motion.div
