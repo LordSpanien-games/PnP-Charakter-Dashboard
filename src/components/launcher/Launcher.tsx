@@ -7,21 +7,17 @@ import {
   FolderOpen,
   RefreshCw,
   FileUp,
-  Sparkles,
-  Loader2,
-  Bot,
-  Settings
+  UserPlus
 } from "lucide-react";
-import { CharacterData, GameSystem, LocalCharacterMeta, AiConfig } from "../../types";
+import { CharacterData, GameSystem, LocalCharacterMeta } from "../../types";
 import { isPathfinder, syncPathfinderStats } from "../../utils/pathfinder";
-import { parseCharacterWithAi } from "../../services/aiService";
 import { loadLocalCharacter } from "../../services/characterStorageService";
-import { 
-  FLOKI_DATA, 
-  HARVEY_DATA, 
-  ARMITAGE_DATA, 
-  GHOST_DATA, 
-  RODERICK_DATA 
+import {
+  FLOKI_DATA,
+  HARVEY_DATA,
+  ARMITAGE_DATA,
+  GHOST_DATA,
+  RODERICK_DATA
 } from "../../data";
 
 export interface PresetCharacterInfo {
@@ -155,97 +151,6 @@ export const SYSTEM_OPTIONS: SystemOption[] = [
   }
 ];
 
-export const SYSTEM_SAMPLES: Record<GameSystem, string> = {
-  pathfinder: `Name: Valeros
-Volk: Mensch | Klasse: Kämpfer 5 | Gesinnung: Neutral Gut
-Attribute: ST 18 (+4), GE 14 (+2), KO 16 (+3), IN 10 (+0), WE 12 (+1), CH 10 (+0)
-TP: 54 | RK: 21 (Brustpanzer + Schild) | Initiative: +6
-Rettungswürfe: Zähigkeit +7, Reflex +3, Wille +2
-Basis-Angriffsbonus: +5 | KMB: +9 | KMV: 21
-Waffen:
-- Langschwert +1 Meisterarbeit (+10 Angriff, 1W8+6 Schaden, 19-20/x2)
-- Komposit-Kurzbogen (+7 Angriff, 1W6+4 Schaden, x3)
-Talente: Waffenfokus (Langschwert), Waffenspezialisierung, Heftiger Angriff, Verbesserte Initiative
-Fertigkeiten: Klettern +11, Schwimmen +10, Reiten +8, Wahrnehmung +6`,
-
-  coc7e: `Name: Harvey Walters
-Beruf: Enthüllungsjournalist | Alter: 42
-Attribute: ST 40, KO 50, GR 65, GE 70, ER 75, IN 85, MA 60, BI 80
-Werte: TP 11, Stabilität 60, Magiepunkte 12, Glück 55
-Fertigkeiten:
-- Bibliotheksnutzung: 70%
-- Verborgenes erkennen: 65%
-- Psychologie: 60%
-- Überreden: 65%
-- Ausweichen: 35%
-- Schusswaffen (Handfeuerwaffe): 50%
-Waffen:
-- .38 Revolver (.38 Special): 1W10 Schaden, Reichweite 15m, 1 Angriff
-Inventar: Notizbuch, Presseausweis, Taschenlampe, Füllfederhalter`,
-
-  coc1920: `Name: Dr. Henry Armitage
-Beruf: Chefbibliothekar & Forscher | Alter: 68
-Attribute: ST 35, KO 45, GR 60, GE 40, ER 50, IN 90, MA 75, BI 90
-Werte: TP 10, Stabilität 75, Magiepunkte 15, Glück 45
-Fertigkeiten:
-- Bibliotheksnutzung: 90%
-- Okkultismus: 75%
-- Cthulhu-Mythos: 18%
-- Geschichte: 80%
-- Fremdsprache (Latein): 85%
-- Fremdsprache (Griechisch): 70%
-Inventar: Schlüssel zum Sperrbestand der Miskatonic-Bibliothek, Lesebrille, Notizbuch`,
-
-  shadowrun: `Name: Ghost (Kira Vance)
-Archetyp: Straßensamurai / Cyber-Spezialistin
-Attribute: KON 5, GES 7 (9), REA 5 (7), STÄ 4, CHA 3, INT 5, LOG 4, WIL 4, EDG 4, ESS 2.15
-Initiative: 12 + 3W6 | Limits: Körperlich 8, Geistig 6, Sozid 5
-Zustandsmonitore: Körperlich 11, Geistig 10
-Cyberware:
-- Cyberaugen Stufe 2 (Restlicht, Smartlink, Blitzkompensation)
-- Reflexbooster Stufe 2 (+2 REA, +2W6 Initiative)
-- Titanknochen (+2 Würfel Schadenswiderstand)
-Waffen:
-- Ares Predator V (Schwere Pistole, Smartlink, Schaden 8K, PB -1, RC 0)
-- Katana (Schaden 7K, PB -3)
-Fertigkeiten:
-- Pistolen: 6 (+2 Schwere Pistolen)
-- Klingenwaffen: 5
-- Wahrnehmung: 4
-- Schleichen: 5
-- Athletik-Gruppe: 4`,
-
-  traveller: `Name: Roderick Thorne
-Karriere: Scout (Rang 3 - Leitender Erkunder) | Alter: 38
-Attribute: STR 7 (+0), DEX 9 (+1), END 8 (+0), INT 10 (+1), EDU 9 (+1), SOC 5 (-1)
-Fertigkeiten:
-- Pilot (Raumschiff): 2
-- Astrogation: 2
-- Sensoren: 1
-- Schusswaffen (Energiewaffen): 1
-- Überleben: 2
-- Mechanik: 1
-Ausrüstung:
-- Laserpistole (Schaden 3W6+3)
-- Vakuum-Anzug (Panzerung 8)
-- Hand-Computer / Kommunikator
-Besitz: Anteile an einem Typ S Scout-Schiff (100 Tonnen "Sternenwanderer")`,
-
-  generic: `Name: Alistair
-Rolle: Abenteurer & Waldläufer
-Werte:
-- Lebenspunkte: 30
-- Rüstung: 14
-- Stärke: 14 (+2)
-- Geschicklichkeit: 16 (+3)
-- Konstitution: 12 (+1)
-- Verstand: 13 (+1)
-Waffen:
-- Jagdbogen (1W8+3 Schaden)
-- Kurzschwert (1W6+2 Schaden)
-Ausrüstung: Seil, Fackeln, Rationen, Schlafsack`
-};
-
 export interface LauncherProps {
   selectedSystem: GameSystem;
   setSelectedSystem: (sys: GameSystem) => void;
@@ -257,8 +162,7 @@ export interface LauncherProps {
   isLoadingLocalChars: boolean;
   onOpenVaultModal: () => void;
   onOpenBackupModal: () => void;
-  aiConfig: AiConfig;
-  onOpenAiSettings: () => void;
+  onOpenCreateModal: () => void;
 }
 
 export const Launcher: FC<LauncherProps> = ({
@@ -272,76 +176,12 @@ export const Launcher: FC<LauncherProps> = ({
   isLoadingLocalChars,
   onOpenVaultModal,
   onOpenBackupModal,
-  aiConfig,
-  onOpenAiSettings
+  onOpenCreateModal
 }) => {
-  const [launcherTab, setLauncherTab] = useState<'vault' | 'presets' | 'text' | 'file'>('vault');
-  const [textInput, setTextInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [launcherTab, setLauncherTab] = useState<'vault' | 'presets' | 'file'>('vault');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentSelectedSystemOption = SYSTEM_OPTIONS.find(s => s.id === selectedSystem) || SYSTEM_OPTIONS[0];
-
-  const handlePasteClipboard = async () => {
-    try {
-      if (navigator?.clipboard?.readText) {
-        const text = await navigator.clipboard.readText();
-        if (text) {
-          setTextInput(text);
-        }
-      }
-    } catch (err) {
-      console.warn("Clipboard access not available", err);
-    }
-  };
-
-  const handleLoadSample = () => {
-    const sample = SYSTEM_SAMPLES[selectedSystem];
-    if (sample) {
-      setTextInput(sample);
-    }
-  };
-
-  const parseCharacterText = async () => {
-    const trimmed = textInput.trim();
-    if (!trimmed) return;
-    setIsLoading(true);
-
-    // 1. Direct JSON detection
-    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
-      try {
-        const directJson = JSON.parse(trimmed);
-        if (directJson && directJson.name && (directJson.stats || directJson.characteristics)) {
-          if (isPathfinder(directJson)) {
-            directJson.stats = syncPathfinderStats(directJson.stats, directJson.savingThrows);
-          }
-          onSelectCharacter(directJson);
-          setIsLoading(false);
-          return;
-        }
-      } catch {
-        // Fall through to AI
-      }
-    }
-
-    // 2. AI Parsing
-    try {
-      const parsedData = await parseCharacterWithAi(textInput, selectedSystem, aiConfig);
-      if (isPathfinder(parsedData)) {
-        parsedData.stats = syncPathfinderStats(parsedData.stats, parsedData.savingThrows);
-      }
-      onSelectCharacter(parsedData);
-    } catch (err: any) {
-      console.error("AI Parsing failed", err);
-      const msg = err?.message || "Fehler beim Verarbeiten des Textes.";
-      alert(msg);
-      if (msg.includes("Key") || msg.includes("Schlüssel") || msg.includes("API")) {
-        onOpenAiSettings();
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -365,13 +205,12 @@ export const Launcher: FC<LauncherProps> = ({
 
   return (
     <div className="min-h-screen bg-black text-zinc-300 font-sans flex flex-col items-center justify-start p-4 sm:p-8 relative">
-      {/* Background Ambient Glow */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-orange-900/15 rounded-full blur-[140px]" />
         <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-blue-900/15 rounded-full blur-[140px]" />
       </div>
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25 }}
@@ -383,7 +222,7 @@ export const Launcher: FC<LauncherProps> = ({
             <div className="flex items-center gap-2 mb-2">
               <span className="px-2.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 font-mono text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
                 <Rocket size={13} className="text-orange-400" />
-                System-Launcher & Charakter-Import
+                System-Launcher
               </span>
               <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px] font-mono">
                 6 Regelsysteme
@@ -393,7 +232,7 @@ export const Launcher: FC<LauncherProps> = ({
               P&P <span className="text-orange-500">System-Launcher</span>
             </h1>
             <p className="text-zinc-400 text-xs sm:text-sm mt-1">
-              Wähle dein Spielsystem & importiere bestehende Charaktere (als Freitext/PDF oder JSON) oder wähle eine spielbereite Vorlage.
+              Wähle dein Spielsystem, erstelle einen neuen Charakter oder lade einen bestehenden.
             </p>
           </div>
 
@@ -408,11 +247,21 @@ export const Launcher: FC<LauncherProps> = ({
               <span>Backup & Doku</span>
             </button>
 
+            <button
+              type="button"
+              onClick={onOpenCreateModal}
+              className="flex items-center gap-2 px-3.5 py-3 bg-orange-500 hover:bg-orange-400 text-black font-mono font-bold rounded-2xl text-xs transition-all shadow-lg shadow-orange-500/20 cursor-pointer"
+              title="Neuen Charakter manuell anlegen"
+            >
+              <UserPlus size={15} />
+              <span>Neuen Charakter anlegen</span>
+            </button>
+
             {currentCharacter && (
               <button
                 type="button"
                 onClick={onOpenDashboard}
-                className="flex items-center gap-2.5 px-4 py-3 bg-orange-500 hover:bg-orange-400 text-black font-mono font-bold rounded-2xl text-xs transition-all shadow-lg shadow-orange-500/20 cursor-pointer group"
+                className="flex items-center gap-2.5 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-mono font-bold rounded-2xl text-xs transition-all shadow-sm cursor-pointer group"
                 title="Zurück zum aktuell geladenen Charakterbogen"
               >
                 <span>Aktiven Bogen öffnen: <strong>{currentCharacter.name}</strong></span>
@@ -422,7 +271,7 @@ export const Launcher: FC<LauncherProps> = ({
           </div>
         </div>
 
-        {/* Section 1: Spielsystem auswählen */}
+        {/* Section 1: Spielsystem wählen */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <label className="text-[11px] uppercase tracking-widest text-zinc-400 font-bold font-mono flex items-center gap-2">
@@ -466,7 +315,6 @@ export const Launcher: FC<LauncherProps> = ({
             })}
           </div>
 
-          {/* System Info Banner */}
           <div className="p-3 bg-zinc-950/60 border border-zinc-800/80 rounded-xl flex items-center justify-between gap-3 text-xs font-mono text-zinc-400">
             <div className="flex items-center gap-2 truncate">
               <span className="text-orange-400 font-bold">Besonderheiten ({currentSelectedSystemOption.name}):</span>
@@ -475,15 +323,14 @@ export const Launcher: FC<LauncherProps> = ({
           </div>
         </div>
 
-        {/* Section 2: Import-Methode & Aktionen */}
+        {/* Section 2: Charakter laden */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <label className="text-[11px] uppercase tracking-widest text-zinc-400 font-bold font-mono flex items-center gap-2">
               <span className="w-5 h-5 rounded-full bg-zinc-800 text-zinc-300 flex items-center justify-center text-[10px] font-bold">2</span>
-              <span>Bestehenden Charakter importieren oder starten</span>
+              <span>Bestehenden Charakter laden</span>
             </label>
 
-            {/* Tab Selector */}
             <div className="flex items-center gap-1 p-1 bg-zinc-950 rounded-xl border border-zinc-800 text-xs font-mono">
               <button
                 type="button"
@@ -497,15 +344,6 @@ export const Launcher: FC<LauncherProps> = ({
               >
                 <FolderOpen size={13} />
                 <span>Lokale Charaktere ({localCharactersList.length})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setLauncherTab('text')}
-                className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
-                  launcherTab === 'text' ? 'bg-orange-500 text-black shadow-sm' : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                Text / KI-Import
               </button>
               <button
                 type="button"
@@ -528,98 +366,10 @@ export const Launcher: FC<LauncherProps> = ({
             </div>
           </div>
 
-          {/* TAB CONTENT: Text / KI Import */}
-          {launcherTab === 'text' && (
-            <div className="bg-zinc-950/80 border border-zinc-800/90 rounded-2xl p-5 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs text-zinc-400 font-mono">
-                  Füge hier beliebigen Charaktertext ein (z. B. aus PDF, Word, Chummer, Rollenspiel-Notizen):
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handlePasteClipboard}
-                    className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-lg text-[11px] font-mono transition-all cursor-pointer"
-                    title="Text direkt aus der Zwischenablage einfügen"
-                  >
-                    Aus Zwischenablage einfügen
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleLoadSample}
-                    className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-700 rounded-lg text-[11px] font-mono transition-all cursor-pointer"
-                    title={`Beispieldaten für ${currentSelectedSystemOption.name} einsetzen`}
-                  >
-                    Beispiel-Text laden
-                  </button>
-                  {textInput && (
-                    <button
-                      type="button"
-                      onClick={() => setTextInput("")}
-                      className="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-red-400 rounded-lg text-[11px] font-mono transition-all cursor-pointer"
-                    >
-                      Leeren
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <textarea
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                placeholder={`Kopiere deine Charakterwerte hier hinein...\n(z.B. Name, Attribute, Rettungswürfe/Fertigkeiten, Waffen, Rüstung für ${currentSelectedSystemOption.name})`}
-                className="w-full h-44 bg-black/80 border border-zinc-800 rounded-xl p-4 text-xs sm:text-sm font-mono text-zinc-200 focus:outline-none focus:border-orange-500 transition-colors resize-none leading-relaxed"
-              />
-
-              {/* AI Provider Indicator & Selector */}
-              <div className="flex items-center justify-between p-3 bg-zinc-900/60 border border-zinc-800/80 rounded-xl">
-                <div className="flex items-center gap-2.5">
-                  <div className={`p-1.5 rounded-lg ${aiConfig.provider === 'openrouter' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'}`}>
-                    <Bot size={15} />
-                  </div>
-                  <div className="text-left">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-zinc-200">
-                        {aiConfig.provider === 'openrouter' ? 'OpenRouter' : 'Google Gemini'}
-                      </span>
-                      {aiConfig.provider === 'openrouter' && (
-                        <span className="text-[9px] bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-1.5 py-0.5 rounded-full font-mono">
-                          Kostenlose Modelle aktiv
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-zinc-500 font-mono block truncate max-w-[200px] sm:max-w-md">
-                      {aiConfig.provider === 'openrouter' ? aiConfig.openrouterModel : aiConfig.geminiModel}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={onOpenAiSettings}
-                  className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-lg text-xs font-mono flex items-center gap-1.5 transition-colors border border-zinc-700 shrink-0 cursor-pointer"
-                >
-                  <Settings size={12} />
-                  <span>KI-Modell / Key</span>
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={parseCharacterText}
-                disabled={isLoading || !textInput.trim()}
-                className="w-full py-4 bg-orange-500 hover:bg-orange-400 text-black font-mono font-black uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2.5 shadow-lg shadow-orange-500/20 disabled:opacity-40 disabled:hover:bg-orange-500 cursor-pointer text-sm"
-              >
-                {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
-                <span>Charakter mit {aiConfig.provider === 'openrouter' ? 'OpenRouter' : 'Gemini'} für {currentSelectedSystemOption.name} analysieren</span>
-              </button>
-            </div>
-          )}
-
           {/* TAB CONTENT: JSON File Upload */}
           {launcherTab === 'file' && (
             <div className="bg-zinc-950/80 border border-zinc-800/90 rounded-2xl p-6">
-              <div 
+              <div
                 className="p-10 border-2 border-dashed border-zinc-800 hover:border-orange-500/60 rounded-2xl text-center transition-all group cursor-pointer bg-zinc-900/30"
                 onClick={() => fileInputRef.current?.click()}
               >
@@ -673,7 +423,7 @@ export const Launcher: FC<LauncherProps> = ({
             </div>
           )}
 
-          {/* TAB CONTENT: Vault (Local Files in characters/) */}
+          {/* TAB CONTENT: Vault (Local Files) */}
           {launcherTab === 'vault' && (
             <div className="bg-zinc-950/80 border border-zinc-800/90 rounded-2xl p-5 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80">
@@ -715,7 +465,15 @@ export const Launcher: FC<LauncherProps> = ({
               {localCharactersList.length === 0 ? (
                 <div className="text-center py-10 border border-dashed border-zinc-800 rounded-xl">
                   <FolderOpen size={32} className="mx-auto text-zinc-600 mb-2" />
-                  <p className="text-xs text-zinc-400 font-mono">Noch keine Charakterdateien in ./characters/ gefunden.</p>
+                  <p className="text-xs text-zinc-400 font-mono mb-4">Noch keine Charakterdateien in ./characters/ gefunden.</p>
+                  <button
+                    type="button"
+                    onClick={onOpenCreateModal}
+                    className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-400 text-black font-mono font-bold rounded-xl text-xs transition-all cursor-pointer mx-auto"
+                  >
+                    <UserPlus size={14} />
+                    Ersten Charakter anlegen
+                  </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
