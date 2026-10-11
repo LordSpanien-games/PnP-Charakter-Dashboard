@@ -1,0 +1,304 @@
+{
+  "system": "traveller",
+  "name": "Roderick Vance",
+  "subTitle": "Ex-Scout (Survey) • 4 Dienstzeiten • Alter 34",
+  "stats": [
+    {
+      "label": "Ausdauer (END)",
+      "value": 8
+    },
+    {
+      "label": "Stärke (STR)",
+      "value": 7
+    },
+    {
+      "label": "Geschick (DEX)",
+      "value": 9
+    },
+    {
+      "label": "Panzerung",
+      "value": "8"
+    },
+    {
+      "label": "Strahlenschutz",
+      "value": "45 RAD"
+    },
+    {
+      "label": "Schiff",
+      "value": "Scout Typ S"
+    }
+  ],
+  "characteristics": [
+    {
+      "label": "STR",
+      "value": 7
+    },
+    {
+      "label": "DEX",
+      "value": 9
+    },
+    {
+      "label": "END",
+      "value": 8
+    },
+    {
+      "label": "INT",
+      "value": 10
+    },
+    {
+      "label": "EDU",
+      "value": 9
+    },
+    {
+      "label": "SOC",
+      "value": 6
+    }
+  ],
+  "skills": [
+    {
+      "name": "Pilot (Raumschiff)",
+      "value": 2,
+      "note": "DEX"
+    },
+    {
+      "name": "Astrogation",
+      "value": 2,
+      "note": "EDU"
+    },
+    {
+      "name": "Schusswaffen (Energie)",
+      "value": 2,
+      "note": "DEX"
+    },
+    {
+      "name": "Schusswaffen (Pistolen)",
+      "value": 1,
+      "note": "DEX"
+    },
+    {
+      "name": "Elektronik (Sensoren)",
+      "value": 2,
+      "note": "INT"
+    },
+    {
+      "name": "Mechanik",
+      "value": 1,
+      "note": "EDU"
+    },
+    {
+      "name": "Technik (Antrieb)",
+      "value": 1,
+      "note": "EDU"
+    },
+    {
+      "name": "Schwerelosigkeit (Zero-G)",
+      "value": 1,
+      "note": "DEX"
+    },
+    {
+      "name": "Überleben",
+      "value": 1,
+      "note": "END"
+    },
+    {
+      "name": "Nahkampf (Klinge)",
+      "value": 1,
+      "note": "STR"
+    },
+    {
+      "name": "Straßenwissen",
+      "value": 1,
+      "note": "SOC"
+    },
+    {
+      "name": "Diplomatie & Verhandeln",
+      "value": 1,
+      "note": "SOC"
+    },
+    {
+      "name": "Medizin",
+      "value": 0,
+      "note": "EDU"
+    }
+  ],
+  "weapons": {
+    "melee": [
+      {
+        "name": "Schock-Schlagstock (TL9)",
+        "attack": "+2",
+        "damage": "2D6+3 Betäubung",
+        "critical": "Lähmung",
+        "note": "Nahkampf • AP 2 • 20 Ladungen",
+        "range": "Nahkampf"
+      },
+      {
+        "name": "Monofilament-Klinge (TL12)",
+        "attack": "+2",
+        "damage": "1D6+3 (AP 4)",
+        "critical": "Schnitt",
+        "note": "Durchdringt schwere Panzerung",
+        "range": "Nahkampf"
+      }
+    ],
+    "ranged": [
+      {
+        "name": "Laserkarabiner (TL11)",
+        "attack": "+3",
+        "damage": "4D6",
+        "critical": "Verbrennung",
+        "note": "Reichweite 300m • Rückstoßfrei (Zero-G) • 50 Schuss Powerpack",
+        "range": "300m"
+      },
+      {
+        "name": "Gauss-Pistole (TL13)",
+        "attack": "+2",
+        "damage": "3D6-3 (AP 4)",
+        "critical": "Präzision",
+        "note": "Reichweite 20m • 40 Schuss Magazin • Auto 2",
+        "range": "20m"
+      },
+      {
+        "name": "Schrotflinte (TL6)",
+        "attack": "+2",
+        "damage": "4D6 (Nah) / 2D6 (Fern)",
+        "critical": "Wucht",
+        "note": "Reichweite 25m • Streuschuss • 6 Schuss",
+        "range": "25m"
+      }
+    ]
+  },
+  "combos": [
+    {
+      "id": "1",
+      "title": "Notfall-Ausweichmanöver (Schiffskampf)",
+      "description": "Reaktions-Ausweichflug im Typ-S Scout gegen feindliches Waffenfeuer. Pilot (Raumschiff) + DEX Wurf gegen Standard SG 8+.",
+      "weapons": [
+        {
+          "name": "Pilot (Raumschiff) + DEX",
+          "roll": "2D6+3 (Stufe 2 + DM +1)",
+          "damage": "Effekt reduziert Treffer-Schaden",
+          "notes": [
+            "Erfolgswert zieht direkten Schaden von Schiffshülle ab",
+            "Erfordert Antriebskraft"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2",
+      "title": "Feuerstoß-Salve (Auto 2)",
+      "description": "Gauss-Pistole Salvenfeuer. Feuert 3 Schuss in schneller Folge auf ein Einzelziel.",
+      "table": {
+        "headers": [
+          "Feuermodus",
+          "Wurf (2D6)",
+          "Munitionsverbrauch",
+          "Auswirkung"
+        ],
+        "rows": [
+          [
+            "Einzelschuss",
+            "2D6 + 2 (DEX + Skill)",
+            "1 Schuss",
+            "3D6-3 (AP 4)"
+          ],
+          [
+            "Feuerstoß (Auto 2)",
+            "2D6 + 4 (+2 DM Treffer)",
+            "3 Schuss",
+            "3D6-3 (AP 4) + höhere Trefferchance"
+          ],
+          [
+            "Schadens-Salve",
+            "2D6 + 2",
+            "3 Schuss",
+            "3D6-3 + 2 Extra-Schaden"
+          ]
+        ]
+      },
+      "notes": [
+        "Panzerbrechend AP 4 ignoriert 4 Rüstungspunkte",
+        "Magazin: 40 Schuss"
+      ]
+    },
+    {
+      "id": "3",
+      "title": "Hyperraum-Sprungberechnung",
+      "description": "Astrogatorische Koordinatenberechnung für 1 Parsec Hyperraumsprung durch das Sprungtor.",
+      "weapons": [
+        {
+          "name": "Astrogation + EDU",
+          "roll": "2D6+3 (Stufe 2 + DM +1)",
+          "damage": "Sprungpräzision",
+          "notes": [
+            "SG 8+ Durchschnitt (Dauer: 15-60 Minuten)",
+            "Fehlschlag erzeugt Fehlsprung (Misjump-Risiko)"
+          ]
+        }
+      ],
+      "notes": [
+        "Erfordert funktionstüchtigen Bordcomputer und Sprungantrieb"
+      ]
+    }
+  ],
+  "abilities": [
+    {
+      "name": "Typ S Scout/Courier Schiffsbriefe",
+      "type": "item",
+      "effect": "Besitz von 2 Schiff-Anteilen am Scout-Schiff 'Seeker IV'. Berechtigt zur kostenlosen Nutzung imperialer Scout-Basen, Wartungshangars und Treibstoff-Raffinerien."
+    },
+    {
+      "name": "TL 10 Kevlar-Mesh Panzeranzug",
+      "type": "item",
+      "effect": "Panzerung 8 gegen physische und ballistische Angriffe. Integriertes Comms-HUD mit Sensorüberlagerung und Biosensoren."
+    },
+    {
+      "name": "Grav-Gürtel TL 12",
+      "type": "item",
+      "effect": "Ermöglicht freies Schweben und präzise Manövrierung in Schwerelosigkeit (Zero-G) sowie sicheres Abfedern bei Stürzen bis zu 1.5 G."
+    },
+    {
+      "name": "Scout-Veteranen-Instinkt",
+      "type": "trait",
+      "effect": "Ehemaliger Scout des IISS (Imperial Interstellar Scout Service). Erhält permanent +1 DM auf alle Überlebens-, Orientierungs- und Sensorproben auf unkartierten Welten."
+    },
+    {
+      "name": "Muster-Out Pensionsanspruch",
+      "type": "trait",
+      "effect": "Gesicherter Sold und Ruhestandssold des Imperialen Dienstes. Monatlicher Auszahlungsanspruch über das Galaktische Banknetzwerk."
+    }
+  ],
+  "party": [
+    {
+      "name": "Dr. Aris Thorne",
+      "occupation": "Schiffsarzt / Scholar",
+      "race": "Mensch (Solomani)"
+    },
+    {
+      "name": "Mira Novak",
+      "occupation": "Bordingenieurin / Ex-Marine",
+      "race": "Mensch (Imperial)"
+    },
+    {
+      "name": "Kaelen Voss",
+      "occupation": "Handelsagent / Astrogator",
+      "race": "Vargr"
+    }
+  ],
+  "currency": {
+    "amount": 34500,
+    "unit": "Cr",
+    "lifestyle": "Mittelstand (Middle Passage)",
+    "lifestyleCost": 1000,
+    "history": [
+      {
+        "id": "1",
+        "timestamp": "08:30",
+        "description": "Scout-Dienst Abfindung & Sold",
+        "amount": 34500,
+        "type": "income",
+        "balanceAfter": 34500
+      }
+    ]
+  }
+}

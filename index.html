@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Universal P&P Dashboard</title>
+    <meta name="description" content="An AI-powered, system-agnostic character dashboard for Pen & Paper RPGs, supporting Pathfinder, Call of Cthulhu 7e & 1920s, Shadowrun, and Traveller." />
+    <meta property="og:title" content="Universal P&P Dashboard" />
+    <meta property="og:description" content="An AI-powered, system-agnostic character dashboard for Pen & Paper RPGs, supporting Pathfinder, Call of Cthulhu 7e & 1920s, Shadowrun, and Traveller." />
+    <script>
+      // Polyfill environment globals to guarantee reliable offline browser execution
+      window.global = window;
+      window.process = window.process || {
+        env: { NODE_ENV: 'development' },
+        versions: { node: '20.0.0' },
+        version: 'v20.0.0',
+        platform: 'browser'
+      };
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
