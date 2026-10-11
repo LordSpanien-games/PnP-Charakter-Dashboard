@@ -1,5 +1,5 @@
 import React, { FC, useState } from "react";
-import { X, UserPlus, ChevronRight } from "lucide-react";
+import { X, UserPlus, ChevronRight, ChevronLeft } from "lucide-react";
 import { CharacterData, GameSystem } from "../types";
 import { SYSTEM_OPTIONS } from "./launcher/Launcher";
 
@@ -62,6 +62,7 @@ const SYSTEM_DEFAULTS: Record<GameSystem, Partial<CharacterData>> = {
       { label: "Trefferpunkte", value: "10" },
       { label: "Geistige Stabilität", value: "60" },
       { label: "Glück", value: "50" },
+      { label: "Magiepunkte", value: "10" },
     ],
     characteristics: [
       { label: "Stärke (ST)", value: 50 },
@@ -136,22 +137,29 @@ export const CreateCharacterModal: FC<CreateCharacterModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleClose = () => {
+    setStep(1);
+    setName("");
+    setSubTitle("");
+    setSelectedSystem("pathfinder");
+    onClose();
+  };
+
   const handleCreate = () => {
     if (!name.trim()) return;
     const defaults = SYSTEM_DEFAULTS[selectedSystem];
     const newChar: CharacterData = {
       system: selectedSystem,
       name: name.trim(),
-      subTitle: subTitle.trim() || defaults.subTitle || "",
-      stats: defaults.stats || [],
-      characteristics: defaults.characteristics || [],
-      skills: defaults.skills || [],
-      weapons: defaults.weapons || { melee: [], ranged: [] },
-      combos: defaults.combos || [],
-      abilities: defaults.abilities || [],
+      subTitle: subTitle.trim() || (defaults.subTitle as string) || "",
+      stats: (defaults.stats as any) || [],
+      characteristics: (defaults.characteristics as any) || [],
+      skills: [],
+      weapons: { melee: [], ranged: [] },
+      combos: [],
+      abilities: [],
     };
     onCreateCharacter(newChar);
-    // Reset
     setStep(1);
     setName("");
     setSubTitle("");
@@ -163,34 +171,40 @@ export const CreateCharacterModal: FC<CreateCharacterModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
       <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-lg shadow-2xl">
-        {/* Header */}
+
         <div className="flex items-center justify-between p-6 border-b border-zinc-800">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center">
               <UserPlus size={18} className="text-orange-400" />
             </div>
             <div>
-              <h3 className="text-base font-black text-white tracking-tight">
+              <h3 className="text-base font-black text-white tracking-tight font-mono">
                 NEUEN CHARAKTER ANLEGEN
               </h3>
               <p className="text-xs text-zinc-500 font-mono">
-                Schritt {step} von 2
+                Schritt {step} von 2 – {step === 1 ? "Spielsystem wählen" : "Name & Beschreibung"}
               </p>
             </div>
           </div>
           <button
-            onClick={onClose}
-            className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800"
+            onClick={handleClose}
+            className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors"
           >
             <X size={16} />
           </button>
         </div>
 
+        <div className="flex px-6 pt-4 gap-2">
+          <div className={`h-1 flex-1 rounded-full transition-colors ${step >= 1 ? 'bg-orange-500' : 'bg-zinc-800'}`} />
+          <div className={`h-1 flex-1 rounded-full transition-colors ${step >= 2 ? 'bg-orange-500' : 'bg-zinc-800'}`} />
+        </div>
+
         <div className="p-6 space-y-5">
+
           {step === 1 && (
             <>
               <p className="text-xs text-zinc-400 font-mono">
-                Wähle das Spielsystem für deinen neuen Charakter:
+                Für welches Spielsystem soll der Charakter angelegt werden?
               </p>
               <div className="grid grid-cols-1 gap-2">
                 {SYSTEM_OPTIONS.map((sys) => (
@@ -207,7 +221,7 @@ export const CreateCharacterModal: FC<CreateCharacterModalProps> = ({
                       <div className="text-sm font-bold font-mono">{sys.name}</div>
                       <div className="text-xs text-zinc-500 mt-0.5">{sys.tagline}</div>
                     </div>
-                    <span className="text-[10px] font-mono border border-current rounded px-1.5 py-0.5 opacity-70">
+                    <span className="text-[10px] font-mono border border-current rounded px-1.5 py-0.5 opacity-70 shrink-0 ml-3">
                       {sys.badge}
                     </span>
                   </button>
@@ -228,12 +242,10 @@ export const CreateCharacterModal: FC<CreateCharacterModalProps> = ({
                 Gib deinem Charakter einen Namen und eine kurze Beschreibung:
               </p>
 
-              {/* System Badge */}
               <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-mono font-bold ${systemInfo?.activeColor}`}>
                 {systemInfo?.name} · {systemInfo?.badge}
               </div>
 
-              {/* Name */}
               <div>
                 <label className="block text-[10px] text-zinc-400 uppercase tracking-wider mb-1.5 font-mono font-bold">
                   Charaktername *
@@ -245,11 +257,10 @@ export const CreateCharacterModal: FC<CreateCharacterModalProps> = ({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && name.trim() && handleCreate()}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 font-bold placeholder:text-zinc-600"
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 font-bold placeholder:text-zinc-600 transition-colors"
                 />
               </div>
 
-              {/* Subtitle */}
               <div>
                 <label className="block text-[10px] text-zinc-400 uppercase tracking-wider mb-1.5 font-mono font-bold">
                   Klasse / Beruf / Beschreibung
@@ -259,18 +270,27 @@ export const CreateCharacterModal: FC<CreateCharacterModalProps> = ({
                   placeholder={SYSTEM_DEFAULTS[selectedSystem].subTitle as string}
                   value={subTitle}
                   onChange={(e) => setSubTitle(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 placeholder:text-zinc-600"
+                  onKeyDown={(e) => e.key === "Enter" && name.trim() && handleCreate()}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 placeholder:text-zinc-600 transition-colors"
                 />
                 <p className="text-[10px] text-zinc-600 mt-1 font-mono">
                   Optional · Kann später im Dashboard bearbeitet werden
                 </p>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-[11px] text-zinc-400 font-mono">
+                <span className="text-zinc-300 font-bold">ℹ️ Startwerte:</span>{" "}
+                Der Charakter wird mit den Standard-Grundwerten für{" "}
+                <span className="text-orange-400">{systemInfo?.name}</span> angelegt.
+                Alle Werte können im Dashboard bearbeitet werden.
+              </div>
+
+              <div className="flex gap-3 pt-1">
                 <button
                   onClick={() => setStep(1)}
-                  className="px-4 py-2.5 border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-500 font-mono font-bold rounded-xl text-sm transition-all"
+                  className="flex items-center gap-1.5 px-4 py-2.5 border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-500 font-mono font-bold rounded-xl text-sm transition-all"
                 >
+                  <ChevronLeft size={15} />
                   Zurück
                 </button>
                 <button
@@ -279,7 +299,7 @@ export const CreateCharacterModal: FC<CreateCharacterModalProps> = ({
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-black font-mono font-bold rounded-xl text-sm transition-all"
                 >
                   <UserPlus size={15} />
-                  Charakter erstellen
+                  Charakter erstellen & öffnen
                 </button>
               </div>
             </>
