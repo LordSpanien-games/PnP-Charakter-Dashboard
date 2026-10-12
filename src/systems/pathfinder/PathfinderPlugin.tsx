@@ -1,4 +1,5 @@
 import React from "react";
+import { Info, Plus, Minus } from "lucide-react";
 import { SystemPlugin, AttributePool } from "../../core/SystemPlugin";
 import { GenericCharacter, createEmptyGenericCharacter, InventoryItem } from "../../core/types";
 import { rollPool, roll4d6DropLowest } from "../../core/dice";
@@ -19,6 +20,8 @@ import {
   getChannelEnergy,
   getBardicPerformanceRounds,
   getStunningFistUses,
+  parseLegacyWeaponDamage,
+  parseMagicBonusFromName,
   PATHFINDER_CLASSES,
   PATHFINDER_RACES,
 } from "./pathfinderRules";
@@ -118,59 +121,93 @@ export const PathfinderPlugin: SystemPlugin = {
 
     const char = createBase(raw.name || "Unbenannt", raw.subTitle, attrs);
 
-    const hpStat = (raw.stats || []).find((s: any) => (s.label || "").toLowerCase().includes("trefferpunkte"));
+    // --- Trefferpunkte inkl. bereits erlittenem Schaden übernehmen ---
+    const hpStat = (raw.stats || []).find(
+      (s: any) => (s.label || "").toLowerCase().includes("trefferpunkte") || (s.label || "").toUpperCase() === "TP"
+    );
     if (hpStat) {
-      const hp = parseInt(String(hpStat.value).replace(/[^0-9-]/g, ""), 10) || 1;
-      char.resources.hp = { current: hp, max: hp };
+      const rawVal = typeof hpStat.value === "number" ? hpStat.value : parseInt(String(hpStat.value).replace(/[^0-9-]/g, ""), 10);
+      const maxHp = isNaN(rawVal) ? 1 : rawVal;
+      const damageTaken = Number(hpStat.damage) || 0;
+      char.resources.hp = { current: Math.max(0, maxHp - damageTaken), max: maxHp };
     }
 
-    const sub = (raw.subTitle || "").toLowerCase();
-    const levelMatch = sub.match(/(?:level|stufe)\s*(\d+)/);
-    char.systemData.level = levelMatch ? parseInt(levelMatch[1], 10) : 1;
+    // --- Rasse bestimmen: zuerst direktes "race"-Feld, dann Text-Suche als Fallback ---
+    const combinedText = [raw.race, raw.level, raw.subTitle].filter(Boolean).join(" ").toLowerCase();
+
+    let raceId = "human";
+    if (raw.race) {
+      const direct = Object.entries(PATHFINDER_RACES).find(
+        ([, r]) => r.name.toLowerCase() === String(raw.race).toLowerCase()
+      );
+      if (direct) raceId = direct[0];
+    }
+    if (raceId === "human") {
+      const textMatch = Object.entries(PATHFINDER_RACES).find(([, r]) => combinedText.includes(r.name.toLowerCase()));
+      if (textMatch) raceId = textMatch[0];
+    }
+    char.systemData.raceId = raceId;
+
+    // --- Level & Klasse bestimmen: zuerst direktes "level"-Feld (z.B. "Dieb 9"), dann subTitle ---
+    const levelSource = (raw.level ? String(raw.level) : (raw.subTitle || "")).toLowerCase();
+    const levelNumMatch = levelSource.match(/(\d+)/);
+    const level = levelNumMatch ? parseInt(levelNumMatch[1], 10) : 1;
 
     const classMatch = Object.entries(PATHFINDER_CLASSES).find(([, c]) =>
-      sub.includes(c.name.toLowerCase().split(" ")[0].replace(/[^a-zäöü]/gi, ""))
+      c.aliases.some((alias) => levelSource.includes(alias) || combinedText.includes(alias))
     );
+    char.systemData.level = level;
     char.systemData.classId = classMatch ? classMatch[0] : "fighter";
 
-    const raceMatch = Object.entries(PATHFINDER_RACES).find(([, r]) => sub.includes(r.name.toLowerCase()));
-    char.systemData.raceId = raceMatch ? raceMatch[0] : "human";
-
-    const migrateWeapon = (w: any, isMelee: boolean): InventoryItem => ({
-      id: makeId(),
-      name: w.name,
-      category: "weapon",
-      location: "equipped",
-      isActiveWeapon: true,
-      sourceReference: w.sourceReference,
-      weaponData: {
-        isMelee,
-        isFinesse: !!w.isFinesse,
-        isLight: !!w.isLight,
-        magicBonus: w.magicBonus ?? 0,
-        baseDice: w.baseDice || "1W6",
-        damageAttribute: w.damageAttribute === "GE" ? "GE" : isMelee ? "ST" : "NONE",
-        sneakAttackBonusAttack: w.sneakAttackBonus ?? 0,
-        sneakAttackBonusDamage: w.sneakAttackDamageBonus ?? 0,
-        weaponSlot: "primary",
-      },
-    });
+    // --- Waffen migrieren: Schadens-String zerlegen, Magie-Bonus aus dem Namen lesen ---
+    const migrateWeapon = (w: any, isMelee: boolean): InventoryItem => {
+      const { baseDice, extraDamage } = parseLegacyWeaponDamage(w.damage);
+      const magicBonus = w.magicBonus ?? parseMagicBonusFromName(w.name || "");
+      return {
+        id: makeId(),
+        name: w.name,
+        category: "weapon",
+        location: "equipped",
+        isActiveWeapon: true,
+        notes: w.note || w.notes,
+        sourceReference: w.sourceReference || w.page,
+        weaponData: {
+          isMelee,
+          isFinesse: !!w.isFinesse,
+          isLight: !!w.isLight,
+          magicBonus,
+          baseDice,
+          extraDamage,
+          damageAttribute: w.damageAttribute === "GE" ? "GE" : isMelee ? "ST" : "NONE",
+          // Diese beiden Werte sind in älteren Exporten oft nur als Freitext in "note"
+          // vorhanden und können nicht automatisch erkannt werden - bitte unten im
+          // Inventar-Editor einmalig nachtragen, danach bleiben sie dauerhaft gespeichert.
+          sneakAttackBonusAttack: w.sneakAttackBonus ?? 0,
+          sneakAttackBonusDamage: w.sneakAttackDamageBonus ?? 0,
+          weaponSlot: "primary",
+        },
+      };
+    };
 
     char.inventory = [
       ...(raw.weapons?.melee || []).map((w: any) => migrateWeapon(w, true)),
       ...(raw.weapons?.ranged || []).map((w: any) => migrateWeapon(w, false)),
-      ...((raw.inventory || []).map((it: any) => ({
-        id: makeId(),
-        name: it.name,
-        category: it.category || "gear",
-        quantity: it.quantity ?? 1,
-        notes: it.notes,
-        sourceReference: it.page || it.sourceReference,
-        location: it.status === "stored" ? "stored" : "equipped",
-        charges: it.maxUses
-          ? { max: it.maxUses, current: it.currentUses ?? it.maxUses, rechargeType: "rest" }
-          : undefined,
-      }))),
+      // Items aus raw.inventory, die bereits Waffen sind, NICHT doppelt übernehmen
+      // (manche Exporte enthalten Waffen sowohl in raw.weapons als auch in raw.inventory)
+      ...((raw.inventory || [])
+        .filter((it: any) => it.category !== "weapon")
+        .map((it: any) => ({
+          id: makeId(),
+          name: it.name,
+          category: it.category || "gear",
+          quantity: it.quantity ?? 1,
+          notes: it.notes,
+          sourceReference: it.page || it.sourceReference,
+          location: it.status === "stored" ? "stored" : "equipped",
+          charges: it.maxUses
+            ? { max: it.maxUses, current: it.currentUses ?? it.maxUses, rechargeType: "rest" }
+            : undefined,
+        }))),
     ];
 
     char.skills = (raw.skills || []).map((s: any) => ({ name: s.name, value: s.value, notes: s.note }));
@@ -250,7 +287,24 @@ export const PathfinderPlugin: SystemPlugin = {
       onUpdate({ inventory: [...character.inventory, base] });
     };
 
-    // Live-Berechnung der aktiven Kampfwaffe(n)
+    // Jederzeit nutzbare Verbrauchs-/Ladungs-Buttons (auch außerhalb des Bearbeitungsmodus)
+    const adjustQuantity = (id: string, delta: number) => {
+      onUpdate({
+        inventory: character.inventory.map((it) =>
+          it.id === id ? { ...it, quantity: Math.max(0, (it.quantity ?? 0) + delta) } : it
+        ),
+      });
+    };
+    const adjustCharge = (id: string, delta: number) => {
+      onUpdate({
+        inventory: character.inventory.map((it) => {
+          if (it.id !== id || !it.charges) return it;
+          const next = Math.min(it.charges.max, Math.max(0, it.charges.current + delta));
+          return { ...it, charges: { ...it.charges, current: next } };
+        }),
+      });
+    };
+
     const singleWeaponResults = !isTwoWeaponMode
       ? activeWeapons.map((item) =>
           calculateWeaponStats(
@@ -449,7 +503,7 @@ export const PathfinderPlugin: SystemPlugin = {
           </div>
         )}
 
-        {/* Aktive Kampfwaffen - Anzeige */}
+        {/* Aktive Kampfwaffen - Live-Berechnung */}
         <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
           <div className="text-xs font-mono font-bold text-zinc-300 mb-1">
             Aktive Kampfwaffen {sneakAttackActive && "(mit hinterhältigem Angriff)"}
@@ -516,6 +570,11 @@ export const PathfinderPlugin: SystemPlugin = {
                   ) : (
                     <span className="text-sm font-bold text-white flex items-center gap-1.5">
                       {item.name}
+                      {item.notes && (
+                        <span title={item.notes} className="text-zinc-500 hover:text-amber-400 cursor-help">
+                          <Info size={13} />
+                        </span>
+                      )}
                       {item.sourceReference && (
                         <span className="text-[9px] text-amber-400/80 bg-amber-950/20 border border-amber-900/30 px-1 py-0.5 rounded">
                           {item.sourceReference}
@@ -525,7 +584,7 @@ export const PathfinderPlugin: SystemPlugin = {
                   )}
 
                   {isEditing && (
-                    <button onClick={() => removeInventoryItem(item.id)} className="text-xs text-red-400 font-mono">Entfernen</button>
+                    <button onClick={() => removeInventoryItem(item.id)} className="text-xs text-red-400 font-mono shrink-0">Entfernen</button>
                   )}
                 </div>
 
@@ -580,7 +639,7 @@ export const PathfinderPlugin: SystemPlugin = {
                     <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
                       <input type="checkbox" checked={!!item.weaponData?.isLight}
                         onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, isLight: e.target.checked } })} />
-                      Leicht (reduziert TWF-Abzug)
+                      Leicht (TWF)
                     </label>
                     <div>
                       <label className="block text-[9px] text-zinc-500">Schaden (W-Formel)</label>
@@ -592,6 +651,24 @@ export const PathfinderPlugin: SystemPlugin = {
                       <label className="block text-[9px] text-zinc-500">Magie-Bonus</label>
                       <input type="number" value={item.weaponData?.magicBonus ?? 0}
                         onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, magicBonus: Number(e.target.value) } })}
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] text-zinc-500">Zusatzschaden (z.B. +1W6 Eis)</label>
+                      <input value={item.weaponData?.extraDamage || ""} placeholder="+1W6 Feuer"
+                        onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, extraDamage: e.target.value || undefined } })}
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] text-zinc-500">Schurkenbonus Angriff (HA)</label>
+                      <input type="number" value={item.weaponData?.sneakAttackBonusAttack ?? 0}
+                        onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, sneakAttackBonusAttack: Number(e.target.value) } })}
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] text-zinc-500">Schurkenbonus Schaden (HA)</label>
+                      <input type="number" value={item.weaponData?.sneakAttackBonusDamage ?? 0}
+                        onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, sneakAttackBonusDamage: Number(e.target.value) } })}
                         className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
                     </div>
                   </div>
@@ -644,20 +721,47 @@ export const PathfinderPlugin: SystemPlugin = {
                         className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-white"
                       />
                     </div>
+
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
+                      <span>Beschreibung / Effekt (für Info-Symbol)</span>
+                    </div>
+                    <textarea
+                      value={item.notes || ""}
+                      onChange={(e) => updateInventoryItem(item.id, { notes: e.target.value || undefined })}
+                      placeholder="z.B. Fängt 2x/Tag ein Geschoss ab, das auf den Charakter gefeuert wird."
+                      className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-white font-mono min-h-[50px]"
+                    />
                   </div>
                 )}
 
-                {!isEditing && (
+                {/* Immer sichtbare Schnellaktionen - auch außerhalb des Bearbeitungsmodus */}
+                <div className="flex items-center justify-between pt-1 border-t border-zinc-800">
                   <div className="text-[11px] text-zinc-500 font-mono flex gap-3">
                     <span>{item.location === "equipped" ? "Am Körper" : "Eingelagert"}</span>
-                    {item.charges && <span>Ladungen: {item.charges.current}/{item.charges.max}</span>}
                     {item.category === "weapon" && item.isActiveWeapon && (
                       <span className="text-orange-400">
-                        Aktive Waffe ({item.weaponData?.weaponSlot === "offHand" ? "Nebenhand" : item.weaponData?.weaponSlot === "twoHanded" ? "beidhändig" : "Haupthand"})
+                        Aktiv ({item.weaponData?.weaponSlot === "offHand" ? "Nebenhand" : item.weaponData?.weaponSlot === "twoHanded" ? "beidhändig" : "Haupthand"})
                       </span>
                     )}
                   </div>
-                )}
+
+                  <div className="flex items-center gap-3">
+                    {item.charges && (
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => adjustCharge(item.id, -1)} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300"><Minus size={11} /></button>
+                        <span className="text-[11px] font-mono text-zinc-300 w-10 text-center">{item.charges.current}/{item.charges.max}</span>
+                        <button onClick={() => adjustCharge(item.id, 1)} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300"><Plus size={11} /></button>
+                      </div>
+                    )}
+                    {item.quantity !== undefined && (
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => adjustQuantity(item.id, -1)} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300"><Minus size={11} /></button>
+                        <span className="text-[11px] font-mono text-zinc-300 w-8 text-center">{item.quantity}x</span>
+                        <button onClick={() => adjustQuantity(item.id, 1)} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300"><Plus size={11} /></button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
