@@ -21,7 +21,6 @@ export const PATHFINDER_CLASSES: Record<string, PathfinderClassPreset> = {
   bard: { id: "bard", name: "Barde (Bard)", hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: false, ref: true, will: true } },
 };
 
-/** Rassen-Größenmodifikatoren - generisch, nicht an einen Namen gebunden. */
 export interface PathfinderRacePreset {
   id: string;
   name: string;
@@ -43,14 +42,18 @@ export const SIZE_MODIFIERS: Record<string, { attackAndAc: number; cmbAndCmd: nu
   large: { attackAndAc: -1, cmbAndCmd: 1 },
 };
 
-/** Klassen-Kampf-Features als FORMEL, abhängig von Level/Attributen -
- * das ersetzt die alten, charakterspezifischen Hardcodierungen. */
+/** Klassen-Kampf-/Ressourcen-Features als FORMEL - nicht an einen Charakter gebunden,
+ * sondern generisch über Level/Attribute berechnet. Vereinfachte Näherungen, siehe Hinweis. */
 export interface ClassCombatFeatures {
-  sneakAttackDice?: (level: number) => number;              // Rogue
-  rageRoundsPerDay?: (conMod: number) => number;             // Barbarian
-  favoredEnemyBonus?: (level: number) => number;             // Ranger
-  smiteUsesPerDay?: (chaMod: number) => number;              // Paladin
-  flurryExtraAttack?: (level: number) => boolean;            // Monk
+  sneakAttackDice?: (level: number) => number;                       // Rogue
+  rageRoundsPerDay?: (conMod: number) => number;                     // Barbarian
+  favoredEnemyBonus?: (level: number) => number;                     // Ranger
+  smiteUsesPerDay?: (chaMod: number) => number;                      // Paladin
+  flurryExtraAttack?: (level: number) => boolean;                    // Monk
+  channelEnergyDice?: (level: number) => number;                     // Cleric (vereinfacht)
+  channelEnergyUsesPerDay?: (chaMod: number) => number;               // Cleric (vereinfacht)
+  bardicPerformanceRounds?: (level: number) => number;                // Bard (vereinfacht)
+  stunningFistUsesPerDay?: (level: number) => number;                 // Monk (vereinfacht)
 }
 
 export const PATHFINDER_CLASS_COMBAT_FEATURES: Record<string, ClassCombatFeatures> = {
@@ -68,6 +71,17 @@ export const PATHFINDER_CLASS_COMBAT_FEATURES: Record<string, ClassCombatFeature
   },
   monk: {
     flurryExtraAttack: (level) => level >= 1,
+    // Vereinfacht: offiziell 1 + 1 pro 4 Stufen nach der 1.
+    stunningFistUsesPerDay: (level) => 1 + Math.floor((level - 1) / 4),
+  },
+  cleric: {
+    // Vereinfacht: ceil(level/2) W6, 3 + CHA-Mod Nutzungen/Tag
+    channelEnergyDice: (level) => Math.ceil(level / 2),
+    channelEnergyUsesPerDay: (chaMod) => 3 + chaMod,
+  },
+  bard: {
+    // Vereinfacht: 4 + 2x Level Runden/Tag (regelwerksgenaue Formel ggf. anpassen)
+    bardicPerformanceRounds: (level) => 4 + level * 2,
   },
 };
 
@@ -83,6 +97,29 @@ export const getRageRounds = (classId: string | undefined, conMod: number): numb
 
 export const getFavoredEnemyBonus = (classId: string | undefined, level: number): number => {
   const fn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.favoredEnemyBonus : undefined;
+  return fn ? fn(level) : 0;
+};
+
+export const getChannelEnergy = (
+  classId: string | undefined,
+  level: number,
+  chaMod: number
+): { dice: number; usesPerDay: number } => {
+  const diceFn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.channelEnergyDice : undefined;
+  const usesFn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.channelEnergyUsesPerDay : undefined;
+  return {
+    dice: diceFn ? diceFn(level) : 0,
+    usesPerDay: usesFn ? usesFn(chaMod) : 0,
+  };
+};
+
+export const getBardicPerformanceRounds = (classId: string | undefined, level: number): number => {
+  const fn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.bardicPerformanceRounds : undefined;
+  return fn ? fn(level) : 0;
+};
+
+export const getStunningFistUses = (classId: string | undefined, level: number): number => {
+  const fn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.stunningFistUsesPerDay : undefined;
   return fn ? fn(level) : 0;
 };
 
@@ -141,13 +178,6 @@ export const calculateSavingThrows = (
   };
 };
 
-/**
- * Berechnet die Kampfwerte EINER Waffe ausschließlich aus:
- * - den Charakter-Attributen
- * - Level/Klasse (für BAB & Sneak Attack)
- * - den Eigenschaften, die AM INVENTAR-ITEM selbst hinterlegt sind
- * Keine Namens-Erkennung, keine Hardcodierung.
- */
 export interface WeaponCalcInput {
   name: string;
   isMelee: boolean;
