@@ -22,7 +22,6 @@ export interface SkillValue {
   name: string;
   value: number | string;
   notes?: string;
-  /** Regelwerk-Referenz zum schnellen Nachschlagen, z.B. "GRW S. 92" */
   sourceReference?: string;
   [extra: string]: unknown;
 }
@@ -40,6 +39,7 @@ export interface Weapon {
 
 export type ItemLocationStatus = "equipped" | "stored";
 export type ChargeRechargeType = "rest" | "manual" | "none";
+export type WeaponSlot = "primary" | "offHand" | "twoHanded";
 
 export interface ItemCharges {
   max: number;
@@ -51,6 +51,8 @@ export interface ItemCharges {
 export interface WeaponItemData {
   isMelee: boolean;
   isFinesse?: boolean;
+  /** 'leichte Waffe' - relevant für reduzierten Nebenhand-Abzug beim Zweiwaffenkampf */
+  isLight?: boolean;
   magicBonus?: number;
   baseDice?: string;
   damageAttribute?: "ST" | "GE" | "NONE";
@@ -58,6 +60,8 @@ export interface WeaponItemData {
   sneakAttackBonusAttack?: number;
   sneakAttackBonusDamage?: number;
   extraDamage?: string;
+  /** Welche Hand diese Waffe belegt, falls sie als aktive Kampfwaffe markiert ist. */
+  weaponSlot?: WeaponSlot;
 }
 
 export interface ArmorItemData {
@@ -75,7 +79,6 @@ export interface InventoryItem {
   weaponData?: WeaponItemData;
   armorData?: ArmorItemData;
   charges?: ItemCharges;
-  /** Regelwerk-Referenz zum schnellen Nachschlagen, z.B. "GRW S. 112" */
   sourceReference?: string;
   [extra: string]: unknown;
 }
