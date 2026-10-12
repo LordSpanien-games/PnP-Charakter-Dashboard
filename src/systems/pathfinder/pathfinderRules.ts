@@ -3,22 +3,24 @@ export type BabProgression = "full" | "threeFourths" | "half";
 export interface PathfinderClassPreset {
   id: string;
   name: string;
+  /** lowercase Suchbegriffe zur Texterkennung beim Import, z.B. "dieb" UND "schurke" für Rogue */
+  aliases: string[];
   hitDie: number;
   babProgression: BabProgression;
   goodSaves: { fort: boolean; ref: boolean; will: boolean };
 }
 
 export const PATHFINDER_CLASSES: Record<string, PathfinderClassPreset> = {
-  rogue: { id: "rogue", name: "Schurke (Rogue)", hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: false, ref: true, will: false } },
-  fighter: { id: "fighter", name: "Kämpfer (Fighter)", hitDie: 10, babProgression: "full", goodSaves: { fort: true, ref: false, will: false } },
-  barbarian: { id: "barbarian", name: "Barbar (Barbarian)", hitDie: 12, babProgression: "full", goodSaves: { fort: true, ref: false, will: false } },
-  wizard: { id: "wizard", name: "Magier (Wizard)", hitDie: 6, babProgression: "half", goodSaves: { fort: false, ref: false, will: true } },
-  cleric: { id: "cleric", name: "Kleriker (Cleric)", hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: true, ref: false, will: true } },
-  ranger: { id: "ranger", name: "Waldläufer (Ranger)", hitDie: 10, babProgression: "full", goodSaves: { fort: true, ref: true, will: false } },
-  paladin: { id: "paladin", name: "Paladin", hitDie: 10, babProgression: "full", goodSaves: { fort: true, ref: false, will: true } },
-  monk: { id: "monk", name: "Mönch (Monk)", hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: true, ref: true, will: true } },
-  sorcerer: { id: "sorcerer", name: "Hexenmeister (Sorcerer)", hitDie: 6, babProgression: "half", goodSaves: { fort: false, ref: false, will: true } },
-  bard: { id: "bard", name: "Barde (Bard)", hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: false, ref: true, will: true } },
+  rogue: { id: "rogue", name: "Schurke / Dieb (Rogue)", aliases: ["schurke", "dieb", "rogue"], hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: false, ref: true, will: false } },
+  fighter: { id: "fighter", name: "Kämpfer (Fighter)", aliases: ["kämpfer", "krieger", "fighter"], hitDie: 10, babProgression: "full", goodSaves: { fort: true, ref: false, will: false } },
+  barbarian: { id: "barbarian", name: "Barbar (Barbarian)", aliases: ["barbar", "barbarian"], hitDie: 12, babProgression: "full", goodSaves: { fort: true, ref: false, will: false } },
+  wizard: { id: "wizard", name: "Magier (Wizard)", aliases: ["magier", "wizard"], hitDie: 6, babProgression: "half", goodSaves: { fort: false, ref: false, will: true } },
+  cleric: { id: "cleric", name: "Kleriker (Cleric)", aliases: ["kleriker", "priester", "cleric"], hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: true, ref: false, will: true } },
+  ranger: { id: "ranger", name: "Waldläufer (Ranger)", aliases: ["waldläufer", "ranger"], hitDie: 10, babProgression: "full", goodSaves: { fort: true, ref: true, will: false } },
+  paladin: { id: "paladin", name: "Paladin", aliases: ["paladin"], hitDie: 10, babProgression: "full", goodSaves: { fort: true, ref: false, will: true } },
+  monk: { id: "monk", name: "Mönch (Monk)", aliases: ["mönch", "monk"], hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: true, ref: true, will: true } },
+  sorcerer: { id: "sorcerer", name: "Hexenmeister (Sorcerer)", aliases: ["hexenmeister", "sorcerer"], hitDie: 6, babProgression: "half", goodSaves: { fort: false, ref: false, will: true } },
+  bard: { id: "bard", name: "Barde (Bard)", aliases: ["barde", "bard"], hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: false, ref: true, will: true } },
 };
 
 export interface PathfinderRacePreset {
@@ -192,7 +194,6 @@ export interface WeaponCalcResult {
   sneakAttack?: { attack: string; damage: string };
 }
 
-/** Einzelwaffen-Berechnung ohne Zweiwaffenkampf-Abzüge (für den Normalfall: eine Waffe). */
 export const calculateWeaponStats = (
   weapon: WeaponCalcInput,
   attrs: PathfinderAttributes,
@@ -263,9 +264,9 @@ export const calculateArmorClass = (
 // ───────────────────────────────────────────────────────────
 
 export interface TwoWeaponFightingFeats {
-  hasTwoWeaponFighting: boolean;         // Grundtalent: reduziert Abzüge auf -2/-2
-  hasImprovedTwoWeaponFighting: boolean; // zusätzlicher Nebenhand-Angriff bei BAB-5
-  hasGreaterTwoWeaponFighting: boolean;  // weiterer Nebenhand-Angriff bei BAB-10
+  hasTwoWeaponFighting: boolean;
+  hasImprovedTwoWeaponFighting: boolean;
+  hasGreaterTwoWeaponFighting: boolean;
 }
 
 export interface TwoWeaponAttackResult {
@@ -281,11 +282,6 @@ export interface TwoWeaponFightingResult {
   penaltyNote: string;
 }
 
-/**
- * Berechnet die vollständige Angriffsfolge für Zweiwaffenkampf.
- * Liest ausschließlich aus den übergebenen Waffen-Items und den Feat-Flags -
- * keine Namens-Erkennung, keine charakterspezifische Logik.
- */
 export const calculateTwoWeaponFighting = (
   primaryWeapon: WeaponCalcInput & { isLight?: boolean },
   offHandWeapon: WeaponCalcInput & { isLight?: boolean },
@@ -305,7 +301,6 @@ export const calculateTwoWeaponFighting = (
   const geMod = calculateModifier(attrs.GE);
   const sneakDice = options.sneakAttackActive ? getSneakAttackDice(classId, level) : 0;
 
-  // Abzüge bestimmen
   let primaryPenalty = -2;
   let offHandPenalty = offHandWeapon.isLight ? -2 : -4;
   if (feats.hasTwoWeaponFighting) {
@@ -316,7 +311,7 @@ export const calculateTwoWeaponFighting = (
   const buildAttacks = (
     weapon: WeaponCalcInput,
     penalty: number,
-    extraBabThresholds: number[] // z.B. [5, 10] für Improved/Greater TWF
+    extraBabThresholds: number[]
   ) => {
     const useFinesse = weapon.isMelee && weapon.isFinesse;
     const attackAttr = !weapon.isMelee ? "GE" : useFinesse ? "GE" : "ST";
@@ -325,8 +320,6 @@ export const calculateTwoWeaponFighting = (
 
     const dmgAttr = weapon.damageAttribute ?? (!weapon.isMelee ? "NONE" : "ST");
     const rawDmgMod = dmgAttr === "GE" ? geMod : dmgAttr === "ST" ? stMod : 0;
-    // Nebenhand bekommt nur den halben Attributsbonus (bei positivem Bonus)
-    const isOffHand = penalty !== primaryPenalty || weapon === offHandWeapon;
     const dmgMod = weapon === offHandWeapon && rawDmgMod > 0 ? Math.floor(rawDmgMod * 0.5) : rawDmgMod;
 
     const flat = dmgMod + magicBonus + (weapon === primaryWeapon && options.sneakAttackActive ? weapon.sneakAttackBonusDamage ?? 0 : 0);
@@ -335,11 +328,9 @@ export const calculateTwoWeaponFighting = (
     if (sneakDice > 0) damage += ` + ${sneakDice}W6`;
     if (weapon.extraDamage) damage += ` ${weapon.extraDamage}`;
 
-    // Haupt-Angriffsfolge über BAB-Iterative (nur erster Eintrag bei TWF genutzt, Rest optional)
     const mainAttackBonus = bab + attackMod + magicBonus + sizeMod.attackAndAc + penalty;
     const attacks = [{ attackBonus: mainAttackBonus, damage }];
 
-    // Zusätzliche Nebenhand-Angriffe durch Improved/Greater Two-Weapon Fighting
     extraBabThresholds.forEach((threshold) => {
       if (bab >= threshold) {
         attacks.push({
@@ -379,4 +370,35 @@ export const calculateTwoWeaponFighting = (
       ? "Zweiwaffenkampf-Talent aktiv: -2/-2"
       : `Standard-Abzüge: ${primaryPenalty}/${offHandPenalty}${offHandWeapon.isLight ? " (Nebenhand leicht)" : ""}`,
   };
+};
+
+// ───────────────────────────────────────────────────────────
+// Legacy-Import-Hilfsfunktionen
+// ───────────────────────────────────────────────────────────
+
+/**
+ * Zerlegt einen alten, zusammengesetzten Schadens-String wie "1W3+3 + 1W6 Eis"
+ * in Basiswürfel ("1W3") und Zusatzschaden ("+1W6 Eis"). Der ursprüngliche
+ * flache Bonus (+3) wird bewusst verworfen, da er beim Live-Berechnen aus
+ * Attribut-Modifikator + Magie-Bonus automatisch neu zusammengesetzt wird.
+ */
+export const parseLegacyWeaponDamage = (
+  damageStr: string | undefined
+): { baseDice: string; extraDamage?: string } => {
+  if (!damageStr) return { baseDice: "1W6" };
+  const trimmed = damageStr.trim();
+
+  const baseDiceMatch = trimmed.match(/^(\d+[Ww]\d+)/);
+  const baseDice = baseDiceMatch ? baseDiceMatch[1].toUpperCase() : "1W6";
+
+  const extraMatch = trimmed.match(/\+\s*(\d+[Ww]\d+\s*[^\d+]+)/);
+  const extraDamage = extraMatch ? `+${extraMatch[1].trim()}` : undefined;
+
+  return { baseDice, extraDamage };
+};
+
+/** Liest den Magie-Bonus aus der üblichen Waffennamen-Konvention, z.B. "Dolch des Eises +2" -> 2 */
+export const parseMagicBonusFromName = (name: string): number => {
+  const match = name.match(/\+(\d+)\s*$/);
+  return match ? parseInt(match[1], 10) : 0;
 };
