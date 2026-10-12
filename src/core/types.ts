@@ -22,6 +22,8 @@ export interface SkillValue {
   name: string;
   value: number | string;
   notes?: string;
+  /** Regelwerk-Referenz zum schnellen Nachschlagen, z.B. "GRW S. 92" */
+  sourceReference?: string;
   [extra: string]: unknown;
 }
 
@@ -32,6 +34,7 @@ export interface Weapon {
   critical?: string;
   note?: string;
   range?: string;
+  sourceReference?: string;
   [extra: string]: unknown;
 }
 
@@ -41,25 +44,20 @@ export type ChargeRechargeType = "rest" | "manual" | "none";
 export interface ItemCharges {
   max: number;
   current: number;
-  /** 'rest' = füllt sich bei Rast automatisch wieder auf
-   *  'manual' = muss aktiv wieder aufgeladen werden (z.B. Terminal, Zauber)
-   *  'none' = verbraucht sich dauerhaft, keine Wiederauffüllung */
   rechargeType: ChargeRechargeType;
   rechargeAmount?: number;
 }
 
-/** Generische Waffen-Eigenschaften, die direkt am Inventar-Item hängen -
- * KEINE Logik im Code, die auf Namen oder bestimmte Charaktere reagiert. */
 export interface WeaponItemData {
   isMelee: boolean;
   isFinesse?: boolean;
   magicBonus?: number;
-  baseDice?: string;              // z.B. "1W6"
+  baseDice?: string;
   damageAttribute?: "ST" | "GE" | "NONE";
   attackAttribute?: "ST" | "GE";
   sneakAttackBonusAttack?: number;
   sneakAttackBonusDamage?: number;
-  extraDamage?: string;           // z.B. "+1W6 Feuer"
+  extraDamage?: string;
 }
 
 export interface ArmorItemData {
@@ -73,12 +71,12 @@ export interface InventoryItem {
   quantity?: number;
   notes?: string;
   location: ItemLocationStatus;
-  /** Nur relevant für category === 'weapon': ist diese Waffe aktuell
-   * im Kampfeinsatz? Mehrere gleichzeitig möglich (z.B. beidhändig). */
   isActiveWeapon?: boolean;
   weaponData?: WeaponItemData;
   armorData?: ArmorItemData;
   charges?: ItemCharges;
+  /** Regelwerk-Referenz zum schnellen Nachschlagen, z.B. "GRW S. 112" */
+  sourceReference?: string;
   [extra: string]: unknown;
 }
 
@@ -89,6 +87,7 @@ export interface Ability {
   type?: string;
   maxUses?: number;
   currentUses?: number;
+  sourceReference?: string;
   [extra: string]: unknown;
 }
 
@@ -111,7 +110,7 @@ export interface GenericCharacter {
   attributes: Record<string, AttributeValue>;
   resources: Record<string, ResourceState>;
   skills: SkillValue[];
-  weapons: { melee: Weapon[]; ranged: Weapon[] }; // bleibt als Legacy-Lesefeld für alte Importe
+  weapons: { melee: Weapon[]; ranged: Weapon[] };
   inventory: InventoryItem[];
   abilities: Ability[];
   party: PartyMember[];
