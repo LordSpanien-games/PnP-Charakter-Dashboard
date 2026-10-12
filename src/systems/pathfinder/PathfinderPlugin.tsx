@@ -1,568 +1,382 @@
-import React from "react";
-import { SystemPlugin, AttributePool } from "../../core/SystemPlugin";
-import { GenericCharacter, createEmptyGenericCharacter, InventoryItem } from "../../core/types";
-import { rollPool, roll4d6DropLowest } from "../../core/dice";
-import {
-  PathfinderAttributes,
-  calculateModifier,
-  formatModifier,
-  calculateSavingThrows,
-  calculateArmorClass,
-  calculateWeaponStats,
-  calculateTwoWeaponFighting,
-  calculateBAB,
-  formatIteratives,
-  getBabIteratives,
-  getSneakAttackDice,
-  getRageRounds,
-  getFavoredEnemyBonus,
-  getChannelEnergy,
-  getBardicPerformanceRounds,
-  getStunningFistUses,
-  PATHFINDER_CLASSES,
-  PATHFINDER_RACES,
-} from "./pathfinderRules";
+export type BabProgression = "full" | "threeFourths" | "half";
 
-const ATTR_KEYS = ["ST", "GE", "KO", "IN", "WE", "CH"] as const;
-const ATTR_LABELS: Record<string, string> = {
-  ST: "Stärke (ST)", GE: "Geschicklichkeit (GE)", KO: "Konstitution (KO)",
-  IN: "Intelligenz (IN)", WE: "Weisheit (WE)", CH: "Charisma (CH)",
+export interface PathfinderClassPreset {
+  id: string;
+  name: string;
+  hitDie: number;
+  babProgression: BabProgression;
+  goodSaves: { fort: boolean; ref: boolean; will: boolean };
+}
+
+export const PATHFINDER_CLASSES: Record<string, PathfinderClassPreset> = {
+  rogue: { id: "rogue", name: "Schurke (Rogue)", hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: false, ref: true, will: false } },
+  fighter: { id: "fighter", name: "Kämpfer (Fighter)", hitDie: 10, babProgression: "full", goodSaves: { fort: true, ref: false, will: false } },
+  barbarian: { id: "barbarian", name: "Barbar (Barbarian)", hitDie: 12, babProgression: "full", goodSaves: { fort: true, ref: false, will: false } },
+  wizard: { id: "wizard", name: "Magier (Wizard)", hitDie: 6, babProgression: "half", goodSaves: { fort: false, ref: false, will: true } },
+  cleric: { id: "cleric", name: "Kleriker (Cleric)", hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: true, ref: false, will: true } },
+  ranger: { id: "ranger", name: "Waldläufer (Ranger)", hitDie: 10, babProgression: "full", goodSaves: { fort: true, ref: true, will: false } },
+  paladin: { id: "paladin", name: "Paladin", hitDie: 10, babProgression: "full", goodSaves: { fort: true, ref: false, will: true } },
+  monk: { id: "monk", name: "Mönch (Monk)", hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: true, ref: true, will: true } },
+  sorcerer: { id: "sorcerer", name: "Hexenmeister (Sorcerer)", hitDie: 6, babProgression: "half", goodSaves: { fort: false, ref: false, will: true } },
+  bard: { id: "bard", name: "Barde (Bard)", hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: false, ref: true, will: true } },
 };
 
-const getAttrs = (character: GenericCharacter): PathfinderAttributes => ({
-  ST: Number(character.attributes.ST) || 10,
-  GE: Number(character.attributes.GE) || 10,
-  KO: Number(character.attributes.KO) || 10,
-  IN: Number(character.attributes.IN) || 10,
-  WE: Number(character.attributes.WE) || 10,
-  CH: Number(character.attributes.CH) || 10,
-});
+export interface PathfinderRacePreset {
+  id: string;
+  name: string;
+  size: "small" | "medium" | "large";
+}
 
-const getLevel = (c: GenericCharacter) => Number(c.systemData.level) || 1;
-const getClassId = (c: GenericCharacter) => c.systemData.classId as string | undefined;
-const getRaceId = (c: GenericCharacter) => c.systemData.raceId as string | undefined;
+export const PATHFINDER_RACES: Record<string, PathfinderRacePreset> = {
+  human: { id: "human", name: "Mensch", size: "medium" },
+  elf: { id: "elf", name: "Elf", size: "medium" },
+  dwarf: { id: "dwarf", name: "Zwerg", size: "medium" },
+  halfling: { id: "halfling", name: "Halbling", size: "small" },
+  gnome: { id: "gnome", name: "Gnom", size: "small" },
+  halforc: { id: "halforc", name: "Halbork", size: "medium" },
+};
 
-const makeId = () => `item_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+export const SIZE_MODIFIERS: Record<string, { attackAndAc: number; cmbAndCmd: number }> = {
+  small: { attackAndAc: 1, cmbAndCmd: -1 },
+  medium: { attackAndAc: 0, cmbAndCmd: 0 },
+  large: { attackAndAc: -1, cmbAndCmd: 1 },
+};
 
-const createBase = (name: string, subTitle: string | undefined, attrs: Record<string, number>): GenericCharacter => {
-  const base = createEmptyGenericCharacter("pathfinder", name, subTitle);
+export interface ClassCombatFeatures {
+  sneakAttackDice?: (level: number) => number;
+  rageRoundsPerDay?: (conMod: number) => number;
+  favoredEnemyBonus?: (level: number) => number;
+  smiteUsesPerDay?: (chaMod: number) => number;
+  flurryExtraAttack?: (level: number) => boolean;
+  channelEnergyDice?: (level: number) => number;
+  channelEnergyUsesPerDay?: (chaMod: number) => number;
+  bardicPerformanceRounds?: (level: number) => number;
+  stunningFistUsesPerDay?: (level: number) => number;
+}
+
+export const PATHFINDER_CLASS_COMBAT_FEATURES: Record<string, ClassCombatFeatures> = {
+  rogue: {
+    sneakAttackDice: (level) => Math.max(1, Math.ceil(level / 2)),
+  },
+  barbarian: {
+    rageRoundsPerDay: (conMod) => 4 + 2 * conMod,
+  },
+  ranger: {
+    favoredEnemyBonus: (level) => (level >= 15 ? 4 : level >= 10 ? 3 : level >= 5 ? 2 : 1),
+  },
+  paladin: {
+    smiteUsesPerDay: (chaMod) => Math.max(1, 1 + chaMod),
+  },
+  monk: {
+    flurryExtraAttack: (level) => level >= 1,
+    stunningFistUsesPerDay: (level) => 1 + Math.floor((level - 1) / 4),
+  },
+  cleric: {
+    channelEnergyDice: (level) => Math.ceil(level / 2),
+    channelEnergyUsesPerDay: (chaMod) => 3 + chaMod,
+  },
+  bard: {
+    bardicPerformanceRounds: (level) => 4 + level * 2,
+  },
+};
+
+export const getSneakAttackDice = (classId: string | undefined, level: number): number => {
+  const fn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.sneakAttackDice : undefined;
+  return fn ? fn(level) : 0;
+};
+
+export const getRageRounds = (classId: string | undefined, conMod: number): number => {
+  const fn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.rageRoundsPerDay : undefined;
+  return fn ? fn(conMod) : 0;
+};
+
+export const getFavoredEnemyBonus = (classId: string | undefined, level: number): number => {
+  const fn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.favoredEnemyBonus : undefined;
+  return fn ? fn(level) : 0;
+};
+
+export const getChannelEnergy = (
+  classId: string | undefined,
+  level: number,
+  chaMod: number
+): { dice: number; usesPerDay: number } => {
+  const diceFn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.channelEnergyDice : undefined;
+  const usesFn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.channelEnergyUsesPerDay : undefined;
   return {
-    ...base,
-    attributes: attrs,
-    resources: { hp: { current: 1, max: 1 } },
-    systemData: {
-      level: 1, classId: "fighter", raceId: "human", sneakAttackActive: false,
-      hasTwoWeaponFighting: false, hasImprovedTwoWeaponFighting: false, hasGreaterTwoWeaponFighting: false,
-    },
+    dice: diceFn ? diceFn(level) : 0,
+    usesPerDay: usesFn ? usesFn(chaMod) : 0,
   };
 };
 
-export const PathfinderPlugin: SystemPlugin = {
-  id: "pathfinder",
-  name: "Pathfinder 1e",
-  tagline: "High-Fantasy D20 mit taktischem Tiefgang",
-  badge: "D20 System",
-  color: "border-zinc-800 hover:border-amber-500/50 bg-zinc-900/60",
-  activeColor: "border-amber-500 bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/50",
+export const getBardicPerformanceRounds = (classId: string | undefined, level: number): number => {
+  const fn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.bardicPerformanceRounds : undefined;
+  return fn ? fn(level) : 0;
+};
 
-  attributeDefinitions: ATTR_KEYS.map((k) => ({ key: k, label: ATTR_LABELS[k] })),
-  resourceDefinitions: [{ key: "hp", label: "Trefferpunkte (TP)", hasMax: true }],
+export const getStunningFistUses = (classId: string | undefined, level: number): number => {
+  const fn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.stunningFistUsesPerDay : undefined;
+  return fn ? fn(level) : 0;
+};
 
-  createBlankCharacter: (name, subTitle) =>
-    createBase(name, subTitle, { ST: 10, GE: 10, KO: 10, IN: 10, WE: 10, CH: 10 }),
+export const calculateModifier = (score: number): number => Math.floor((score - 10) / 2);
+export const formatModifier = (mod: number): string => (mod >= 0 ? `+${mod}` : `${mod}`);
 
-  rollAttributePool: (): AttributePool => ({
-    values: rollPool(6, roll4d6DropLowest),
-    methodLabel: "4W6 pro Attribut, niedrigsten Wurf verwerfen (Standardmethode)",
-  }),
+export const calculateBAB = (level: number, progression: BabProgression): number => {
+  if (level <= 0) return 0;
+  if (progression === "full") return level;
+  if (progression === "threeFourths") return Math.floor(level * 0.75);
+  return Math.floor(level * 0.5);
+};
 
-  supportsManualAssignment: true,
+export const calculateBaseSave = (level: number, isGood: boolean): number => {
+  if (level <= 0) return 0;
+  return isGood ? 2 + Math.floor(level / 2) : Math.floor(level / 3);
+};
 
-  buildCharacterFromPool: (name, subTitle, pool, assignment) => {
-    const attrs: Record<string, number> = {};
-    ATTR_KEYS.forEach((key, idx) => {
-      const poolIndex = assignment ? assignment[key] : idx;
-      attrs[key] = pool[poolIndex] ?? 10;
-    });
-    const char = createBase(name, subTitle, attrs);
-    const hp = 8 + calculateModifier(attrs.KO);
-    char.resources.hp = { current: hp, max: hp };
-    return char;
-  },
+export const getBabIteratives = (bab: number): number[] => {
+  const result: number[] = [];
+  let current = bab;
+  while (current > 0) {
+    result.push(current);
+    current -= 5;
+  }
+  return result.length > 0 ? result : [0];
+};
 
-  detectLegacy: (raw: any) => {
-    if (!raw || typeof raw !== "object") return false;
-    const sys = String(raw.system || "").toLowerCase();
-    if (sys === "pathfinder" || sys.startsWith("pathfinder") || sys === "pf" || sys === "pf1e") return true;
-    if (Array.isArray(raw.stats)) {
-      return raw.stats.some((s: any) => {
-        const l = (s.label || "").toLowerCase();
-        return l.includes("zähigkeit") || l.includes("reflex") || l.includes("wille") || l.includes("kmb") || l.includes("kmv");
-      });
-    }
-    return false;
-  },
+export const formatIteratives = (iteratives: number[]): string =>
+  iteratives.map(formatModifier).join(" / ");
 
-  migrateLegacy: (raw: any) => {
-    const attrs: Record<string, number> = { ST: 10, GE: 10, KO: 10, IN: 10, WE: 10, CH: 10 };
-    const sourceList = [...(raw.characteristics || []), ...(raw.stats || [])];
-    sourceList.forEach((s: any) => {
-      const label = (s.label || "").toUpperCase();
-      ATTR_KEYS.forEach((key) => {
-        if (label === key || label.startsWith(ATTR_LABELS[key].toUpperCase().slice(0, 4))) {
-          const val = typeof s.value === "number" ? s.value : parseInt(String(s.value).replace(/[^0-9-]/g, ""), 10);
-          if (!isNaN(val)) attrs[key] = val;
-        }
-      });
-    });
+export interface PathfinderAttributes {
+  ST: number; GE: number; KO: number; IN: number; WE: number; CH: number;
+}
 
-    const char = createBase(raw.name || "Unbenannt", raw.subTitle, attrs);
+export interface PathfinderSavingThrows {
+  fortitude: { base: number; total: number };
+  reflex: { base: number; total: number };
+  will: { base: number; total: number };
+}
 
-    const hpStat = (raw.stats || []).find((s: any) => (s.label || "").toLowerCase().includes("trefferpunkte"));
-    if (hpStat) {
-      const hp = parseInt(String(hpStat.value).replace(/[^0-9-]/g, ""), 10) || 1;
-      char.resources.hp = { current: hp, max: hp };
-    }
+export const calculateSavingThrows = (
+  attrs: PathfinderAttributes,
+  level: number,
+  classId: string | undefined
+): PathfinderSavingThrows => {
+  const cls = classId ? PATHFINDER_CLASSES[classId] : undefined;
+  const fortBase = calculateBaseSave(level, cls?.goodSaves.fort ?? false);
+  const refBase = calculateBaseSave(level, cls?.goodSaves.ref ?? false);
+  const willBase = calculateBaseSave(level, cls?.goodSaves.will ?? false);
 
-    const sub = (raw.subTitle || "").toLowerCase();
-    const levelMatch = sub.match(/(?:level|stufe)\s*(\d+)/);
-    char.systemData.level = levelMatch ? parseInt(levelMatch[1], 10) : 1;
+  return {
+    fortitude: { base: fortBase, total: fortBase + calculateModifier(attrs.KO) },
+    reflex: { base: refBase, total: refBase + calculateModifier(attrs.GE) },
+    will: { base: willBase, total: willBase + calculateModifier(attrs.WE) },
+  };
+};
 
-    const classMatch = Object.entries(PATHFINDER_CLASSES).find(([, c]) =>
-      sub.includes(c.name.toLowerCase().split(" ")[0].replace(/[^a-zäöü]/gi, ""))
-    );
-    char.systemData.classId = classMatch ? classMatch[0] : "fighter";
+export interface WeaponCalcInput {
+  name: string;
+  isMelee: boolean;
+  isFinesse?: boolean;
+  magicBonus?: number;
+  baseDice?: string;
+  damageAttribute?: "ST" | "GE" | "NONE";
+  sneakAttackBonusAttack?: number;
+  sneakAttackBonusDamage?: number;
+  extraDamage?: string;
+}
 
-    const raceMatch = Object.entries(PATHFINDER_RACES).find(([, r]) => sub.includes(r.name.toLowerCase()));
-    char.systemData.raceId = raceMatch ? raceMatch[0] : "human";
+export interface WeaponCalcResult {
+  name: string;
+  attack: string;
+  damage: string;
+  sneakAttack?: { attack: string; damage: string };
+}
 
-    const migrateWeapon = (w: any, isMelee: boolean): InventoryItem => ({
-      id: makeId(),
-      name: w.name,
-      category: "weapon",
-      location: "equipped",
-      isActiveWeapon: true,
-      sourceReference: w.sourceReference,
-      weaponData: {
-        isMelee,
-        isFinesse: !!w.isFinesse,
-        isLight: !!w.isLight,
-        magicBonus: w.magicBonus ?? 0,
-        baseDice: w.baseDice || "1W6",
-        damageAttribute: w.damageAttribute === "GE" ? "GE" : isMelee ? "ST" : "NONE",
-        sneakAttackBonusAttack: w.sneakAttackBonus ?? 0,
-        sneakAttackBonusDamage: w.sneakAttackDamageBonus ?? 0,
-        weaponSlot: "primary",
-      },
-    });
+/** Einzelwaffen-Berechnung ohne Zweiwaffenkampf-Abzüge (für den Normalfall: eine Waffe). */
+export const calculateWeaponStats = (
+  weapon: WeaponCalcInput,
+  attrs: PathfinderAttributes,
+  level: number,
+  classId: string | undefined,
+  raceId: string | undefined,
+  options: { sneakAttackActive: boolean }
+): WeaponCalcResult => {
+  const cls = classId ? PATHFINDER_CLASSES[classId] : undefined;
+  const race = raceId ? PATHFINDER_RACES[raceId] : undefined;
+  const sizeMod = SIZE_MODIFIERS[race?.size ?? "medium"];
+  const bab = calculateBAB(level, cls?.babProgression ?? "threeFourths");
 
-    char.inventory = [
-      ...(raw.weapons?.melee || []).map((w: any) => migrateWeapon(w, true)),
-      ...(raw.weapons?.ranged || []).map((w: any) => migrateWeapon(w, false)),
-      ...((raw.inventory || []).map((it: any) => ({
-        id: makeId(),
-        name: it.name,
-        category: it.category || "gear",
-        quantity: it.quantity ?? 1,
-        notes: it.notes,
-        sourceReference: it.page || it.sourceReference,
-        location: it.status === "stored" ? "stored" : "equipped",
-        charges: it.maxUses
-          ? { max: it.maxUses, current: it.currentUses ?? it.maxUses, rechargeType: "rest" }
-          : undefined,
-      }))),
-    ];
+  const stMod = calculateModifier(attrs.ST);
+  const geMod = calculateModifier(attrs.GE);
+  const magicBonus = weapon.magicBonus ?? 0;
 
-    char.skills = (raw.skills || []).map((s: any) => ({ name: s.name, value: s.value, notes: s.note }));
-    char.abilities = raw.abilities || [];
+  const useFinesse = weapon.isMelee && weapon.isFinesse;
+  const attackAttr = !weapon.isMelee ? "GE" : useFinesse ? "GE" : "ST";
+  const attackMod = attackAttr === "GE" ? geMod : stMod;
 
-    return char;
-  },
+  const iteratives = getBabIteratives(bab).map((b) => b + attackMod + magicBonus + sizeMod.attackAndAc);
+  const attack = formatIteratives(iteratives);
 
-  recalculate: (character) => character,
+  const dmgAttr = weapon.damageAttribute ?? (!weapon.isMelee ? "NONE" : "ST");
+  const dmgMod = dmgAttr === "GE" ? geMod : dmgAttr === "ST" ? stMod : 0;
+  const flat = dmgMod + magicBonus;
+  const baseDice = weapon.baseDice || "1W6";
+  let damage = flat > 0 ? `${baseDice}+${flat}` : flat < 0 ? `${baseDice}${flat}` : baseDice;
+  if (weapon.extraDamage) damage += ` ${weapon.extraDamage}`;
 
-  DashboardComponent: ({ character, isEditing, onUpdate }) => {
-    const attrs = getAttrs(character);
-    const level = getLevel(character);
-    const classId = getClassId(character);
-    const raceId = getRaceId(character);
-    const cls = classId ? PATHFINDER_CLASSES[classId] : undefined;
-    const race = raceId ? PATHFINDER_RACES[raceId] : undefined;
-    const sneakAttackActive = Boolean(character.systemData.sneakAttackActive);
-
-    const hasTwoWeaponFighting = Boolean(character.systemData.hasTwoWeaponFighting);
-    const hasImprovedTwoWeaponFighting = Boolean(character.systemData.hasImprovedTwoWeaponFighting);
-    const hasGreaterTwoWeaponFighting = Boolean(character.systemData.hasGreaterTwoWeaponFighting);
-
-    const bab = calculateBAB(level, cls?.babProgression ?? "threeFourths");
-    const iteratives = getBabIteratives(bab);
-    const saves = calculateSavingThrows(attrs, level, classId);
-
-    const armorItem = character.inventory.find((i) => i.category === "armor" && i.location === "equipped");
-    const armorBonus = armorItem?.armorData?.armorBonus ?? 0;
-    const ac = calculateArmorClass(attrs, armorBonus, raceId);
-    const hp = character.resources.hp || { current: 0, max: 0 };
-
-    const activeWeapons = character.inventory.filter(
-      (i) => i.category === "weapon" && i.location === "equipped" && i.isActiveWeapon
-    );
-    const primaryWeapon = activeWeapons.find((w) => w.weaponData?.weaponSlot === "primary" || !w.weaponData?.weaponSlot) || activeWeapons[0];
-    const offHandWeapon = activeWeapons.find((w) => w.weaponData?.weaponSlot === "offHand" && w !== primaryWeapon);
-    const isTwoWeaponMode = !!primaryWeapon && !!offHandWeapon;
-
-    const chaMod = calculateModifier(attrs.CH);
-
+  let sneakAttack: WeaponCalcResult["sneakAttack"] | undefined;
+  if (options.sneakAttackActive) {
     const sneakDice = getSneakAttackDice(classId, level);
-    const rageRounds = classId === "barbarian" ? getRageRounds(classId, calculateModifier(attrs.KO)) : 0;
-    const favoredEnemy = classId === "ranger" ? getFavoredEnemyBonus(classId, level) : 0;
-    const channelEnergy = classId === "cleric" ? getChannelEnergy(classId, level, chaMod) : null;
-    const bardicRounds = classId === "bard" ? getBardicPerformanceRounds(classId, level) : 0;
-    const stunningFistUses = classId === "monk" ? getStunningFistUses(classId, level) : 0;
+    const bonusAtk = weapon.sneakAttackBonusAttack ?? 0;
+    const bonusDmg = weapon.sneakAttackBonusDamage ?? 0;
+    const sneakIteratives = getBabIteratives(bab).map(
+      (b) => b + attackMod + magicBonus + sizeMod.attackAndAc + bonusAtk
+    );
+    const sneakFlat = flat + bonusDmg;
+    let sneakDamage = sneakFlat > 0 ? `${baseDice}+${sneakFlat}` : sneakFlat < 0 ? `${baseDice}${sneakFlat}` : baseDice;
+    if (sneakDice > 0) sneakDamage += ` + ${sneakDice}W6`;
+    if (weapon.extraDamage) sneakDamage += ` ${weapon.extraDamage}`;
 
-    const hasClassFeatureDisplay = ["barbarian", "ranger", "cleric", "bard", "monk"].includes(classId || "");
+    sneakAttack = { attack: formatIteratives(sneakIteratives), damage: sneakDamage };
+  }
 
-    const updateAttr = (key: string, value: number) =>
-      onUpdate({ attributes: { ...character.attributes, [key]: value } });
-    const updateSystemData = (key: string, value: unknown) =>
-      onUpdate({ systemData: { ...character.systemData, [key]: value } });
-    const updateHp = (field: "current" | "max", value: number) =>
-      onUpdate({ resources: { ...character.resources, hp: { ...hp, [field]: value } } });
+  return { name: weapon.name, attack, damage, sneakAttack };
+};
 
-    const updateInventoryItem = (id: string, patch: Partial<InventoryItem>) => {
-      onUpdate({
-        inventory: character.inventory.map((it) => (it.id === id ? { ...it, ...patch } : it)),
-      });
-    };
-    const removeInventoryItem = (id: string) => {
-      onUpdate({ inventory: character.inventory.filter((it) => it.id !== id) });
-    };
-    const addInventoryItem = (category: "weapon" | "armor" | "gear") => {
-      const base: InventoryItem = {
-        id: makeId(),
-        name: category === "weapon" ? "Neue Waffe" : category === "armor" ? "Neue Rüstung" : "Neuer Gegenstand",
-        category,
-        quantity: 1,
-        location: "equipped",
-        isActiveWeapon: category === "weapon" ? false : undefined,
-        weaponData: category === "weapon" ? { isMelee: true, baseDice: "1W6", damageAttribute: "ST", weaponSlot: "primary" } : undefined,
-        armorData: category === "armor" ? { armorBonus: 0 } : undefined,
-      };
-      onUpdate({ inventory: [...character.inventory, base] });
-    };
+export const calculateArmorClass = (
+  attrs: PathfinderAttributes,
+  armorBonus: number,
+  raceId: string | undefined
+): { armorClass: number; touchAc: number; flatFootedAc: number } => {
+  const geMod = calculateModifier(attrs.GE);
+  const race = raceId ? PATHFINDER_RACES[raceId] : undefined;
+  const sizeMod = SIZE_MODIFIERS[race?.size ?? "medium"].attackAndAc;
+  return {
+    armorClass: 10 + geMod + armorBonus + sizeMod,
+    touchAc: 10 + geMod + sizeMod,
+    flatFootedAc: 10 + armorBonus + sizeMod,
+  };
+};
 
-    // Live-Berechnung der aktiven Kampfwaffe(n)
-    const singleWeaponResults = !isTwoWeaponMode
-      ? activeWeapons.map((item) =>
-          calculateWeaponStats(
-            {
-              name: item.name,
-              isMelee: item.weaponData?.isMelee ?? true,
-              isFinesse: item.weaponData?.isFinesse,
-              magicBonus: item.weaponData?.magicBonus,
-              baseDice: item.weaponData?.baseDice,
-              damageAttribute: item.weaponData?.damageAttribute,
-              sneakAttackBonusAttack: item.weaponData?.sneakAttackBonusAttack,
-              sneakAttackBonusDamage: item.weaponData?.sneakAttackBonusDamage,
-              extraDamage: item.weaponData?.extraDamage,
-            },
-            attrs, level, classId, raceId, { sneakAttackActive }
-          )
-        )
-      : [];
+// ───────────────────────────────────────────────────────────
+// Zweiwaffenkampf (Two-Weapon Fighting)
+// ───────────────────────────────────────────────────────────
 
-    const twfResult = isTwoWeaponMode
-      ? calculateTwoWeaponFighting(
-          {
-            name: primaryWeapon!.name,
-            isMelee: primaryWeapon!.weaponData?.isMelee ?? true,
-            isFinesse: primaryWeapon!.weaponData?.isFinesse,
-            isLight: primaryWeapon!.weaponData?.isLight,
-            magicBonus: primaryWeapon!.weaponData?.magicBonus,
-            baseDice: primaryWeapon!.weaponData?.baseDice,
-            damageAttribute: primaryWeapon!.weaponData?.damageAttribute,
-            sneakAttackBonusDamage: primaryWeapon!.weaponData?.sneakAttackBonusDamage,
-            extraDamage: primaryWeapon!.weaponData?.extraDamage,
-          },
-          {
-            name: offHandWeapon!.name,
-            isMelee: offHandWeapon!.weaponData?.isMelee ?? true,
-            isFinesse: offHandWeapon!.weaponData?.isFinesse,
-            isLight: offHandWeapon!.weaponData?.isLight,
-            magicBonus: offHandWeapon!.weaponData?.magicBonus,
-            baseDice: offHandWeapon!.weaponData?.baseDice,
-            damageAttribute: offHandWeapon!.weaponData?.damageAttribute,
-            extraDamage: offHandWeapon!.weaponData?.extraDamage,
-          },
-          attrs, level, classId, raceId,
-          { hasTwoWeaponFighting, hasImprovedTwoWeaponFighting, hasGreaterTwoWeaponFighting },
-          { sneakAttackActive }
-        )
-      : null;
+export interface TwoWeaponFightingFeats {
+  hasTwoWeaponFighting: boolean;         // Grundtalent: reduziert Abzüge auf -2/-2
+  hasImprovedTwoWeaponFighting: boolean; // zusätzlicher Nebenhand-Angriff bei BAB-5
+  hasGreaterTwoWeaponFighting: boolean;  // weiterer Nebenhand-Angriff bei BAB-10
+}
 
-    return (
-      <div className="space-y-6">
-        {/* Klasse, Rasse, Level */}
-        <div className="grid grid-cols-3 gap-3 p-4 bg-zinc-900 border border-zinc-800 rounded-xl">
-          <div>
-            <label className="text-[10px] text-zinc-500 uppercase font-mono">Klasse</label>
-            {isEditing ? (
-              <select value={classId || ""} onChange={(e) => updateSystemData("classId", e.target.value)}
-                className="w-full bg-black border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white font-mono mt-1">
-                {Object.values(PATHFINDER_CLASSES).map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-              </select>
-            ) : <div className="text-sm font-bold text-white mt-1">{cls?.name || "–"}</div>}
-          </div>
-          <div>
-            <label className="text-[10px] text-zinc-500 uppercase font-mono">Rasse</label>
-            {isEditing ? (
-              <select value={raceId || ""} onChange={(e) => updateSystemData("raceId", e.target.value)}
-                className="w-full bg-black border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white font-mono mt-1">
-                {Object.values(PATHFINDER_RACES).map((r) => (<option key={r.id} value={r.id}>{r.name}</option>))}
-              </select>
-            ) : <div className="text-sm font-bold text-white mt-1">{race?.name || "–"}</div>}
-          </div>
-          <div>
-            <label className="text-[10px] text-zinc-500 uppercase font-mono">Level</label>
-            {isEditing ? (
-              <input type="number" min={1} max={20} value={level}
-                onChange={(e) => updateSystemData("level", Number(e.target.value))}
-                className="w-full bg-black border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white font-mono mt-1 text-center" />
-            ) : <div className="text-sm font-bold text-white mt-1 text-center">{level}</div>}
-          </div>
-        </div>
+export interface TwoWeaponAttackResult {
+  slot: "primary" | "offHand";
+  weaponName: string;
+  attacks: { attackBonus: number; damage: string }[];
+  formattedAttack: string;
+}
 
-        {/* Attribute */}
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-          {ATTR_KEYS.map((key) => (
-            <div key={key} className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-              <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">{key}</div>
-              {isEditing ? (
-                <input type="number" value={attrs[key]} onChange={(e) => updateAttr(key, Number(e.target.value))}
-                  className="w-full bg-black border border-zinc-700 rounded-lg text-center text-lg font-bold text-white py-1" />
-              ) : <div className="text-xl font-bold text-white">{attrs[key]}</div>}
-              <div className="text-[10px] text-amber-400 font-mono mt-0.5">{formatModifier(calculateModifier(attrs[key]))}</div>
-            </div>
-          ))}
-        </div>
+export interface TwoWeaponFightingResult {
+  primary: TwoWeaponAttackResult;
+  offHand: TwoWeaponAttackResult;
+  penaltyNote: string;
+}
 
-        {/* Kampfwerte */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-            <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">GAB</div>
-            <div className="text-sm font-bold text-white">{formatIteratives(iteratives)}</div>
-          </div>
-          <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-            <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Rüstungsklasse</div>
-            <div className="text-lg font-bold text-white">{ac.armorClass}</div>
-            <div className="text-[9px] text-zinc-500 font-mono mt-0.5">Berührung {ac.touchAc} · Flat {ac.flatFootedAc}</div>
-            <div className="text-[9px] text-zinc-600 font-mono">aus Rüstung: {armorItem?.name || "keine"}</div>
-          </div>
-          <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-            <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Trefferpunkte</div>
-            {isEditing ? (
-              <div className="flex items-center justify-center gap-1">
-                <input type="number" value={hp.current} onChange={(e) => updateHp("current", Number(e.target.value))}
-                  className="w-12 bg-black border border-zinc-700 rounded-lg text-center text-sm font-bold text-white py-1" />
-                <span className="text-zinc-500">/</span>
-                <input type="number" value={hp.max ?? 0} onChange={(e) => updateHp("max", Number(e.target.value))}
-                  className="w-12 bg-black border border-zinc-700 rounded-lg text-center text-sm font-bold text-white py-1" />
-              </div>
-            ) : <div className="text-lg font-bold text-white">{hp.current} / {hp.max ?? "–"}</div>}
-          </div>
-          <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-            <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Hinterhält. Angriff</div>
-            <label className="flex items-center justify-center gap-1.5 mt-1 cursor-pointer">
-              <input type="checkbox" checked={sneakAttackActive}
-                onChange={(e) => updateSystemData("sneakAttackActive", e.target.checked)} />
-              <span className="text-sm font-bold text-white">{sneakDice > 0 ? `+${sneakDice}W6` : "–"}</span>
-            </label>
-          </div>
-        </div>
+/**
+ * Berechnet die vollständige Angriffsfolge für Zweiwaffenkampf.
+ * Liest ausschließlich aus den übergebenen Waffen-Items und den Feat-Flags -
+ * keine Namens-Erkennung, keine charakterspezifische Logik.
+ */
+export const calculateTwoWeaponFighting = (
+  primaryWeapon: WeaponCalcInput & { isLight?: boolean },
+  offHandWeapon: WeaponCalcInput & { isLight?: boolean },
+  attrs: PathfinderAttributes,
+  level: number,
+  classId: string | undefined,
+  raceId: string | undefined,
+  feats: TwoWeaponFightingFeats,
+  options: { sneakAttackActive: boolean }
+): TwoWeaponFightingResult => {
+  const cls = classId ? PATHFINDER_CLASSES[classId] : undefined;
+  const race = raceId ? PATHFINDER_RACES[raceId] : undefined;
+  const sizeMod = SIZE_MODIFIERS[race?.size ?? "medium"];
+  const bab = calculateBAB(level, cls?.babProgression ?? "threeFourths");
 
-        {/* Rettungswürfe */}
-        <div className="grid grid-cols-3 gap-3">
-          {(["fortitude", "reflex", "will"] as const).map((key) => (
-            <div key={key} className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-              <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">
-                {key === "fortitude" ? "Zähigkeit" : key === "reflex" ? "Reflex" : "Wille"}
-              </div>
-              <div className="text-lg font-bold text-white">{formatModifier(saves[key].total)}</div>
-            </div>
-          ))}
-        </div>
+  const stMod = calculateModifier(attrs.ST);
+  const geMod = calculateModifier(attrs.GE);
+  const sneakDice = options.sneakAttackActive ? getSneakAttackDice(classId, level) : 0;
 
-        {/* Generische Klassen-Features */}
-        {hasClassFeatureDisplay && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {classId === "barbarian" && (
-              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-                <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Wut (Runden/Tag)</div>
-                <div className="text-lg font-bold text-white">{rageRounds}</div>
-              </div>
-            )}
-            {classId === "ranger" && (
-              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-                <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Lieblingsfeind-Bonus</div>
-                <div className="text-lg font-bold text-white">+{favoredEnemy}</div>
-              </div>
-            )}
-            {classId === "cleric" && channelEnergy && (
-              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-                <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Energie fokussieren</div>
-                <div className="text-lg font-bold text-white">{channelEnergy.dice}W6</div>
-                <div className="text-[9px] text-zinc-500 font-mono">{channelEnergy.usesPerDay}x / Tag</div>
-              </div>
-            )}
-            {classId === "bard" && (
-              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-                <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Bardenauftritt (Runden/Tag)</div>
-                <div className="text-lg font-bold text-white">{bardicRounds}</div>
-              </div>
-            )}
-            {classId === "monk" && (
-              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-                <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Betäubender Schlag (x/Tag)</div>
-                <div className="text-lg font-bold text-white">{stunningFistUses}</div>
-              </div>
-            )}
-          </div>
-        )}
+  // Abzüge bestimmen
+  let primaryPenalty = -2;
+  let offHandPenalty = offHandWeapon.isLight ? -2 : -4;
+  if (feats.hasTwoWeaponFighting) {
+    primaryPenalty = -2;
+    offHandPenalty = -2;
+  }
 
-        {/* Zweiwaffenkampf-Talente */}
-        {isEditing && (
-          <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl flex flex-wrap gap-4 text-[11px] font-mono text-zinc-400">
-            <label className="flex items-center gap-1.5">
-              <input type="checkbox" checked={hasTwoWeaponFighting}
-                onChange={(e) => updateSystemData("hasTwoWeaponFighting", e.target.checked)} />
-              Zweiwaffenkampf (Talent)
-            </label>
-            <label className="flex items-center gap-1.5">
-              <input type="checkbox" checked={hasImprovedTwoWeaponFighting}
-                onChange={(e) => updateSystemData("hasImprovedTwoWeaponFighting", e.target.checked)} />
-              Verbesserter Zweiwaffenkampf
-            </label>
-            <label className="flex items-center gap-1.5">
-              <input type="checkbox" checked={hasGreaterTwoWeaponFighting}
-                onChange={(e) => updateSystemData("hasGreaterTwoWeaponFighting", e.target.checked)} />
-              Meisterlicher Zweiwaffenkampf
-            </label>
-          </div>
-        )}
+  const buildAttacks = (
+    weapon: WeaponCalcInput,
+    penalty: number,
+    extraBabThresholds: number[] // z.B. [5, 10] für Improved/Greater TWF
+  ) => {
+    const useFinesse = weapon.isMelee && weapon.isFinesse;
+    const attackAttr = !weapon.isMelee ? "GE" : useFinesse ? "GE" : "ST";
+    const attackMod = attackAttr === "GE" ? geMod : stMod;
+    const magicBonus = weapon.magicBonus ?? 0;
 
-        {/* Aktive Kampfwaffen - Anzeige */}
-        <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
-          <div className="text-xs font-mono font-bold text-zinc-300 mb-1">
-            Aktive Kampfwaffen {sneakAttackActive && "(mit hinterhältigem Angriff)"}
-          </div>
+    const dmgAttr = weapon.damageAttribute ?? (!weapon.isMelee ? "NONE" : "ST");
+    const rawDmgMod = dmgAttr === "GE" ? geMod : dmgAttr === "ST" ? stMod : 0;
+    // Nebenhand bekommt nur den halben Attributsbonus (bei positivem Bonus)
+    const isOffHand = penalty !== primaryPenalty || weapon === offHandWeapon;
+    const dmgMod = weapon === offHandWeapon && rawDmgMod > 0 ? Math.floor(rawDmgMod * 0.5) : rawDmgMod;
 
-          {activeWeapons.length === 0 && (
-            <p className="text-xs text-zinc-600 font-mono">
-              Keine aktive Waffe markiert – im Inventar unten eine Waffe als "aktiv" setzen.
-            </p>
-          )}
+    const flat = dmgMod + magicBonus + (weapon === primaryWeapon && options.sneakAttackActive ? weapon.sneakAttackBonusDamage ?? 0 : 0);
+    const baseDice = weapon.baseDice || "1W6";
+    let damage = flat > 0 ? `${baseDice}+${flat}` : flat < 0 ? `${baseDice}${flat}` : baseDice;
+    if (sneakDice > 0) damage += ` + ${sneakDice}W6`;
+    if (weapon.extraDamage) damage += ` ${weapon.extraDamage}`;
 
-          {!isTwoWeaponMode && singleWeaponResults.map((result, idx) => (
-            <div key={idx} className="text-sm font-mono text-zinc-300 flex items-center justify-between">
-              <span>{result.name}</span>
-              <span className="text-zinc-500">
-                {sneakAttackActive && result.sneakAttack
-                  ? <>{result.sneakAttack.attack} · {result.sneakAttack.damage}</>
-                  : <>{result.attack} · {result.damage}</>}
-              </span>
-            </div>
-          ))}
+    // Haupt-Angriffsfolge über BAB-Iterative (nur erster Eintrag bei TWF genutzt, Rest optional)
+    const mainAttackBonus = bab + attackMod + magicBonus + sizeMod.attackAndAc + penalty;
+    const attacks = [{ attackBonus: mainAttackBonus, damage }];
 
-          {isTwoWeaponMode && twfResult && (
-            <>
-              <p className="text-[10px] text-amber-400/80 font-mono">{twfResult.penaltyNote}</p>
-              <div className="text-sm font-mono text-zinc-300 flex items-center justify-between">
-                <span>⚔ {twfResult.primary.weaponName} (Haupthand)</span>
-                <span className="text-zinc-500">
-                  {twfResult.primary.formattedAttack} · {twfResult.primary.attacks[0].damage}
-                </span>
-              </div>
-              <div className="text-sm font-mono text-zinc-300 flex items-center justify-between">
-                <span>⚔ {twfResult.offHand.weaponName} (Nebenhand)</span>
-                <span className="text-zinc-500">
-                  {twfResult.offHand.formattedAttack} · {twfResult.offHand.attacks[0].damage}
-                </span>
-              </div>
-            </>
-          )}
-        </div>
+    // Zusätzliche Nebenhand-Angriffe durch Improved/Greater Two-Weapon Fighting
+    extraBabThresholds.forEach((threshold) => {
+      if (bab >= threshold) {
+        attacks.push({
+          attackBonus: bab - threshold + attackMod + magicBonus + sizeMod.attackAndAc + penalty,
+          damage,
+        });
+      }
+    });
 
-        {/* Inventar-Editor */}
-        <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-bold text-zinc-300">Inventar</span>
-            {isEditing && (
-              <div className="flex gap-1.5">
-                <button onClick={() => addInventoryItem("weapon")} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono rounded-lg text-zinc-300">+ Waffe</button>
-                <button onClick={() => addInventoryItem("armor")} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono rounded-lg text-zinc-300">+ Rüstung</button>
-                <button onClick={() => addInventoryItem("gear")} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono rounded-lg text-zinc-300">+ Gegenstand</button>
-              </div>
-            )}
-          </div>
+    return attacks;
+  };
 
-          {character.inventory.length === 0 && <p className="text-xs text-zinc-600 font-mono">Leer</p>}
+  const primaryAttacks = buildAttacks(primaryWeapon, primaryPenalty, []);
+  const offHandExtra = [
+    ...(feats.hasImprovedTwoWeaponFighting ? [5] : []),
+    ...(feats.hasGreaterTwoWeaponFighting ? [10] : []),
+  ];
+  const offHandAttacks = buildAttacks(offHandWeapon, offHandPenalty, offHandExtra);
 
-          <div className="space-y-2">
-            {character.inventory.map((item) => (
-              <div key={item.id} className="p-3 bg-black/40 border border-zinc-800 rounded-lg space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  {isEditing ? (
-                    <input value={item.name} onChange={(e) => updateInventoryItem(item.id, { name: e.target.value })}
-                      className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-white font-mono" />
-                  ) : (
-                    <span className="text-sm font-bold text-white flex items-center gap-1.5">
-                      {item.name}
-                      {item.sourceReference && (
-                        <span className="text-[9px] text-amber-400/80 bg-amber-950/20 border border-amber-900/30 px-1 py-0.5 rounded">
-                          {item.sourceReference}
-                        </span>
-                      )}
-                    </span>
-                  )}
+  const formatAttacks = (attacks: { attackBonus: number }[]) =>
+    attacks.map((a) => formatModifier(a.attackBonus)).join(" / ");
 
-                  {isEditing && (
-                    <button onClick={() => removeInventoryItem(item.id)} className="text-xs text-red-400 font-mono">Entfernen</button>
-                  )}
-                </div>
-
-                {isEditing && (
-                  <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-zinc-400">
-                    <label className="flex items-center gap-1.5">
-                      <input type="checkbox" checked={item.location === "equipped"}
-                        onChange={(e) => updateInventoryItem(item.id, { location: e.target.checked ? "equipped" : "stored" })} />
-                      Am Körper getragen
-                    </label>
-
-                    {item.category === "weapon" && (
-                      <>
-                        <label className="flex items-center gap-1.5">
-                          <input type="checkbox" checked={!!item.isActiveWeapon}
-                            onChange={(e) => updateInventoryItem(item.id, { isActiveWeapon: e.target.checked })} />
-                          Aktive Kampfwaffe
-                        </label>
-                        {item.isActiveWeapon && (
-                          <label className="flex items-center gap-1.5">
-                            <span>Hand:</span>
-                            <select
-                              value={item.weaponData?.weaponSlot || "primary"}
-                              onChange={(e) => updateInventoryItem(item.id, {
-                                weaponData: { ...item.weaponData!, weaponSlot: e.target.value as any }
-                              })}
-                              className="bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-white"
-                            >
-                              <option value="primary">Haupthand</option>
-                              <option value="offHand">Nebenhand</option>
-                              <option value="twoHanded">Beidhändig</option>
-                            </select>
-                          </label>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {isEditing && item.category === "weapon" && (
+  return {
+    primary: {
+      slot: "primary",
+      weaponName: primaryWeapon.name,
+      attacks: primaryAttacks,
+      formattedAttack: formatAttacks(primaryAttacks),
+    },
+    offHand: {
+      slot: "offHand",
+      weaponName: offHandWeapon.name,
+      attacks: offHandAttacks,
+      formattedAttack: formatAttacks(offHandAttacks),
+    },
+    penaltyNote: feats.hasTwoWeaponFighting
+      ? "Zweiwaffenkampf-Talent aktiv: -2/-2"
+      : `Standard-Abzüge: ${primaryPenalty}/${offHandPenalty}${offHandWeapon.isLight ? " (Nebenhand leicht)" : ""}`,
+  };
+};
