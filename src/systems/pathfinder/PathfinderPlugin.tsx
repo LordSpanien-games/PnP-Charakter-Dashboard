@@ -15,6 +15,9 @@ import {
   getSneakAttackDice,
   getRageRounds,
   getFavoredEnemyBonus,
+  getChannelEnergy,
+  getBardicPerformanceRounds,
+  getStunningFistUses,
   PATHFINDER_CLASSES,
   PATHFINDER_RACES,
 } from "./pathfinderRules";
@@ -129,13 +132,13 @@ export const PathfinderPlugin: SystemPlugin = {
     const raceMatch = Object.entries(PATHFINDER_RACES).find(([, r]) => sub.includes(r.name.toLowerCase()));
     char.systemData.raceId = raceMatch ? raceMatch[0] : "human";
 
-    // Alte Waffen-Arrays als Inventar-Items mit Standard-Waffendaten migrieren
     const migrateWeapon = (w: any, isMelee: boolean): InventoryItem => ({
       id: makeId(),
       name: w.name,
       category: "weapon",
       location: "equipped",
       isActiveWeapon: true,
+      sourceReference: w.sourceReference,
       weaponData: {
         isMelee,
         isFinesse: !!w.isFinesse,
@@ -156,6 +159,7 @@ export const PathfinderPlugin: SystemPlugin = {
         category: it.category || "gear",
         quantity: it.quantity ?? 1,
         notes: it.notes,
+        sourceReference: it.page || it.sourceReference,
         location: it.status === "stored" ? "stored" : "equipped",
         charges: it.maxUses
           ? { max: it.maxUses, current: it.currentUses ?? it.maxUses, rechargeType: "rest" }
@@ -172,8 +176,6 @@ export const PathfinderPlugin: SystemPlugin = {
   recalculate: (character) => character,
 
   DashboardComponent: ({ character, isEditing, onUpdate }) => {
-    const [showInventoryEditor, setShowInventoryEditor] = useState(false);
-
     const attrs = getAttrs(character);
     const level = getLevel(character);
     const classId = getClassId(character);
@@ -195,10 +197,17 @@ export const PathfinderPlugin: SystemPlugin = {
       (i) => i.category === "weapon" && i.location === "equipped" && i.isActiveWeapon
     );
 
-    // Generische Klassen-Feature-Werte (nur angezeigt, wenn die Klasse das Feature besitzt)
+    const chaMod = calculateModifier(attrs.CH);
+    const wisMod = calculateModifier(attrs.WE);
+
     const sneakDice = getSneakAttackDice(classId, level);
     const rageRounds = classId === "barbarian" ? getRageRounds(classId, calculateModifier(attrs.KO)) : 0;
     const favoredEnemy = classId === "ranger" ? getFavoredEnemyBonus(classId, level) : 0;
+    const channelEnergy = classId === "cleric" ? getChannelEnergy(classId, level, chaMod) : null;
+    const bardicRounds = classId === "bard" ? getBardicPerformanceRounds(classId, level) : 0;
+    const stunningFistUses = classId === "monk" ? getStunningFistUses(classId, level) : 0;
+
+    const hasClassFeatureDisplay = ["barbarian", "ranger", "cleric", "bard", "monk"].includes(classId || "");
 
     const updateAttr = (key: string, value: number) =>
       onUpdate({ attributes: { ...character.attributes, [key]: value } });
@@ -322,18 +331,37 @@ export const PathfinderPlugin: SystemPlugin = {
         </div>
 
         {/* Generische Klassen-Features (nur sichtbar, wenn relevant) */}
-        {(classId === "barbarian" || classId === "ranger") && (
-          <div className="flex gap-3">
+        {hasClassFeatureDisplay && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {classId === "barbarian" && (
-              <div className="flex-1 p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
                 <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Wut (Runden/Tag)</div>
                 <div className="text-lg font-bold text-white">{rageRounds}</div>
               </div>
             )}
             {classId === "ranger" && (
-              <div className="flex-1 p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
                 <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Lieblingsfeind-Bonus</div>
                 <div className="text-lg font-bold text-white">+{favoredEnemy}</div>
+              </div>
+            )}
+            {classId === "cleric" && channelEnergy && (
+              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+                <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Energie fokussieren</div>
+                <div className="text-lg font-bold text-white">{channelEnergy.dice}W6</div>
+                <div className="text-[9px] text-zinc-500 font-mono">{channelEnergy.usesPerDay}x / Tag</div>
+              </div>
+            )}
+            {classId === "bard" && (
+              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+                <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Bardenauftritt (Runden/Tag)</div>
+                <div className="text-lg font-bold text-white">{bardicRounds}</div>
+              </div>
+            )}
+            {classId === "monk" && (
+              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+                <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Betäubender Schlag (x/Tag)</div>
+                <div className="text-lg font-bold text-white">{stunningFistUses}</div>
               </div>
             )}
           </div>
@@ -365,8 +393,15 @@ export const PathfinderPlugin: SystemPlugin = {
               attrs, level, classId, raceId, { sneakAttackActive }
             );
             return (
-              <div key={item.id} className="text-sm font-mono text-zinc-300 flex items-center justify-between">
-                <span>{item.name}</span>
+              <div key={item.id} className="text-sm font-mono text-zinc-300 flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5">
+                  {item.name}
+                  {item.sourceReference && (
+                    <span className="text-[9px] text-amber-400/80 bg-amber-950/20 border border-amber-900/30 px-1 py-0.5 rounded">
+                      {item.sourceReference}
+                    </span>
+                  )}
+                </span>
                 <span className="text-zinc-500">
                   {sneakAttackActive && result.sneakAttack ? (
                     <>{result.sneakAttack.attack} · {result.sneakAttack.damage}</>
@@ -401,7 +436,16 @@ export const PathfinderPlugin: SystemPlugin = {
                   {isEditing ? (
                     <input value={item.name} onChange={(e) => updateInventoryItem(item.id, { name: e.target.value })}
                       className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-white font-mono" />
-                  ) : <span className="text-sm font-bold text-white">{item.name}</span>}
+                  ) : (
+                    <span className="text-sm font-bold text-white flex items-center gap-1.5">
+                      {item.name}
+                      {item.sourceReference && (
+                        <span className="text-[9px] text-amber-400/80 bg-amber-950/20 border border-amber-900/30 px-1 py-0.5 rounded">
+                          {item.sourceReference}
+                        </span>
+                      )}
+                    </span>
+                  )}
 
                   {isEditing && (
                     <button onClick={() => removeInventoryItem(item.id)} className="text-xs text-red-400 font-mono">Entfernen</button>
@@ -410,14 +454,12 @@ export const PathfinderPlugin: SystemPlugin = {
 
                 {isEditing && (
                   <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-zinc-400">
-                    {/* Standort */}
                     <label className="flex items-center gap-1.5">
                       <input type="checkbox" checked={item.location === "equipped"}
                         onChange={(e) => updateInventoryItem(item.id, { location: e.target.checked ? "equipped" : "stored" })} />
                       Am Körper getragen
                     </label>
 
-                    {/* Aktive Waffe */}
                     {item.category === "weapon" && (
                       <label className="flex items-center gap-1.5">
                         <input type="checkbox" checked={!!item.isActiveWeapon}
@@ -428,7 +470,6 @@ export const PathfinderPlugin: SystemPlugin = {
                   </div>
                 )}
 
-                {/* Waffen-Detaildaten */}
                 {isEditing && item.category === "weapon" && (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-zinc-800">
                     <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
@@ -456,7 +497,6 @@ export const PathfinderPlugin: SystemPlugin = {
                   </div>
                 )}
 
-                {/* Rüstungs-Detaildaten */}
                 {isEditing && item.category === "armor" && (
                   <div className="pt-1 border-t border-zinc-800">
                     <label className="block text-[9px] text-zinc-500">Rüstungsbonus</label>
@@ -466,7 +506,6 @@ export const PathfinderPlugin: SystemPlugin = {
                   </div>
                 )}
 
-                {/* Ladungen (für alle Kategorien verfügbar) */}
                 {isEditing && (
                   <div className="pt-1 border-t border-zinc-800 space-y-1.5">
                     <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
@@ -495,6 +534,17 @@ export const PathfinderPlugin: SystemPlugin = {
                         </select>
                       </div>
                     )}
+
+                    {/* Regelwerk-Referenz zum schnellen Nachschlagen */}
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
+                      <span>Regelwerk-Seite</span>
+                      <input
+                        value={item.sourceReference || ""}
+                        placeholder="z.B. GRW S. 112"
+                        onChange={(e) => updateInventoryItem(item.id, { sourceReference: e.target.value || undefined })}
+                        className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-white"
+                      />
+                    </div>
                   </div>
                 )}
 
