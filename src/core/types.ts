@@ -1,17 +1,13 @@
-// Generische, systemunabhängige Charakter-Datenstruktur.
-// Jedes System-Plugin liest/schreibt ausschließlich diese Form -
-// keine system-spezifischen Felder im Kern der App.
-
 export type AttributeValue = number | string;
 
 export interface AttributeDefinition {
-  key: string;          // "ST", "DEX", "MU", ...
-  label: string;         // "Stärke"
+  key: string;
+  label: string;
   description?: string;
 }
 
 export interface ResourceDefinition {
-  key: string;           // "hp", "sanity", "deprivation", "essence"
+  key: string;
   label: string;
   hasMax?: boolean;
 }
@@ -39,13 +35,50 @@ export interface Weapon {
   [extra: string]: unknown;
 }
 
+export type ItemLocationStatus = "equipped" | "stored";
+export type ChargeRechargeType = "rest" | "manual" | "none";
+
+export interface ItemCharges {
+  max: number;
+  current: number;
+  /** 'rest' = füllt sich bei Rast automatisch wieder auf
+   *  'manual' = muss aktiv wieder aufgeladen werden (z.B. Terminal, Zauber)
+   *  'none' = verbraucht sich dauerhaft, keine Wiederauffüllung */
+  rechargeType: ChargeRechargeType;
+  rechargeAmount?: number;
+}
+
+/** Generische Waffen-Eigenschaften, die direkt am Inventar-Item hängen -
+ * KEINE Logik im Code, die auf Namen oder bestimmte Charaktere reagiert. */
+export interface WeaponItemData {
+  isMelee: boolean;
+  isFinesse?: boolean;
+  magicBonus?: number;
+  baseDice?: string;              // z.B. "1W6"
+  damageAttribute?: "ST" | "GE" | "NONE";
+  attackAttribute?: "ST" | "GE";
+  sneakAttackBonusAttack?: number;
+  sneakAttackBonusDamage?: number;
+  extraDamage?: string;           // z.B. "+1W6 Feuer"
+}
+
+export interface ArmorItemData {
+  armorBonus: number;
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
   category?: string;
   quantity?: number;
   notes?: string;
-  status?: "equipped" | "stored";
+  location: ItemLocationStatus;
+  /** Nur relevant für category === 'weapon': ist diese Waffe aktuell
+   * im Kampfeinsatz? Mehrere gleichzeitig möglich (z.B. beidhändig). */
+  isActiveWeapon?: boolean;
+  weaponData?: WeaponItemData;
+  armorData?: ArmorItemData;
+  charges?: ItemCharges;
   [extra: string]: unknown;
 }
 
@@ -78,14 +111,12 @@ export interface GenericCharacter {
   attributes: Record<string, AttributeValue>;
   resources: Record<string, ResourceState>;
   skills: SkillValue[];
-  weapons: { melee: Weapon[]; ranged: Weapon[] };
+  weapons: { melee: Weapon[]; ranged: Weapon[] }; // bleibt als Legacy-Lesefeld für alte Importe
   inventory: InventoryItem[];
   abilities: Ability[];
   party: PartyMember[];
   currency?: CurrencyData;
   notes?: string;
-  /** Freie Ablage für alles, was sich nicht sinnvoll generalisieren lässt
-   * (z.B. Pathfinder combatSettings, Shadowrun bodyMods, Cairn-Sonderregeln). */
   systemData: Record<string, unknown>;
 }
 
