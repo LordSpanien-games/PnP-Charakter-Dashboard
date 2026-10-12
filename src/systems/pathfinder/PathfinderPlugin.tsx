@@ -1,5 +1,5 @@
-import React from "react";
-import { Info, Plus, Minus } from "lucide-react";
+import React, { useState } from "react";
+import { Info, Plus, Minus, ChevronDown, ChevronRight } from "lucide-react";
 import { SystemPlugin, AttributePool } from "../../core/SystemPlugin";
 import { GenericCharacter, createEmptyGenericCharacter, InventoryItem } from "../../core/types";
 import { rollPool, roll4d6DropLowest } from "../../core/dice";
@@ -59,6 +59,61 @@ const createBase = (name: string, subTitle: string | undefined, attrs: Record<st
     },
   };
 };
+
+/** Kleines, immer sichtbares Werte-Badge - für Zahlen/Kampfwerte, NICHT für Fließtext. */
+const ValueBadge: React.FC<{ label: string; value: React.ReactNode; color?: string }> = ({ label, value, color }) => (
+  <div className="bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded text-zinc-300 text-[11px] font-mono">
+    <span className="text-[9px] text-zinc-500 uppercase mr-1">{label}:</span>
+    <strong className={color || "text-zinc-200"}>{value}</strong>
+  </div>
+);
+
+type CategoryTabId = "all" | "weapon" | "armor" | "consumable" | "jewelry" | "gear";
+
+const CATEGORY_TABS: { id: CategoryTabId; label: string }[] = [
+  { id: "all", label: "Alle" },
+  { id: "weapon", label: "Waffen" },
+  { id: "armor", label: "Rüstung" },
+  { id: "consumable", label: "Tränke & Verbrauch" },
+  { id: "jewelry", label: "Schmuck" },
+  { id: "gear", label: "Sonstiges" },
+];
+
+const getTabForItem = (item: InventoryItem): CategoryTabId => {
+  const cat = (item.category || "gear").toLowerCase();
+  if (cat === "weapon") return "weapon";
+  if (cat === "armor") return "armor";
+  if (cat === "consumable" || cat === "potion" || cat === "ammo") return "consumable";
+  if (cat === "jewelry" || cat === "accessory" || cat === "ring" || cat === "amulet") return "jewelry";
+  return "gear";
+};
+
+/** Klickbare Ladungs-Kästchen zum "Abstreichen" - unabhängig vom Bearbeitungsmodus nutzbar. */
+const ChargeTracker: React.FC<{
+  current: number;
+  max: number;
+  onToggle: (newCurrent: number) => void;
+}> = ({ current, max, onToggle }) => (
+  <div className="flex items-center gap-1 flex-wrap">
+    {Array.from({ length: max }, (_, i) => {
+      const filled = i < current;
+      return (
+        <button
+          key={i}
+          onClick={() => onToggle(filled ? i : i + 1)}
+          title={filled ? "Ladung verbrauchen" : "Ladung wiederherstellen"}
+          className={`w-5 h-5 rounded border text-[9px] font-mono font-bold transition-colors ${
+            filled
+              ? "bg-purple-500/20 border-purple-500/50 text-purple-300"
+              : "bg-zinc-900 border-zinc-700 text-zinc-600"
+          }`}
+        >
+          {i + 1}
+        </button>
+      );
+    })}
+  </div>
+);
 
 export const PathfinderPlugin: SystemPlugin = {
   id: "pathfinder",
@@ -121,7 +176,6 @@ export const PathfinderPlugin: SystemPlugin = {
 
     const char = createBase(raw.name || "Unbenannt", raw.subTitle, attrs);
 
-    // --- Trefferpunkte inkl. bereits erlittenem Schaden übernehmen ---
     const hpStat = (raw.stats || []).find(
       (s: any) => (s.label || "").toLowerCase().includes("trefferpunkte") || (s.label || "").toUpperCase() === "TP"
     );
@@ -132,7 +186,6 @@ export const PathfinderPlugin: SystemPlugin = {
       char.resources.hp = { current: Math.max(0, maxHp - damageTaken), max: maxHp };
     }
 
-    // --- Rasse bestimmen: zuerst direktes "race"-Feld, dann Text-Suche als Fallback ---
     const combinedText = [raw.race, raw.level, raw.subTitle].filter(Boolean).join(" ").toLowerCase();
 
     let raceId = "human";
@@ -148,7 +201,6 @@ export const PathfinderPlugin: SystemPlugin = {
     }
     char.systemData.raceId = raceId;
 
-    // --- Level & Klasse bestimmen: zuerst direktes "level"-Feld (z.B. "Dieb 9"), dann subTitle ---
     const levelSource = (raw.level ? String(raw.level) : (raw.subTitle || "")).toLowerCase();
     const levelNumMatch = levelSource.match(/(\d+)/);
     const level = levelNumMatch ? parseInt(levelNumMatch[1], 10) : 1;
@@ -159,7 +211,6 @@ export const PathfinderPlugin: SystemPlugin = {
     char.systemData.level = level;
     char.systemData.classId = classMatch ? classMatch[0] : "fighter";
 
-    // --- Waffen migrieren: Schadens-String zerlegen, Magie-Bonus aus dem Namen lesen ---
     const migrateWeapon = (w: any, isMelee: boolean): InventoryItem => {
       const { baseDice, extraDamage } = parseLegacyWeaponDamage(w.damage);
       const magicBonus = w.magicBonus ?? parseMagicBonusFromName(w.name || "");
@@ -179,9 +230,6 @@ export const PathfinderPlugin: SystemPlugin = {
           baseDice,
           extraDamage,
           damageAttribute: w.damageAttribute === "GE" ? "GE" : isMelee ? "ST" : "NONE",
-          // Diese beiden Werte sind in älteren Exporten oft nur als Freitext in "note"
-          // vorhanden und können nicht automatisch erkannt werden - bitte unten im
-          // Inventar-Editor einmalig nachtragen, danach bleiben sie dauerhaft gespeichert.
           sneakAttackBonusAttack: w.sneakAttackBonus ?? 0,
           sneakAttackBonusDamage: w.sneakAttackDamageBonus ?? 0,
           weaponSlot: "primary",
@@ -192,8 +240,6 @@ export const PathfinderPlugin: SystemPlugin = {
     char.inventory = [
       ...(raw.weapons?.melee || []).map((w: any) => migrateWeapon(w, true)),
       ...(raw.weapons?.ranged || []).map((w: any) => migrateWeapon(w, false)),
-      // Items aus raw.inventory, die bereits Waffen sind, NICHT doppelt übernehmen
-      // (manche Exporte enthalten Waffen sowohl in raw.weapons als auch in raw.inventory)
       ...((raw.inventory || [])
         .filter((it: any) => it.category !== "weapon")
         .map((it: any) => ({
@@ -219,6 +265,18 @@ export const PathfinderPlugin: SystemPlugin = {
   recalculate: (character) => character,
 
   DashboardComponent: ({ character, isEditing, onUpdate }) => {
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+    const [activeTab, setActiveTab] = useState<CategoryTabId>("all");
+
+    const toggleExpand = (id: string) => {
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    };
+
     const attrs = getAttrs(character);
     const level = getLevel(character);
     const classId = getClassId(character);
@@ -273,10 +331,14 @@ export const PathfinderPlugin: SystemPlugin = {
     const removeInventoryItem = (id: string) => {
       onUpdate({ inventory: character.inventory.filter((it) => it.id !== id) });
     };
-    const addInventoryItem = (category: "weapon" | "armor" | "gear") => {
+    const addInventoryItem = (category: "weapon" | "armor" | "consumable" | "jewelry" | "gear") => {
       const base: InventoryItem = {
         id: makeId(),
-        name: category === "weapon" ? "Neue Waffe" : category === "armor" ? "Neue Rüstung" : "Neuer Gegenstand",
+        name:
+          category === "weapon" ? "Neue Waffe" :
+          category === "armor" ? "Neue Rüstung" :
+          category === "consumable" ? "Neuer Trank" :
+          category === "jewelry" ? "Neuer Schmuck" : "Neuer Gegenstand",
         category,
         quantity: 1,
         location: "equipped",
@@ -285,9 +347,9 @@ export const PathfinderPlugin: SystemPlugin = {
         armorData: category === "armor" ? { armorBonus: 0 } : undefined,
       };
       onUpdate({ inventory: [...character.inventory, base] });
+      setExpandedIds((prev) => new Set(prev).add(base.id));
     };
 
-    // Jederzeit nutzbare Verbrauchs-/Ladungs-Buttons (auch außerhalb des Bearbeitungsmodus)
     const adjustQuantity = (id: string, delta: number) => {
       onUpdate({
         inventory: character.inventory.map((it) =>
@@ -295,19 +357,20 @@ export const PathfinderPlugin: SystemPlugin = {
         ),
       });
     };
-    const adjustCharge = (id: string, delta: number) => {
+    const setCharge = (id: string, newCurrent: number) => {
       onUpdate({
         inventory: character.inventory.map((it) => {
           if (it.id !== id || !it.charges) return it;
-          const next = Math.min(it.charges.max, Math.max(0, it.charges.current + delta));
-          return { ...it, charges: { ...it.charges, current: next } };
+          const clamped = Math.min(it.charges.max, Math.max(0, newCurrent));
+          return { ...it, charges: { ...it.charges, current: clamped } };
         }),
       });
     };
 
     const singleWeaponResults = !isTwoWeaponMode
-      ? activeWeapons.map((item) =>
-          calculateWeaponStats(
+      ? activeWeapons.map((item) => ({
+          item,
+          result: calculateWeaponStats(
             {
               name: item.name,
               isMelee: item.weaponData?.isMelee ?? true,
@@ -320,8 +383,8 @@ export const PathfinderPlugin: SystemPlugin = {
               extraDamage: item.weaponData?.extraDamage,
             },
             attrs, level, classId, raceId, { sneakAttackActive }
-          )
-        )
+          ),
+        }))
       : [];
 
     const twfResult = isTwoWeaponMode
@@ -352,6 +415,10 @@ export const PathfinderPlugin: SystemPlugin = {
           { sneakAttackActive }
         )
       : null;
+
+    const filteredInventory = character.inventory.filter(
+      (item) => activeTab === "all" || getTabForItem(item) === activeTab
+    );
 
     return (
       <div className="space-y-6">
@@ -503,10 +570,10 @@ export const PathfinderPlugin: SystemPlugin = {
           </div>
         )}
 
-        {/* Aktive Kampfwaffen - Live-Berechnung */}
-        <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
-          <div className="text-xs font-mono font-bold text-zinc-300 mb-1">
-            Aktive Kampfwaffen {sneakAttackActive && "(mit hinterhältigem Angriff)"}
+        {/* Aktive Kampfwaffen */}
+        <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
+          <div className="text-xs font-mono font-bold text-zinc-300">
+            Aktive Kampfwaffen {sneakAttackActive && "(Hinterhältiger Angriff aktiv)"}
           </div>
 
           {activeWeapons.length === 0 && (
@@ -515,255 +582,364 @@ export const PathfinderPlugin: SystemPlugin = {
             </p>
           )}
 
-          {!isTwoWeaponMode && singleWeaponResults.map((result, idx) => (
-            <div key={idx} className="text-sm font-mono text-zinc-300 flex items-center justify-between">
-              <span>{result.name}</span>
-              <span className="text-zinc-500">
-                {sneakAttackActive && result.sneakAttack
-                  ? <>{result.sneakAttack.attack} · {result.sneakAttack.damage}</>
-                  : <>{result.attack} · {result.damage}</>}
-              </span>
+          {!isTwoWeaponMode && singleWeaponResults.map(({ item, result }) => (
+            <div key={item.id} className="pb-2 border-b border-zinc-800 last:border-b-0 last:pb-0">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-sm font-bold text-white">{item.name}</span>
+                {item.weaponData?.isFinesse && (
+                  <span className="text-[9px] uppercase px-1.5 py-0.5 bg-amber-950/30 border border-amber-800/40 rounded text-amber-400">Finesse</span>
+                )}
+                {item.weaponData?.sneakAttackBonusAttack ? (
+                  <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 bg-amber-900/30 border border-amber-700/40 rounded text-amber-300">
+                    Schurkenwaffe
+                  </span>
+                ) : null}
+                {item.notes && (
+                  <span title={item.notes} className="text-zinc-500 hover:text-amber-400 cursor-help">
+                    <Info size={13} />
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <ValueBadge label="Angriff" value={result.attack} color="text-cyan-300" />
+                <ValueBadge label="Schaden" value={result.damage} color="text-rose-400" />
+                {!!item.weaponData?.magicBonus && (
+                  <ValueBadge label="Magie" value={`+${item.weaponData.magicBonus}`} color="text-indigo-300" />
+                )}
+                {sneakAttackActive && result.sneakAttack && (
+                  <>
+                    <ValueBadge label="HA-Angriff" value={result.sneakAttack.attack} color="text-emerald-400" />
+                    <ValueBadge label="HA-Schaden" value={result.sneakAttack.damage} color="text-emerald-400" />
+                  </>
+                )}
+              </div>
             </div>
           ))}
 
           {isTwoWeaponMode && twfResult && (
             <>
               <p className="text-[10px] text-amber-400/80 font-mono">{twfResult.penaltyNote}</p>
-              <div className="text-sm font-mono text-zinc-300 flex items-center justify-between">
-                <span>⚔ {twfResult.primary.weaponName} (Haupthand)</span>
-                <span className="text-zinc-500">
-                  {twfResult.primary.formattedAttack} · {twfResult.primary.attacks[0].damage}
-                </span>
+
+              <div className="pb-2 border-b border-zinc-800">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-sm font-bold text-white">⚔ {twfResult.primary.weaponName}</span>
+                  <span className="text-[9px] uppercase px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-300">Haupthand</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <ValueBadge label="Angriff" value={twfResult.primary.formattedAttack} color="text-cyan-300" />
+                  <ValueBadge label="Schaden" value={twfResult.primary.attacks[0].damage} color="text-rose-400" />
+                </div>
               </div>
-              <div className="text-sm font-mono text-zinc-300 flex items-center justify-between">
-                <span>⚔ {twfResult.offHand.weaponName} (Nebenhand)</span>
-                <span className="text-zinc-500">
-                  {twfResult.offHand.formattedAttack} · {twfResult.offHand.attacks[0].damage}
-                </span>
+
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-sm font-bold text-white">⚔ {twfResult.offHand.weaponName}</span>
+                  <span className="text-[9px] uppercase px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-300">Nebenhand</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <ValueBadge label="Angriff" value={twfResult.offHand.formattedAttack} color="text-cyan-300" />
+                  <ValueBadge label="Schaden" value={twfResult.offHand.attacks[0].damage} color="text-rose-400" />
+                </div>
               </div>
             </>
           )}
         </div>
 
-        {/* Inventar-Editor */}
+        {/* Inventar mit Kategorie-Reitern */}
         <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <span className="text-xs font-mono font-bold text-zinc-300">Inventar</span>
             {isEditing && (
-              <div className="flex gap-1.5">
+              <div className="flex gap-1.5 flex-wrap">
                 <button onClick={() => addInventoryItem("weapon")} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono rounded-lg text-zinc-300">+ Waffe</button>
                 <button onClick={() => addInventoryItem("armor")} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono rounded-lg text-zinc-300">+ Rüstung</button>
+                <button onClick={() => addInventoryItem("consumable")} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono rounded-lg text-zinc-300">+ Trank/Verbrauch</button>
+                <button onClick={() => addInventoryItem("jewelry")} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono rounded-lg text-zinc-300">+ Schmuck</button>
                 <button onClick={() => addInventoryItem("gear")} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono rounded-lg text-zinc-300">+ Gegenstand</button>
               </div>
             )}
           </div>
 
-          {character.inventory.length === 0 && <p className="text-xs text-zinc-600 font-mono">Leer</p>}
+          {/* Kategorie-Reiter */}
+          <div className="flex items-center gap-1 p-1 bg-black/40 rounded-xl border border-zinc-800 text-xs font-mono overflow-x-auto">
+            {CATEGORY_TABS.map((tab) => {
+              const count = tab.id === "all"
+                ? character.inventory.length
+                : character.inventory.filter((it) => getTabForItem(it) === tab.id).length;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg font-bold whitespace-nowrap transition-all ${
+                    activeTab === tab.id ? "bg-orange-500 text-black" : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  {tab.label} <span className="opacity-60">({count})</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {filteredInventory.length === 0 && <p className="text-xs text-zinc-600 font-mono">Keine Gegenstände in dieser Kategorie.</p>}
 
           <div className="space-y-2">
-            {character.inventory.map((item) => (
-              <div key={item.id} className="p-3 bg-black/40 border border-zinc-800 rounded-lg space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  {isEditing ? (
-                    <input value={item.name} onChange={(e) => updateInventoryItem(item.id, { name: e.target.value })}
-                      className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-white font-mono" />
-                  ) : (
-                    <span className="text-sm font-bold text-white flex items-center gap-1.5">
-                      {item.name}
-                      {item.notes && (
-                        <span title={item.notes} className="text-zinc-500 hover:text-amber-400 cursor-help">
-                          <Info size={13} />
-                        </span>
+            {filteredInventory.map((item) => {
+              const isExpanded = expandedIds.has(item.id);
+              return (
+                <div key={item.id} className="bg-black/40 border border-zinc-800 rounded-lg overflow-hidden">
+                  {/* Kompakte Kopfzeile - immer sichtbar */}
+                  <div className="p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        onClick={() => toggleExpand(item.id)}
+                        className="flex items-center gap-1.5 text-left flex-1 min-w-0"
+                      >
+                        {isExpanded ? <ChevronDown size={14} className="text-zinc-500 shrink-0" /> : <ChevronRight size={14} className="text-zinc-500 shrink-0" />}
+                        {isEditing ? (
+                          <input
+                            value={item.name}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => updateInventoryItem(item.id, { name: e.target.value })}
+                            className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-white font-mono"
+                          />
+                        ) : (
+                          <span className="text-sm font-bold text-white truncate">{item.name}</span>
+                        )}
+                        {!isExpanded && item.notes && (
+                          <span title={item.notes} className="text-zinc-500 hover:text-amber-400 cursor-help shrink-0">
+                            <Info size={13} />
+                          </span>
+                        )}
+                      </button>
+                      {isEditing && (
+                        <button onClick={() => removeInventoryItem(item.id)} className="text-xs text-red-400 font-mono shrink-0">Entfernen</button>
+                      )}
+                    </div>
+
+                    {/* Kompakte Badges - immer sichtbar, egal ob ausgeklappt */}
+                    <div className="flex flex-wrap gap-1.5">
+                      <ValueBadge label="Ort" value={item.location === "equipped" ? "Am Mann" : "Eingelagert"} color={item.location === "equipped" ? "text-emerald-400" : "text-amber-400"} />
+                      {item.category === "weapon" && item.weaponData?.baseDice && (
+                        <ValueBadge label="Schaden" value={`${item.weaponData.baseDice}${item.weaponData.extraDamage ? ` ${item.weaponData.extraDamage}` : ""}`} color="text-rose-400" />
+                      )}
+                      {item.category === "weapon" && !!item.weaponData?.magicBonus && (
+                        <ValueBadge label="Magie" value={`+${item.weaponData.magicBonus}`} color="text-indigo-300" />
+                      )}
+                      {item.category === "weapon" && item.isActiveWeapon && (
+                        <ValueBadge
+                          label="Aktiv"
+                          value={item.weaponData?.weaponSlot === "offHand" ? "Nebenhand" : item.weaponData?.weaponSlot === "twoHanded" ? "beidhändig" : "Haupthand"}
+                          color="text-orange-400"
+                        />
+                      )}
+                      {item.category === "armor" && (
+                        <ValueBadge label="Rüstung" value={`+${item.armorData?.armorBonus ?? 0}`} color="text-cyan-300" />
+                      )}
+                      {item.charges && (
+                        <ValueBadge label="Ladungen" value={`${item.charges.current}/${item.charges.max}`} color="text-purple-300" />
+                      )}
+                      {item.quantity !== undefined && item.category !== "weapon" && item.category !== "armor" && (
+                        <ValueBadge label="Anzahl" value={`${item.quantity}x`} color="text-zinc-200" />
                       )}
                       {item.sourceReference && (
-                        <span className="text-[9px] text-amber-400/80 bg-amber-950/20 border border-amber-900/30 px-1 py-0.5 rounded">
-                          {item.sourceReference}
-                        </span>
+                        <ValueBadge label="Quelle" value={item.sourceReference} color="text-amber-300" />
                       )}
-                    </span>
-                  )}
+                    </div>
+                  </div>
 
-                  {isEditing && (
-                    <button onClick={() => removeInventoryItem(item.id)} className="text-xs text-red-400 font-mono shrink-0">Entfernen</button>
-                  )}
-                </div>
+                  {/* Ausklappbarer Detailbereich */}
+                  {isExpanded && (
+                    <div className="px-3 pb-3 pt-1 border-t border-zinc-800 space-y-3">
+                      {/* Ladungen zum Abstreichen - immer nutzbar, egal ob Bearbeitungsmodus */}
+                      {item.charges && (
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-zinc-500 font-mono uppercase">Ladungen verwalten</span>
+                          <ChargeTracker
+                            current={item.charges.current}
+                            max={item.charges.max}
+                            onToggle={(newCurrent) => setCharge(item.id, newCurrent)}
+                          />
+                        </div>
+                      )}
 
-                {isEditing && (
-                  <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-zinc-400">
-                    <label className="flex items-center gap-1.5">
-                      <input type="checkbox" checked={item.location === "equipped"}
-                        onChange={(e) => updateInventoryItem(item.id, { location: e.target.checked ? "equipped" : "stored" })} />
-                      Am Körper getragen
-                    </label>
+                      {/* Anzahl - immer nutzbar */}
+                      {item.quantity !== undefined && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-zinc-500 font-mono uppercase">Anzahl</span>
+                          <button onClick={() => adjustQuantity(item.id, -1)} className="p-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300"><Minus size={12} /></button>
+                          <span className="text-sm font-mono text-white w-10 text-center">{item.quantity}</span>
+                          <button onClick={() => adjustQuantity(item.id, 1)} className="p-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300"><Plus size={12} /></button>
+                        </div>
+                      )}
 
-                    {item.category === "weapon" && (
-                      <>
-                        <label className="flex items-center gap-1.5">
-                          <input type="checkbox" checked={!!item.isActiveWeapon}
-                            onChange={(e) => updateInventoryItem(item.id, { isActiveWeapon: e.target.checked })} />
-                          Aktive Kampfwaffe
-                        </label>
-                        {item.isActiveWeapon && (
-                          <label className="flex items-center gap-1.5">
-                            <span>Hand:</span>
-                            <select
-                              value={item.weaponData?.weaponSlot || "primary"}
+                      {/* Vollständige Beschreibung - immer lesbar, nicht nur im Hover */}
+                      {item.notes && (
+                        <div>
+                          <span className="text-[10px] text-zinc-500 font-mono uppercase">Beschreibung</span>
+                          <p className="text-xs text-zinc-300 font-mono mt-1 whitespace-pre-wrap bg-zinc-950/60 border border-zinc-800 rounded-lg p-2">
+                            {item.notes}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Bearbeitungsfelder - nur im Bearbeitungsmodus */}
+                      {isEditing && (
+                        <div className="space-y-3 pt-2 border-t border-zinc-800">
+                          <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-zinc-400">
+                            <label className="flex items-center gap-1.5">
+                              <input type="checkbox" checked={item.location === "equipped"}
+                                onChange={(e) => updateInventoryItem(item.id, { location: e.target.checked ? "equipped" : "stored" })} />
+                              Am Körper getragen
+                            </label>
+
+                            {item.category === "weapon" && (
+                              <>
+                                <label className="flex items-center gap-1.5">
+                                  <input type="checkbox" checked={!!item.isActiveWeapon}
+                                    onChange={(e) => updateInventoryItem(item.id, { isActiveWeapon: e.target.checked })} />
+                                  Aktive Kampfwaffe
+                                </label>
+                                {item.isActiveWeapon && (
+                                  <label className="flex items-center gap-1.5">
+                                    <span>Hand:</span>
+                                    <select
+                                      value={item.weaponData?.weaponSlot || "primary"}
+                                      onChange={(e) => updateInventoryItem(item.id, {
+                                        weaponData: { ...item.weaponData!, weaponSlot: e.target.value as any }
+                                      })}
+                                      className="bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-white"
+                                    >
+                                      <option value="primary">Haupthand</option>
+                                      <option value="offHand">Nebenhand</option>
+                                      <option value="twoHanded">Beidhändig</option>
+                                    </select>
+                                  </label>
+                                )}
+                              </>
+                            )}
+                          </div>
+
+                          {item.category === "weapon" && (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+                                <input type="checkbox" checked={item.weaponData?.isMelee ?? true}
+                                  onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData, isMelee: e.target.checked } })} />
+                                Nahkampf
+                              </label>
+                              <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+                                <input type="checkbox" checked={!!item.weaponData?.isFinesse}
+                                  onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, isFinesse: e.target.checked } })} />
+                                Finesse
+                              </label>
+                              <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+                                <input type="checkbox" checked={!!item.weaponData?.isLight}
+                                  onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, isLight: e.target.checked } })} />
+                                Leicht (TWF)
+                              </label>
+                              <div>
+                                <label className="block text-[9px] text-zinc-500">Schaden (W-Formel)</label>
+                                <input value={item.weaponData?.baseDice || ""} placeholder="1W6"
+                                  onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, baseDice: e.target.value } })}
+                                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] text-zinc-500">Magie-Bonus</label>
+                                <input type="number" value={item.weaponData?.magicBonus ?? 0}
+                                  onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, magicBonus: Number(e.target.value) } })}
+                                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] text-zinc-500">Zusatzschaden (z.B. +1W6 Eis)</label>
+                                <input value={item.weaponData?.extraDamage || ""} placeholder="+1W6 Feuer"
+                                  onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, extraDamage: e.target.value || undefined } })}
+                                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] text-zinc-500">Schurkenbonus Angriff (HA)</label>
+                                <input type="number" value={item.weaponData?.sneakAttackBonusAttack ?? 0}
+                                  onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, sneakAttackBonusAttack: Number(e.target.value) } })}
+                                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] text-zinc-500">Schurkenbonus Schaden (HA)</label>
+                                <input type="number" value={item.weaponData?.sneakAttackBonusDamage ?? 0}
+                                  onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, sneakAttackBonusDamage: Number(e.target.value) } })}
+                                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
+                              </div>
+                            </div>
+                          )}
+
+                          {item.category === "armor" && (
+                            <div>
+                              <label className="block text-[9px] text-zinc-500">Rüstungsbonus</label>
+                              <input type="number" value={item.armorData?.armorBonus ?? 0}
+                                onChange={(e) => updateInventoryItem(item.id, { armorData: { armorBonus: Number(e.target.value) } })}
+                                className="w-24 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
+                            </div>
+                          )}
+
+                          <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+                            <input type="checkbox" checked={!!item.charges}
                               onChange={(e) => updateInventoryItem(item.id, {
-                                weaponData: { ...item.weaponData!, weaponSlot: e.target.value as any }
-                              })}
-                              className="bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-white"
-                            >
-                              <option value="primary">Haupthand</option>
-                              <option value="offHand">Nebenhand</option>
-                              <option value="twoHanded">Beidhändig</option>
-                            </select>
+                                charges: e.target.checked ? { max: 1, current: 1, rechargeType: "rest" } : undefined
+                              })} />
+                            Hat Ladungen
                           </label>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
+                          {item.charges && (
+                            <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
+                              <span>Max</span>
+                              <input type="number" value={item.charges.max}
+                                onChange={(e) => updateInventoryItem(item.id, { charges: { ...item.charges!, max: Number(e.target.value) } })}
+                                className="w-14 bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-white text-center" />
+                              <select value={item.charges.rechargeType}
+                                onChange={(e) => updateInventoryItem(item.id, { charges: { ...item.charges!, rechargeType: e.target.value as any } })}
+                                className="bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-white">
+                                <option value="rest">Erneuert sich bei Rast</option>
+                                <option value="manual">Muss aufgeladen werden</option>
+                                <option value="none">Verbraucht sich dauerhaft</option>
+                              </select>
+                            </div>
+                          )}
 
-                {isEditing && item.category === "weapon" && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-zinc-800">
-                    <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
-                      <input type="checkbox" checked={item.weaponData?.isMelee ?? true}
-                        onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData, isMelee: e.target.checked } })} />
-                      Nahkampf
-                    </label>
-                    <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
-                      <input type="checkbox" checked={!!item.weaponData?.isFinesse}
-                        onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, isFinesse: e.target.checked } })} />
-                      Finesse
-                    </label>
-                    <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
-                      <input type="checkbox" checked={!!item.weaponData?.isLight}
-                        onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, isLight: e.target.checked } })} />
-                      Leicht (TWF)
-                    </label>
-                    <div>
-                      <label className="block text-[9px] text-zinc-500">Schaden (W-Formel)</label>
-                      <input value={item.weaponData?.baseDice || ""} placeholder="1W6"
-                        onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, baseDice: e.target.value } })}
-                        className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] text-zinc-500">Magie-Bonus</label>
-                      <input type="number" value={item.weaponData?.magicBonus ?? 0}
-                        onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, magicBonus: Number(e.target.value) } })}
-                        className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] text-zinc-500">Zusatzschaden (z.B. +1W6 Eis)</label>
-                      <input value={item.weaponData?.extraDamage || ""} placeholder="+1W6 Feuer"
-                        onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, extraDamage: e.target.value || undefined } })}
-                        className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] text-zinc-500">Schurkenbonus Angriff (HA)</label>
-                      <input type="number" value={item.weaponData?.sneakAttackBonusAttack ?? 0}
-                        onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, sneakAttackBonusAttack: Number(e.target.value) } })}
-                        className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] text-zinc-500">Schurkenbonus Schaden (HA)</label>
-                      <input type="number" value={item.weaponData?.sneakAttackBonusDamage ?? 0}
-                        onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, sneakAttackBonusDamage: Number(e.target.value) } })}
-                        className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
-                    </div>
-                  </div>
-                )}
+                          <div>
+                            <label className="block text-[9px] text-zinc-500">Kategorie</label>
+                            <select value={item.category || "gear"}
+                              onChange={(e) => updateInventoryItem(item.id, { category: e.target.value })}
+                              className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono">
+                              <option value="weapon">Waffe</option>
+                              <option value="armor">Rüstung</option>
+                              <option value="consumable">Trank / Verbrauch</option>
+                              <option value="jewelry">Schmuck</option>
+                              <option value="gear">Sonstiges</option>
+                            </select>
+                          </div>
 
-                {isEditing && item.category === "armor" && (
-                  <div className="pt-1 border-t border-zinc-800">
-                    <label className="block text-[9px] text-zinc-500">Rüstungsbonus</label>
-                    <input type="number" value={item.armorData?.armorBonus ?? 0}
-                      onChange={(e) => updateInventoryItem(item.id, { armorData: { armorBonus: Number(e.target.value) } })}
-                      className="w-24 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
-                  </div>
-                )}
+                          <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
+                            <span>Regelwerk-Seite</span>
+                            <input
+                              value={item.sourceReference || ""}
+                              placeholder="z.B. GRW S. 112"
+                              onChange={(e) => updateInventoryItem(item.id, { sourceReference: e.target.value || undefined })}
+                              className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-white"
+                            />
+                          </div>
 
-                {isEditing && (
-                  <div className="pt-1 border-t border-zinc-800 space-y-1.5">
-                    <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
-                      <input type="checkbox" checked={!!item.charges}
-                        onChange={(e) => updateInventoryItem(item.id, {
-                          charges: e.target.checked ? { max: 1, current: 1, rechargeType: "rest" } : undefined
-                        })} />
-                      Hat Ladungen
-                    </label>
-                    {item.charges && (
-                      <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
-                        <span>Aktuell</span>
-                        <input type="number" value={item.charges.current}
-                          onChange={(e) => updateInventoryItem(item.id, { charges: { ...item.charges!, current: Number(e.target.value) } })}
-                          className="w-12 bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-white text-center" />
-                        <span>/ Max</span>
-                        <input type="number" value={item.charges.max}
-                          onChange={(e) => updateInventoryItem(item.id, { charges: { ...item.charges!, max: Number(e.target.value) } })}
-                          className="w-12 bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-white text-center" />
-                        <select value={item.charges.rechargeType}
-                          onChange={(e) => updateInventoryItem(item.id, { charges: { ...item.charges!, rechargeType: e.target.value as any } })}
-                          className="bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-white">
-                          <option value="rest">Erneuert sich bei Rast</option>
-                          <option value="manual">Muss aufgeladen werden</option>
-                          <option value="none">Verbraucht sich dauerhaft</option>
-                        </select>
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
-                      <span>Regelwerk-Seite</span>
-                      <input
-                        value={item.sourceReference || ""}
-                        placeholder="z.B. GRW S. 112"
-                        onChange={(e) => updateInventoryItem(item.id, { sourceReference: e.target.value || undefined })}
-                        className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-white"
-                      />
+                          <div>
+                            <label className="block text-[10px] text-zinc-400 font-mono mb-1">Beschreibung / Effekt bearbeiten</label>
+                            <textarea
+                              value={item.notes || ""}
+                              onChange={(e) => updateInventoryItem(item.id, { notes: e.target.value || undefined })}
+                              placeholder="z.B. Fängt 2x/Tag ein Geschoss ab, das auf den Charakter gefeuert wird."
+                              className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-white font-mono min-h-[50px]"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
-
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
-                      <span>Beschreibung / Effekt (für Info-Symbol)</span>
-                    </div>
-                    <textarea
-                      value={item.notes || ""}
-                      onChange={(e) => updateInventoryItem(item.id, { notes: e.target.value || undefined })}
-                      placeholder="z.B. Fängt 2x/Tag ein Geschoss ab, das auf den Charakter gefeuert wird."
-                      className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-white font-mono min-h-[50px]"
-                    />
-                  </div>
-                )}
-
-                {/* Immer sichtbare Schnellaktionen - auch außerhalb des Bearbeitungsmodus */}
-                <div className="flex items-center justify-between pt-1 border-t border-zinc-800">
-                  <div className="text-[11px] text-zinc-500 font-mono flex gap-3">
-                    <span>{item.location === "equipped" ? "Am Körper" : "Eingelagert"}</span>
-                    {item.category === "weapon" && item.isActiveWeapon && (
-                      <span className="text-orange-400">
-                        Aktiv ({item.weaponData?.weaponSlot === "offHand" ? "Nebenhand" : item.weaponData?.weaponSlot === "twoHanded" ? "beidhändig" : "Haupthand"})
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    {item.charges && (
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => adjustCharge(item.id, -1)} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300"><Minus size={11} /></button>
-                        <span className="text-[11px] font-mono text-zinc-300 w-10 text-center">{item.charges.current}/{item.charges.max}</span>
-                        <button onClick={() => adjustCharge(item.id, 1)} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300"><Plus size={11} /></button>
-                      </div>
-                    )}
-                    {item.quantity !== undefined && (
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => adjustQuantity(item.id, -1)} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300"><Minus size={11} /></button>
-                        <span className="text-[11px] font-mono text-zinc-300 w-8 text-center">{item.quantity}x</span>
-                        <button onClick={() => adjustQuantity(item.id, 1)} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300"><Plus size={11} /></button>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
