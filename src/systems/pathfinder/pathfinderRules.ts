@@ -21,8 +21,72 @@ export const PATHFINDER_CLASSES: Record<string, PathfinderClassPreset> = {
   bard: { id: "bard", name: "Barde (Bard)", hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: false, ref: true, will: true } },
 };
 
-export const calculateModifier = (score: number): number => Math.floor((score - 10) / 2);
+/** Rassen-Größenmodifikatoren - generisch, nicht an einen Namen gebunden. */
+export interface PathfinderRacePreset {
+  id: string;
+  name: string;
+  size: "small" | "medium" | "large";
+}
 
+export const PATHFINDER_RACES: Record<string, PathfinderRacePreset> = {
+  human: { id: "human", name: "Mensch", size: "medium" },
+  elf: { id: "elf", name: "Elf", size: "medium" },
+  dwarf: { id: "dwarf", name: "Zwerg", size: "medium" },
+  halfling: { id: "halfling", name: "Halbling", size: "small" },
+  gnome: { id: "gnome", name: "Gnom", size: "small" },
+  halforc: { id: "halforc", name: "Halbork", size: "medium" },
+};
+
+export const SIZE_MODIFIERS: Record<string, { attackAndAc: number; cmbAndCmd: number }> = {
+  small: { attackAndAc: 1, cmbAndCmd: -1 },
+  medium: { attackAndAc: 0, cmbAndCmd: 0 },
+  large: { attackAndAc: -1, cmbAndCmd: 1 },
+};
+
+/** Klassen-Kampf-Features als FORMEL, abhängig von Level/Attributen -
+ * das ersetzt die alten, charakterspezifischen Hardcodierungen. */
+export interface ClassCombatFeatures {
+  sneakAttackDice?: (level: number) => number;              // Rogue
+  rageRoundsPerDay?: (conMod: number) => number;             // Barbarian
+  favoredEnemyBonus?: (level: number) => number;             // Ranger
+  smiteUsesPerDay?: (chaMod: number) => number;              // Paladin
+  flurryExtraAttack?: (level: number) => boolean;            // Monk
+}
+
+export const PATHFINDER_CLASS_COMBAT_FEATURES: Record<string, ClassCombatFeatures> = {
+  rogue: {
+    sneakAttackDice: (level) => Math.max(1, Math.ceil(level / 2)),
+  },
+  barbarian: {
+    rageRoundsPerDay: (conMod) => 4 + 2 * conMod,
+  },
+  ranger: {
+    favoredEnemyBonus: (level) => (level >= 15 ? 4 : level >= 10 ? 3 : level >= 5 ? 2 : 1),
+  },
+  paladin: {
+    smiteUsesPerDay: (chaMod) => Math.max(1, 1 + chaMod),
+  },
+  monk: {
+    flurryExtraAttack: (level) => level >= 1,
+  },
+};
+
+export const getSneakAttackDice = (classId: string | undefined, level: number): number => {
+  const fn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.sneakAttackDice : undefined;
+  return fn ? fn(level) : 0;
+};
+
+export const getRageRounds = (classId: string | undefined, conMod: number): number => {
+  const fn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.rageRoundsPerDay : undefined;
+  return fn ? fn(conMod) : 0;
+};
+
+export const getFavoredEnemyBonus = (classId: string | undefined, level: number): number => {
+  const fn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.favoredEnemyBonus : undefined;
+  return fn ? fn(level) : 0;
+};
+
+export const calculateModifier = (score: number): number => Math.floor((score - 10) / 2);
 export const formatModifier = (mod: number): string => (mod >= 0 ? `+${mod}` : `${mod}`);
 
 export const calculateBAB = (level: number, progression: BabProgression): number => {
@@ -77,28 +141,43 @@ export const calculateSavingThrows = (
   };
 };
 
-export interface PathfinderWeaponInput {
+/**
+ * Berechnet die Kampfwerte EINER Waffe ausschließlich aus:
+ * - den Charakter-Attributen
+ * - Level/Klasse (für BAB & Sneak Attack)
+ * - den Eigenschaften, die AM INVENTAR-ITEM selbst hinterlegt sind
+ * Keine Namens-Erkennung, keine Hardcodierung.
+ */
+export interface WeaponCalcInput {
   name: string;
-  baseDice: string;      // "1W6"
   isMelee: boolean;
   isFinesse?: boolean;
   magicBonus?: number;
+  baseDice?: string;
+  damageAttribute?: "ST" | "GE" | "NONE";
+  sneakAttackBonusAttack?: number;
+  sneakAttackBonusDamage?: number;
+  extraDamage?: string;
 }
 
-export interface PathfinderWeaponResult {
+export interface WeaponCalcResult {
   name: string;
-  attack: string;        // "+9 / +4"
-  damage: string;        // "1W6+4"
+  attack: string;
+  damage: string;
+  sneakAttack?: { attack: string; damage: string };
 }
 
 export const calculateWeaponStats = (
-  weapon: PathfinderWeaponInput,
+  weapon: WeaponCalcInput,
   attrs: PathfinderAttributes,
   level: number,
   classId: string | undefined,
-  useDexToDamage: boolean
-): PathfinderWeaponResult => {
+  raceId: string | undefined,
+  options: { sneakAttackActive: boolean }
+): WeaponCalcResult => {
   const cls = classId ? PATHFINDER_CLASSES[classId] : undefined;
+  const race = raceId ? PATHFINDER_RACES[raceId] : undefined;
+  const sizeMod = SIZE_MODIFIERS[race?.size ?? "medium"];
   const bab = calculateBAB(level, cls?.babProgression ?? "threeFourths");
 
   const stMod = calculateModifier(attrs.ST);
@@ -109,24 +188,46 @@ export const calculateWeaponStats = (
   const attackAttr = !weapon.isMelee ? "GE" : useFinesse ? "GE" : "ST";
   const attackMod = attackAttr === "GE" ? geMod : stMod;
 
-  const iteratives = getBabIteratives(bab).map((b) => b + attackMod + magicBonus);
+  const iteratives = getBabIteratives(bab).map((b) => b + attackMod + magicBonus + sizeMod.attackAndAc);
   const attack = formatIteratives(iteratives);
 
-  const dmgAttr = !weapon.isMelee ? "NONE" : useDexToDamage ? "GE" : "ST";
+  const dmgAttr = weapon.damageAttribute ?? (!weapon.isMelee ? "NONE" : "ST");
   const dmgMod = dmgAttr === "GE" ? geMod : dmgAttr === "ST" ? stMod : 0;
   const flat = dmgMod + magicBonus;
-  const damage = flat > 0 ? `${weapon.baseDice}+${flat}` : flat < 0 ? `${weapon.baseDice}${flat}` : weapon.baseDice;
+  const baseDice = weapon.baseDice || "1W6";
+  let damage = flat > 0 ? `${baseDice}+${flat}` : flat < 0 ? `${baseDice}${flat}` : baseDice;
+  if (weapon.extraDamage) damage += ` ${weapon.extraDamage}`;
 
-  return { name: weapon.name, attack, damage };
+  let sneakAttack: WeaponCalcResult["sneakAttack"] | undefined;
+  if (options.sneakAttackActive) {
+    const sneakDice = getSneakAttackDice(classId, level);
+    const bonusAtk = weapon.sneakAttackBonusAttack ?? 0;
+    const bonusDmg = weapon.sneakAttackBonusDamage ?? 0;
+    const sneakIteratives = getBabIteratives(bab).map(
+      (b) => b + attackMod + magicBonus + sizeMod.attackAndAc + bonusAtk
+    );
+    const sneakFlat = flat + bonusDmg;
+    let sneakDamage = sneakFlat > 0 ? `${baseDice}+${sneakFlat}` : sneakFlat < 0 ? `${baseDice}${sneakFlat}` : baseDice;
+    if (sneakDice > 0) sneakDamage += ` + ${sneakDice}W6`;
+    if (weapon.extraDamage) sneakDamage += ` ${weapon.extraDamage}`;
+
+    sneakAttack = { attack: formatIteratives(sneakIteratives), damage: sneakDamage };
+  }
+
+  return { name: weapon.name, attack, damage, sneakAttack };
 };
 
-export const calculateArmorClass = (attrs: PathfinderAttributes, armorBonus: number): {
-  armorClass: number; touchAc: number; flatFootedAc: number;
-} => {
+export const calculateArmorClass = (
+  attrs: PathfinderAttributes,
+  armorBonus: number,
+  raceId: string | undefined
+): { armorClass: number; touchAc: number; flatFootedAc: number } => {
   const geMod = calculateModifier(attrs.GE);
+  const race = raceId ? PATHFINDER_RACES[raceId] : undefined;
+  const sizeMod = SIZE_MODIFIERS[race?.size ?? "medium"].attackAndAc;
   return {
-    armorClass: 10 + geMod + armorBonus,
-    touchAc: 10 + geMod,
-    flatFootedAc: 10 + armorBonus,
+    armorClass: 10 + geMod + armorBonus + sizeMod,
+    touchAc: 10 + geMod + sizeMod,
+    flatFootedAc: 10 + armorBonus + sizeMod,
   };
 };
