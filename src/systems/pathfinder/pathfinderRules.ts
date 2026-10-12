@@ -42,18 +42,16 @@ export const SIZE_MODIFIERS: Record<string, { attackAndAc: number; cmbAndCmd: nu
   large: { attackAndAc: -1, cmbAndCmd: 1 },
 };
 
-/** Klassen-Kampf-/Ressourcen-Features als FORMEL - nicht an einen Charakter gebunden,
- * sondern generisch über Level/Attribute berechnet. Vereinfachte Näherungen, siehe Hinweis. */
 export interface ClassCombatFeatures {
-  sneakAttackDice?: (level: number) => number;                       // Rogue
-  rageRoundsPerDay?: (conMod: number) => number;                     // Barbarian
-  favoredEnemyBonus?: (level: number) => number;                     // Ranger
-  smiteUsesPerDay?: (chaMod: number) => number;                      // Paladin
-  flurryExtraAttack?: (level: number) => boolean;                    // Monk
-  channelEnergyDice?: (level: number) => number;                     // Cleric (vereinfacht)
-  channelEnergyUsesPerDay?: (chaMod: number) => number;               // Cleric (vereinfacht)
-  bardicPerformanceRounds?: (level: number) => number;                // Bard (vereinfacht)
-  stunningFistUsesPerDay?: (level: number) => number;                 // Monk (vereinfacht)
+  sneakAttackDice?: (level: number) => number;
+  rageRoundsPerDay?: (conMod: number) => number;
+  favoredEnemyBonus?: (level: number) => number;
+  smiteUsesPerDay?: (chaMod: number) => number;
+  flurryExtraAttack?: (level: number) => boolean;
+  channelEnergyDice?: (level: number) => number;
+  channelEnergyUsesPerDay?: (chaMod: number) => number;
+  bardicPerformanceRounds?: (level: number) => number;
+  stunningFistUsesPerDay?: (level: number) => number;
 }
 
 export const PATHFINDER_CLASS_COMBAT_FEATURES: Record<string, ClassCombatFeatures> = {
@@ -71,16 +69,13 @@ export const PATHFINDER_CLASS_COMBAT_FEATURES: Record<string, ClassCombatFeature
   },
   monk: {
     flurryExtraAttack: (level) => level >= 1,
-    // Vereinfacht: offiziell 1 + 1 pro 4 Stufen nach der 1.
     stunningFistUsesPerDay: (level) => 1 + Math.floor((level - 1) / 4),
   },
   cleric: {
-    // Vereinfacht: ceil(level/2) W6, 3 + CHA-Mod Nutzungen/Tag
     channelEnergyDice: (level) => Math.ceil(level / 2),
     channelEnergyUsesPerDay: (chaMod) => 3 + chaMod,
   },
   bard: {
-    // Vereinfacht: 4 + 2x Level Runden/Tag (regelwerksgenaue Formel ggf. anpassen)
     bardicPerformanceRounds: (level) => 4 + level * 2,
   },
 };
@@ -197,6 +192,7 @@ export interface WeaponCalcResult {
   sneakAttack?: { attack: string; damage: string };
 }
 
+/** Einzelwaffen-Berechnung ohne Zweiwaffenkampf-Abzüge (für den Normalfall: eine Waffe). */
 export const calculateWeaponStats = (
   weapon: WeaponCalcInput,
   attrs: PathfinderAttributes,
@@ -259,5 +255,128 @@ export const calculateArmorClass = (
     armorClass: 10 + geMod + armorBonus + sizeMod,
     touchAc: 10 + geMod + sizeMod,
     flatFootedAc: 10 + armorBonus + sizeMod,
+  };
+};
+
+// ───────────────────────────────────────────────────────────
+// Zweiwaffenkampf (Two-Weapon Fighting)
+// ───────────────────────────────────────────────────────────
+
+export interface TwoWeaponFightingFeats {
+  hasTwoWeaponFighting: boolean;         // Grundtalent: reduziert Abzüge auf -2/-2
+  hasImprovedTwoWeaponFighting: boolean; // zusätzlicher Nebenhand-Angriff bei BAB-5
+  hasGreaterTwoWeaponFighting: boolean;  // weiterer Nebenhand-Angriff bei BAB-10
+}
+
+export interface TwoWeaponAttackResult {
+  slot: "primary" | "offHand";
+  weaponName: string;
+  attacks: { attackBonus: number; damage: string }[];
+  formattedAttack: string;
+}
+
+export interface TwoWeaponFightingResult {
+  primary: TwoWeaponAttackResult;
+  offHand: TwoWeaponAttackResult;
+  penaltyNote: string;
+}
+
+/**
+ * Berechnet die vollständige Angriffsfolge für Zweiwaffenkampf.
+ * Liest ausschließlich aus den übergebenen Waffen-Items und den Feat-Flags -
+ * keine Namens-Erkennung, keine charakterspezifische Logik.
+ */
+export const calculateTwoWeaponFighting = (
+  primaryWeapon: WeaponCalcInput & { isLight?: boolean },
+  offHandWeapon: WeaponCalcInput & { isLight?: boolean },
+  attrs: PathfinderAttributes,
+  level: number,
+  classId: string | undefined,
+  raceId: string | undefined,
+  feats: TwoWeaponFightingFeats,
+  options: { sneakAttackActive: boolean }
+): TwoWeaponFightingResult => {
+  const cls = classId ? PATHFINDER_CLASSES[classId] : undefined;
+  const race = raceId ? PATHFINDER_RACES[raceId] : undefined;
+  const sizeMod = SIZE_MODIFIERS[race?.size ?? "medium"];
+  const bab = calculateBAB(level, cls?.babProgression ?? "threeFourths");
+
+  const stMod = calculateModifier(attrs.ST);
+  const geMod = calculateModifier(attrs.GE);
+  const sneakDice = options.sneakAttackActive ? getSneakAttackDice(classId, level) : 0;
+
+  // Abzüge bestimmen
+  let primaryPenalty = -2;
+  let offHandPenalty = offHandWeapon.isLight ? -2 : -4;
+  if (feats.hasTwoWeaponFighting) {
+    primaryPenalty = -2;
+    offHandPenalty = -2;
+  }
+
+  const buildAttacks = (
+    weapon: WeaponCalcInput,
+    penalty: number,
+    extraBabThresholds: number[] // z.B. [5, 10] für Improved/Greater TWF
+  ) => {
+    const useFinesse = weapon.isMelee && weapon.isFinesse;
+    const attackAttr = !weapon.isMelee ? "GE" : useFinesse ? "GE" : "ST";
+    const attackMod = attackAttr === "GE" ? geMod : stMod;
+    const magicBonus = weapon.magicBonus ?? 0;
+
+    const dmgAttr = weapon.damageAttribute ?? (!weapon.isMelee ? "NONE" : "ST");
+    const rawDmgMod = dmgAttr === "GE" ? geMod : dmgAttr === "ST" ? stMod : 0;
+    // Nebenhand bekommt nur den halben Attributsbonus (bei positivem Bonus)
+    const isOffHand = penalty !== primaryPenalty || weapon === offHandWeapon;
+    const dmgMod = weapon === offHandWeapon && rawDmgMod > 0 ? Math.floor(rawDmgMod * 0.5) : rawDmgMod;
+
+    const flat = dmgMod + magicBonus + (weapon === primaryWeapon && options.sneakAttackActive ? weapon.sneakAttackBonusDamage ?? 0 : 0);
+    const baseDice = weapon.baseDice || "1W6";
+    let damage = flat > 0 ? `${baseDice}+${flat}` : flat < 0 ? `${baseDice}${flat}` : baseDice;
+    if (sneakDice > 0) damage += ` + ${sneakDice}W6`;
+    if (weapon.extraDamage) damage += ` ${weapon.extraDamage}`;
+
+    // Haupt-Angriffsfolge über BAB-Iterative (nur erster Eintrag bei TWF genutzt, Rest optional)
+    const mainAttackBonus = bab + attackMod + magicBonus + sizeMod.attackAndAc + penalty;
+    const attacks = [{ attackBonus: mainAttackBonus, damage }];
+
+    // Zusätzliche Nebenhand-Angriffe durch Improved/Greater Two-Weapon Fighting
+    extraBabThresholds.forEach((threshold) => {
+      if (bab >= threshold) {
+        attacks.push({
+          attackBonus: bab - threshold + attackMod + magicBonus + sizeMod.attackAndAc + penalty,
+          damage,
+        });
+      }
+    });
+
+    return attacks;
+  };
+
+  const primaryAttacks = buildAttacks(primaryWeapon, primaryPenalty, []);
+  const offHandExtra = [
+    ...(feats.hasImprovedTwoWeaponFighting ? [5] : []),
+    ...(feats.hasGreaterTwoWeaponFighting ? [10] : []),
+  ];
+  const offHandAttacks = buildAttacks(offHandWeapon, offHandPenalty, offHandExtra);
+
+  const formatAttacks = (attacks: { attackBonus: number }[]) =>
+    attacks.map((a) => formatModifier(a.attackBonus)).join(" / ");
+
+  return {
+    primary: {
+      slot: "primary",
+      weaponName: primaryWeapon.name,
+      attacks: primaryAttacks,
+      formattedAttack: formatAttacks(primaryAttacks),
+    },
+    offHand: {
+      slot: "offHand",
+      weaponName: offHandWeapon.name,
+      attacks: offHandAttacks,
+      formattedAttack: formatAttacks(offHandAttacks),
+    },
+    penaltyNote: feats.hasTwoWeaponFighting
+      ? "Zweiwaffenkampf-Talent aktiv: -2/-2"
+      : `Standard-Abzüge: ${primaryPenalty}/${offHandPenalty}${offHandWeapon.isLight ? " (Nebenhand leicht)" : ""}`,
   };
 };
