@@ -48,20 +48,53 @@ export interface ItemCharges {
   rechargeAmount?: number;
 }
 
+/** Wann ein Kampf-Modifikator wirkt. "always" gilt immer zusätzlich zum jeweiligen Kontext. */
+export type CombatModifierContext =
+  | "always"
+  | "oneHandedOnly"
+  | "twoHandedOnly"
+  | "offHandOnly"
+  | "sneakAttackOnly";
+
+export type CombatModifierSourceType = "weapon" | "talent" | "class" | "race" | "skill" | "custom";
+
+/**
+ * Generischer Kampf-Modifikator: kann an einer Waffe (weaponData.modifiers)
+ * oder am Charakter selbst (systemData.combatModifiers, für Talente/Rasse/
+ * Klasse/Skill-Boni, die nicht an eine bestimmte Waffe gebunden sind) hängen.
+ * Mehrere Quellen summieren sich automatisch je nach aktuellem Kontext.
+ */
+export interface CombatModifier {
+  id: string;
+  label: string;
+  sourceType: CombatModifierSourceType;
+  context: CombatModifierContext;
+  attackBonus?: number;
+  damageBonus?: number;
+  /** Zusätzlicher Schaden als Text, z.B. "+1W6 Eis" oder "+5 Blutung" */
+  extraDamageDice?: string;
+}
+
 export interface WeaponItemData {
   isMelee: boolean;
   isFinesse?: boolean;
-  /** 'leichte Waffe' - relevant für reduzierten Nebenhand-Abzug beim Zweiwaffenkampf */
   isLight?: boolean;
   magicBonus?: number;
   baseDice?: string;
   damageAttribute?: "ST" | "GE" | "NONE";
   attackAttribute?: "ST" | "GE";
+  /** @deprecated Nutze stattdessen modifiers mit context "sneakAttackOnly" */
   sneakAttackBonusAttack?: number;
+  /** @deprecated Nutze stattdessen modifiers mit context "sneakAttackOnly" */
   sneakAttackBonusDamage?: number;
   extraDamage?: string;
-  /** Welche Hand diese Waffe belegt, falls sie als aktive Kampfwaffe markiert ist. */
   weaponSlot?: WeaponSlot;
+  /** Ob diese Waffe einhändig geführt werden kann (Default: true) */
+  supportsOneHanded?: boolean;
+  /** Ob diese Waffe zweihändig geführt werden kann (Default: false) */
+  supportsTwoHanded?: boolean;
+  /** Waffeneigene Kampf-Modifikatoren, z.B. ein Schurkenkurzschwert-Bonus nur bei Hinterhalt */
+  modifiers?: CombatModifier[];
 }
 
 export interface ArmorItemData {
