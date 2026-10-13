@@ -22,8 +22,8 @@ export default function App() {
   const [isEditing, setIsEditing] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+  const [activeViewId, setActiveViewId] = useState<string>("overview");
 
-  // Beim Start: zuletzt aktiven Charakter aus dem Browser-Cache laden
   useEffect(() => {
     const last = loadActiveCharacter();
     if (last) {
@@ -33,10 +33,14 @@ export default function App() {
     }
   }, []);
 
-  // Bei jeder Änderung automatisch im Browser-Cache sichern
   useEffect(() => {
     if (character) saveActiveCharacter(character);
   }, [character]);
+
+  // Beim Wechsel auf einen anderen Charakter/System immer zurück zur Übersicht
+  useEffect(() => {
+    setActiveViewId("overview");
+  }, [character?.systemId, character?.name]);
 
   const updateCharacter = (updates: Partial<GenericCharacter>) => {
     setCharacter((prev) => (prev ? { ...prev, ...updates } : null));
@@ -119,10 +123,13 @@ export default function App() {
     );
   }
 
+  const secondaryViews = plugin.secondaryViews || [];
+  const activeSecondaryView = secondaryViews.find((v) => v.id === activeViewId);
+
   return (
     <div className="min-h-screen bg-black text-zinc-300 font-sans p-4 sm:p-8 md:p-12 relative selection:bg-orange-500 selection:text-black">
       <div className="max-w-7xl mx-auto relative z-10 space-y-6">
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-4">
           <div>
             <h1 className="text-2xl font-black text-white font-mono">{character.name}</h1>
             <p className="text-xs text-zinc-500 font-mono">
@@ -155,11 +162,44 @@ export default function App() {
           </div>
         </div>
 
-        <plugin.DashboardComponent
-          character={character}
-          isEditing={isEditing}
-          onUpdate={updateCharacter}
-        />
+        {/* Reiter-Leiste: nur sichtbar, wenn das Plugin Zusatz-Ansichten definiert */}
+        {secondaryViews.length > 0 && (
+          <div className="flex items-center gap-1 p-1 bg-zinc-900 rounded-xl border border-zinc-800 text-xs font-mono w-fit">
+            <button
+              onClick={() => setActiveViewId("overview")}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                activeViewId === "overview" ? "bg-orange-500 text-black" : "text-zinc-400 hover:text-white"
+              }`}
+            >
+              Übersicht
+            </button>
+            {secondaryViews.map((v) => (
+              <button
+                key={v.id}
+                onClick={() => setActiveViewId(v.id)}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                  activeViewId === v.id ? "bg-orange-500 text-black" : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {activeViewId === "overview" || !activeSecondaryView ? (
+          <plugin.DashboardComponent
+            character={character}
+            isEditing={isEditing}
+            onUpdate={updateCharacter}
+          />
+        ) : (
+          <activeSecondaryView.Component
+            character={character}
+            isEditing={isEditing}
+            onUpdate={updateCharacter}
+          />
+        )}
       </div>
     </div>
   );
