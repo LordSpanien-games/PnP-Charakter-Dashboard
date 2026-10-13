@@ -3,7 +3,6 @@ export type BabProgression = "full" | "threeFourths" | "half";
 export interface PathfinderClassPreset {
   id: string;
   name: string;
-  /** lowercase Suchbegriffe zur Texterkennung beim Import, z.B. "dieb" UND "schurke" für Rogue */
   aliases: string[];
   hitDie: number;
   babProgression: BabProgression;
@@ -190,7 +189,10 @@ export interface WeaponCalcInput {
 export interface WeaponCalcResult {
   name: string;
   attack: string;
+  /** Nur Basiswürfel + Attributsbonus + Verstärkung, OHNE Elementarschaden-Text */
   damage: string;
+  /** Separater Elementar-/Zusatzschaden, z.B. "+1W6 Eis" - unabhängig vom Verstärkungsbonus */
+  extraDamage?: string;
   sneakAttack?: { attack: string; damage: string };
 }
 
@@ -215,6 +217,7 @@ export const calculateWeaponStats = (
   const attackAttr = !weapon.isMelee ? "GE" : useFinesse ? "GE" : "ST";
   const attackMod = attackAttr === "GE" ? geMod : stMod;
 
+  // Verstärkungsbonus (magicBonus) wirkt auf Angriff UND Schaden gleichermaßen
   const iteratives = getBabIteratives(bab).map((b) => b + attackMod + magicBonus + sizeMod.attackAndAc);
   const attack = formatIteratives(iteratives);
 
@@ -222,8 +225,8 @@ export const calculateWeaponStats = (
   const dmgMod = dmgAttr === "GE" ? geMod : dmgAttr === "ST" ? stMod : 0;
   const flat = dmgMod + magicBonus;
   const baseDice = weapon.baseDice || "1W6";
-  let damage = flat > 0 ? `${baseDice}+${flat}` : flat < 0 ? `${baseDice}${flat}` : baseDice;
-  if (weapon.extraDamage) damage += ` ${weapon.extraDamage}`;
+  // "damage" enthält NUR den numerischen Teil - der Elementarschaden wird separat zurückgegeben
+  const damage = flat > 0 ? `${baseDice}+${flat}` : flat < 0 ? `${baseDice}${flat}` : baseDice;
 
   let sneakAttack: WeaponCalcResult["sneakAttack"] | undefined;
   if (options.sneakAttackActive) {
@@ -241,7 +244,7 @@ export const calculateWeaponStats = (
     sneakAttack = { attack: formatIteratives(sneakIteratives), damage: sneakDamage };
   }
 
-  return { name: weapon.name, attack, damage, sneakAttack };
+  return { name: weapon.name, attack, damage, extraDamage: weapon.extraDamage, sneakAttack };
 };
 
 export const calculateArmorClass = (
@@ -274,6 +277,7 @@ export interface TwoWeaponAttackResult {
   weaponName: string;
   attacks: { attackBonus: number; damage: string }[];
   formattedAttack: string;
+  extraDamage?: string;
 }
 
 export interface TwoWeaponFightingResult {
@@ -359,12 +363,14 @@ export const calculateTwoWeaponFighting = (
       weaponName: primaryWeapon.name,
       attacks: primaryAttacks,
       formattedAttack: formatAttacks(primaryAttacks),
+      extraDamage: primaryWeapon.extraDamage,
     },
     offHand: {
       slot: "offHand",
       weaponName: offHandWeapon.name,
       attacks: offHandAttacks,
       formattedAttack: formatAttacks(offHandAttacks),
+      extraDamage: offHandWeapon.extraDamage,
     },
     penaltyNote: feats.hasTwoWeaponFighting
       ? "Zweiwaffenkampf-Talent aktiv: -2/-2"
@@ -376,12 +382,6 @@ export const calculateTwoWeaponFighting = (
 // Legacy-Import-Hilfsfunktionen
 // ───────────────────────────────────────────────────────────
 
-/**
- * Zerlegt einen alten, zusammengesetzten Schadens-String wie "1W3+3 + 1W6 Eis"
- * in Basiswürfel ("1W3") und Zusatzschaden ("+1W6 Eis"). Der ursprüngliche
- * flache Bonus (+3) wird bewusst verworfen, da er beim Live-Berechnen aus
- * Attribut-Modifikator + Magie-Bonus automatisch neu zusammengesetzt wird.
- */
 export const parseLegacyWeaponDamage = (
   damageStr: string | undefined
 ): { baseDice: string; extraDamage?: string } => {
@@ -397,7 +397,9 @@ export const parseLegacyWeaponDamage = (
   return { baseDice, extraDamage };
 };
 
-/** Liest den Magie-Bonus aus der üblichen Waffennamen-Konvention, z.B. "Dolch des Eises +2" -> 2 */
+/** Liest den Verstärkungsbonus aus der üblichen Waffennamen-Konvention,
+ * z.B. "Dolch des Eises +2" -> 2. Dieser Bonus wirkt auf Angriff UND Schaden,
+ * NICHT auf Elementar-/Zusatzschaden (siehe extraDamage). */
 export const parseMagicBonusFromName = (name: string): number => {
   const match = name.match(/\+(\d+)\s*$/);
   return match ? parseInt(match[1], 10) : 0;
