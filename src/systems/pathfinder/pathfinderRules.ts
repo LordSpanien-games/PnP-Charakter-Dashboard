@@ -1,3 +1,5 @@
+import { CombatModifier, CombatModifierContext } from "../../core/types";
+
 export type BabProgression = "full" | "threeFourths" | "half";
 
 export interface PathfinderClassPreset {
@@ -56,18 +58,10 @@ export interface ClassCombatFeatures {
 }
 
 export const PATHFINDER_CLASS_COMBAT_FEATURES: Record<string, ClassCombatFeatures> = {
-  rogue: {
-    sneakAttackDice: (level) => Math.max(1, Math.ceil(level / 2)),
-  },
-  barbarian: {
-    rageRoundsPerDay: (conMod) => 4 + 2 * conMod,
-  },
-  ranger: {
-    favoredEnemyBonus: (level) => (level >= 15 ? 4 : level >= 10 ? 3 : level >= 5 ? 2 : 1),
-  },
-  paladin: {
-    smiteUsesPerDay: (chaMod) => Math.max(1, 1 + chaMod),
-  },
+  rogue: { sneakAttackDice: (level) => Math.max(1, Math.ceil(level / 2)) },
+  barbarian: { rageRoundsPerDay: (conMod) => 4 + 2 * conMod },
+  ranger: { favoredEnemyBonus: (level) => (level >= 15 ? 4 : level >= 10 ? 3 : level >= 5 ? 2 : 1) },
+  paladin: { smiteUsesPerDay: (chaMod) => Math.max(1, 1 + chaMod) },
   monk: {
     flurryExtraAttack: (level) => level >= 1,
     stunningFistUsesPerDay: (level) => 1 + Math.floor((level - 1) / 4),
@@ -76,44 +70,30 @@ export const PATHFINDER_CLASS_COMBAT_FEATURES: Record<string, ClassCombatFeature
     channelEnergyDice: (level) => Math.ceil(level / 2),
     channelEnergyUsesPerDay: (chaMod) => 3 + chaMod,
   },
-  bard: {
-    bardicPerformanceRounds: (level) => 4 + level * 2,
-  },
+  bard: { bardicPerformanceRounds: (level) => 4 + level * 2 },
 };
 
 export const getSneakAttackDice = (classId: string | undefined, level: number): number => {
   const fn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.sneakAttackDice : undefined;
   return fn ? fn(level) : 0;
 };
-
 export const getRageRounds = (classId: string | undefined, conMod: number): number => {
   const fn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.rageRoundsPerDay : undefined;
   return fn ? fn(conMod) : 0;
 };
-
 export const getFavoredEnemyBonus = (classId: string | undefined, level: number): number => {
   const fn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.favoredEnemyBonus : undefined;
   return fn ? fn(level) : 0;
 };
-
-export const getChannelEnergy = (
-  classId: string | undefined,
-  level: number,
-  chaMod: number
-): { dice: number; usesPerDay: number } => {
+export const getChannelEnergy = (classId: string | undefined, level: number, chaMod: number) => {
   const diceFn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.channelEnergyDice : undefined;
   const usesFn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.channelEnergyUsesPerDay : undefined;
-  return {
-    dice: diceFn ? diceFn(level) : 0,
-    usesPerDay: usesFn ? usesFn(chaMod) : 0,
-  };
+  return { dice: diceFn ? diceFn(level) : 0, usesPerDay: usesFn ? usesFn(chaMod) : 0 };
 };
-
 export const getBardicPerformanceRounds = (classId: string | undefined, level: number): number => {
   const fn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.bardicPerformanceRounds : undefined;
   return fn ? fn(level) : 0;
 };
-
 export const getStunningFistUses = (classId: string | undefined, level: number): number => {
   const fn = classId ? PATHFINDER_CLASS_COMBAT_FEATURES[classId]?.stunningFistUsesPerDay : undefined;
   return fn ? fn(level) : 0;
@@ -174,79 +154,6 @@ export const calculateSavingThrows = (
   };
 };
 
-export interface WeaponCalcInput {
-  name: string;
-  isMelee: boolean;
-  isFinesse?: boolean;
-  magicBonus?: number;
-  baseDice?: string;
-  damageAttribute?: "ST" | "GE" | "NONE";
-  sneakAttackBonusAttack?: number;
-  sneakAttackBonusDamage?: number;
-  extraDamage?: string;
-}
-
-export interface WeaponCalcResult {
-  name: string;
-  attack: string;
-  /** Nur Basiswürfel + Attributsbonus + Verstärkung, OHNE Elementarschaden-Text */
-  damage: string;
-  /** Separater Elementar-/Zusatzschaden, z.B. "+1W6 Eis" - unabhängig vom Verstärkungsbonus */
-  extraDamage?: string;
-  sneakAttack?: { attack: string; damage: string };
-}
-
-export const calculateWeaponStats = (
-  weapon: WeaponCalcInput,
-  attrs: PathfinderAttributes,
-  level: number,
-  classId: string | undefined,
-  raceId: string | undefined,
-  options: { sneakAttackActive: boolean }
-): WeaponCalcResult => {
-  const cls = classId ? PATHFINDER_CLASSES[classId] : undefined;
-  const race = raceId ? PATHFINDER_RACES[raceId] : undefined;
-  const sizeMod = SIZE_MODIFIERS[race?.size ?? "medium"];
-  const bab = calculateBAB(level, cls?.babProgression ?? "threeFourths");
-
-  const stMod = calculateModifier(attrs.ST);
-  const geMod = calculateModifier(attrs.GE);
-  const magicBonus = weapon.magicBonus ?? 0;
-
-  const useFinesse = weapon.isMelee && weapon.isFinesse;
-  const attackAttr = !weapon.isMelee ? "GE" : useFinesse ? "GE" : "ST";
-  const attackMod = attackAttr === "GE" ? geMod : stMod;
-
-  // Verstärkungsbonus (magicBonus) wirkt auf Angriff UND Schaden gleichermaßen
-  const iteratives = getBabIteratives(bab).map((b) => b + attackMod + magicBonus + sizeMod.attackAndAc);
-  const attack = formatIteratives(iteratives);
-
-  const dmgAttr = weapon.damageAttribute ?? (!weapon.isMelee ? "NONE" : "ST");
-  const dmgMod = dmgAttr === "GE" ? geMod : dmgAttr === "ST" ? stMod : 0;
-  const flat = dmgMod + magicBonus;
-  const baseDice = weapon.baseDice || "1W6";
-  // "damage" enthält NUR den numerischen Teil - der Elementarschaden wird separat zurückgegeben
-  const damage = flat > 0 ? `${baseDice}+${flat}` : flat < 0 ? `${baseDice}${flat}` : baseDice;
-
-  let sneakAttack: WeaponCalcResult["sneakAttack"] | undefined;
-  if (options.sneakAttackActive) {
-    const sneakDice = getSneakAttackDice(classId, level);
-    const bonusAtk = weapon.sneakAttackBonusAttack ?? 0;
-    const bonusDmg = weapon.sneakAttackBonusDamage ?? 0;
-    const sneakIteratives = getBabIteratives(bab).map(
-      (b) => b + attackMod + magicBonus + sizeMod.attackAndAc + bonusAtk
-    );
-    const sneakFlat = flat + bonusDmg;
-    let sneakDamage = sneakFlat > 0 ? `${baseDice}+${sneakFlat}` : sneakFlat < 0 ? `${baseDice}${sneakFlat}` : baseDice;
-    if (sneakDice > 0) sneakDamage += ` + ${sneakDice}W6`;
-    if (weapon.extraDamage) sneakDamage += ` ${weapon.extraDamage}`;
-
-    sneakAttack = { attack: formatIteratives(sneakIteratives), damage: sneakDamage };
-  }
-
-  return { name: weapon.name, attack, damage, extraDamage: weapon.extraDamage, sneakAttack };
-};
-
 export const calculateArmorClass = (
   attrs: PathfinderAttributes,
   armorBonus: number,
@@ -263,6 +170,167 @@ export const calculateArmorClass = (
 };
 
 // ───────────────────────────────────────────────────────────
+// Kampf-Modifikatoren: Summierung nach Kontext
+// ───────────────────────────────────────────────────────────
+
+export const sumCombatModifiers = (
+  modifiers: CombatModifier[],
+  activeContexts: CombatModifierContext[]
+): { attackBonus: number; damageBonus: number; extraDamageParts: string[] } => {
+  let attackBonus = 0;
+  let damageBonus = 0;
+  const extraDamageParts: string[] = [];
+  modifiers.forEach((mod) => {
+    if (mod.context === "always" || activeContexts.includes(mod.context)) {
+      attackBonus += mod.attackBonus ?? 0;
+      damageBonus += mod.damageBonus ?? 0;
+      if (mod.extraDamageDice) extraDamageParts.push(mod.extraDamageDice);
+    }
+  });
+  return { attackBonus, damageBonus, extraDamageParts };
+};
+
+export const hasAnyModifierForContext = (
+  modifierGroups: (CombatModifier[] | undefined)[],
+  context: CombatModifierContext
+): boolean =>
+  modifierGroups.some((group) =>
+    (group || []).some(
+      (m) => m.context === context && ((m.attackBonus ?? 0) !== 0 || (m.damageBonus ?? 0) !== 0 || !!m.extraDamageDice)
+    )
+  );
+
+// ───────────────────────────────────────────────────────────
+// Waffen-Berechnung mit Grip-Varianten (Einhändig/Zweihändig) & Hinterhalt
+// ───────────────────────────────────────────────────────────
+
+export type WeaponGrip = "oneHanded" | "twoHanded";
+
+export interface WeaponCalcInput {
+  name: string;
+  isMelee: boolean;
+  isFinesse?: boolean;
+  magicBonus?: number;
+  baseDice?: string;
+  damageAttribute?: "ST" | "GE" | "NONE";
+  extraDamage?: string;
+  supportsOneHanded?: boolean;
+  supportsTwoHanded?: boolean;
+  modifiers?: CombatModifier[];
+  /** Legacy-Fallback aus älteren Importen */
+  sneakAttackBonusAttack?: number;
+  sneakAttackBonusDamage?: number;
+}
+
+export interface GripAttackResult {
+  grip: WeaponGrip;
+  attack: string;
+  damage: string;
+  extraDamageParts: string[];
+  sneakAttack?: { attack: string; damage: string; extraDamageParts: string[] };
+}
+
+export interface WeaponFullResult {
+  name: string;
+  grips: GripAttackResult[];
+}
+
+export const calculateWeaponGripVariants = (
+  weapon: WeaponCalcInput,
+  attrs: PathfinderAttributes,
+  level: number,
+  classId: string | undefined,
+  raceId: string | undefined,
+  characterModifiers: CombatModifier[] | undefined,
+  sneakAttackActive: boolean
+): WeaponFullResult => {
+  const cls = classId ? PATHFINDER_CLASSES[classId] : undefined;
+  const race = raceId ? PATHFINDER_RACES[raceId] : undefined;
+  const sizeMod = SIZE_MODIFIERS[race?.size ?? "medium"];
+  const bab = calculateBAB(level, cls?.babProgression ?? "threeFourths");
+
+  const stMod = calculateModifier(attrs.ST);
+  const geMod = calculateModifier(attrs.GE);
+  const sneakDice = sneakAttackActive ? getSneakAttackDice(classId, level) : 0;
+
+  // Legacy-Flachfelder (ältere Importe) werden als impliziter Hinterhalt-Modifikator behandelt
+  const legacySneakMod: CombatModifier[] =
+    weapon.sneakAttackBonusAttack || weapon.sneakAttackBonusDamage
+      ? [{
+          id: "legacy-sneak",
+          label: "Hinterhältiger Bonus (Altwert)",
+          sourceType: "weapon",
+          context: "sneakAttackOnly",
+          attackBonus: weapon.sneakAttackBonusAttack ?? 0,
+          damageBonus: weapon.sneakAttackBonusDamage ?? 0,
+        }]
+      : [];
+
+  const weaponMods = [...(weapon.modifiers || []), ...legacySneakMod];
+  const charMods = characterModifiers || [];
+
+  const hasAnySneakBonus =
+    sneakDice > 0 || hasAnyModifierForContext([weaponMods, charMods], "sneakAttackOnly");
+
+  const computeForContexts = (grip: WeaponGrip, includeSneak: boolean) => {
+    const useFinesse = weapon.isMelee && weapon.isFinesse;
+    const attackAttr = !weapon.isMelee ? "GE" : useFinesse ? "GE" : "ST";
+    const attackMod = attackAttr === "GE" ? geMod : stMod;
+
+    const dmgAttr = weapon.damageAttribute ?? (!weapon.isMelee ? "NONE" : "ST");
+    let dmgMod = dmgAttr === "GE" ? geMod : dmgAttr === "ST" ? stMod : 0;
+    if (grip === "twoHanded" && dmgAttr === "ST") {
+      dmgMod = Math.floor(dmgMod * 1.5);
+    }
+
+    const gripContext: CombatModifierContext = grip === "twoHanded" ? "twoHandedOnly" : "oneHandedOnly";
+    const contexts: CombatModifierContext[] = includeSneak ? [gripContext, "sneakAttackOnly"] : [gripContext];
+    const modSum = sumCombatModifiers([...weaponMods, ...charMods], contexts);
+
+    const magicBonus = weapon.magicBonus ?? 0;
+    const totalAttackMod = attackMod + magicBonus + sizeMod.attackAndAc + modSum.attackBonus;
+    const iteratives = getBabIteratives(bab).map((b) => b + totalAttackMod);
+    const attack = formatIteratives(iteratives);
+
+    const baseDice = weapon.baseDice || "1W6";
+    const flat = dmgMod + magicBonus + modSum.damageBonus;
+    let damage = flat > 0 ? `${baseDice}+${flat}` : flat < 0 ? `${baseDice}${flat}` : baseDice;
+    if (includeSneak && sneakDice > 0) damage += ` + ${sneakDice}W6`;
+
+    const extraDamageParts = [
+      ...(weapon.extraDamage ? [weapon.extraDamage] : []),
+      ...modSum.extraDamageParts,
+    ];
+
+    return { attack, damage, extraDamageParts };
+  };
+
+  const buildGrip = (grip: WeaponGrip): GripAttackResult => {
+    const normal = computeForContexts(grip, false);
+    const sneak = hasAnySneakBonus ? computeForContexts(grip, true) : undefined;
+    return {
+      grip,
+      attack: normal.attack,
+      damage: normal.damage,
+      extraDamageParts: normal.extraDamageParts,
+      sneakAttack: sneak
+        ? { attack: sneak.attack, damage: sneak.damage, extraDamageParts: sneak.extraDamageParts }
+        : undefined,
+    };
+  };
+
+  const supportsOneHanded = weapon.supportsOneHanded !== false;
+  const supportsTwoHanded = weapon.isMelee && !!weapon.supportsTwoHanded;
+
+  const grips: GripAttackResult[] = [];
+  if (supportsOneHanded) grips.push(buildGrip("oneHanded"));
+  if (supportsTwoHanded) grips.push(buildGrip("twoHanded"));
+  if (grips.length === 0) grips.push(buildGrip("oneHanded"));
+
+  return { name: weapon.name, grips };
+};
+
+// ───────────────────────────────────────────────────────────
 // Zweiwaffenkampf (Two-Weapon Fighting)
 // ───────────────────────────────────────────────────────────
 
@@ -275,9 +343,8 @@ export interface TwoWeaponFightingFeats {
 export interface TwoWeaponAttackResult {
   slot: "primary" | "offHand";
   weaponName: string;
-  attacks: { attackBonus: number; damage: string }[];
+  attacks: { attackBonus: number; damage: string; extraDamageParts: string[] }[];
   formattedAttack: string;
-  extraDamage?: string;
 }
 
 export interface TwoWeaponFightingResult {
@@ -287,14 +354,15 @@ export interface TwoWeaponFightingResult {
 }
 
 export const calculateTwoWeaponFighting = (
-  primaryWeapon: WeaponCalcInput & { isLight?: boolean },
+  primaryWeapon: WeaponCalcInput,
   offHandWeapon: WeaponCalcInput & { isLight?: boolean },
   attrs: PathfinderAttributes,
   level: number,
   classId: string | undefined,
   raceId: string | undefined,
   feats: TwoWeaponFightingFeats,
-  options: { sneakAttackActive: boolean }
+  characterModifiers: CombatModifier[] | undefined,
+  sneakAttackActive: boolean
 ): TwoWeaponFightingResult => {
   const cls = classId ? PATHFINDER_CLASSES[classId] : undefined;
   const race = raceId ? PATHFINDER_RACES[raceId] : undefined;
@@ -303,20 +371,36 @@ export const calculateTwoWeaponFighting = (
 
   const stMod = calculateModifier(attrs.ST);
   const geMod = calculateModifier(attrs.GE);
-  const sneakDice = options.sneakAttackActive ? getSneakAttackDice(classId, level) : 0;
+  const sneakDice = sneakAttackActive ? getSneakAttackDice(classId, level) : 0;
+  const charMods = characterModifiers || [];
 
   let primaryPenalty = -2;
-  let offHandPenalty = offHandWeapon.isLight ? -2 : -4;
+  let offHandPenalty = (offHandWeapon as any).isLight ? -2 : -4;
   if (feats.hasTwoWeaponFighting) {
     primaryPenalty = -2;
     offHandPenalty = -2;
   }
 
-  const buildAttacks = (
+  const legacySneakMod = (weapon: WeaponCalcInput): CombatModifier[] =>
+    weapon.sneakAttackBonusAttack || weapon.sneakAttackBonusDamage
+      ? [{
+          id: "legacy-sneak",
+          label: "Hinterhältiger Bonus (Altwert)",
+          sourceType: "weapon",
+          context: "sneakAttackOnly",
+          attackBonus: weapon.sneakAttackBonusAttack ?? 0,
+          damageBonus: weapon.sneakAttackBonusDamage ?? 0,
+        }]
+      : [];
+
+  const buildHandAttacks = (
     weapon: WeaponCalcInput,
     penalty: number,
+    isOffHand: boolean,
     extraBabThresholds: number[]
   ) => {
+    const weaponMods = [...(weapon.modifiers || []), ...legacySneakMod(weapon)];
+
     const useFinesse = weapon.isMelee && weapon.isFinesse;
     const attackAttr = !weapon.isMelee ? "GE" : useFinesse ? "GE" : "ST";
     const attackMod = attackAttr === "GE" ? geMod : stMod;
@@ -324,22 +408,33 @@ export const calculateTwoWeaponFighting = (
 
     const dmgAttr = weapon.damageAttribute ?? (!weapon.isMelee ? "NONE" : "ST");
     const rawDmgMod = dmgAttr === "GE" ? geMod : dmgAttr === "ST" ? stMod : 0;
-    const dmgMod = weapon === offHandWeapon && rawDmgMod > 0 ? Math.floor(rawDmgMod * 0.5) : rawDmgMod;
+    const dmgMod = isOffHand && rawDmgMod > 0 ? Math.floor(rawDmgMod * 0.5) : rawDmgMod;
 
-    const flat = dmgMod + magicBonus + (weapon === primaryWeapon && options.sneakAttackActive ? weapon.sneakAttackBonusDamage ?? 0 : 0);
+    const contexts: CombatModifierContext[] = ["oneHandedOnly"];
+    if (isOffHand) contexts.push("offHandOnly");
+    if (sneakDice > 0 || hasAnyModifierForContext([weaponMods, charMods], "sneakAttackOnly")) {
+      contexts.push("sneakAttackOnly");
+    }
+    const modSum = sumCombatModifiers([...weaponMods, ...charMods], contexts);
+
+    const flat = dmgMod + magicBonus + modSum.damageBonus;
     const baseDice = weapon.baseDice || "1W6";
     let damage = flat > 0 ? `${baseDice}+${flat}` : flat < 0 ? `${baseDice}${flat}` : baseDice;
     if (sneakDice > 0) damage += ` + ${sneakDice}W6`;
-    if (weapon.extraDamage) damage += ` ${weapon.extraDamage}`;
+    const extraDamageParts = [
+      ...(weapon.extraDamage ? [weapon.extraDamage] : []),
+      ...modSum.extraDamageParts,
+    ];
 
-    const mainAttackBonus = bab + attackMod + magicBonus + sizeMod.attackAndAc + penalty;
-    const attacks = [{ attackBonus: mainAttackBonus, damage }];
+    const mainAttackBonus = bab + attackMod + magicBonus + sizeMod.attackAndAc + penalty + modSum.attackBonus;
+    const attacks = [{ attackBonus: mainAttackBonus, damage, extraDamageParts }];
 
     extraBabThresholds.forEach((threshold) => {
       if (bab >= threshold) {
         attacks.push({
-          attackBonus: bab - threshold + attackMod + magicBonus + sizeMod.attackAndAc + penalty,
+          attackBonus: bab - threshold + attackMod + magicBonus + sizeMod.attackAndAc + penalty + modSum.attackBonus,
           damage,
+          extraDamageParts,
         });
       }
     });
@@ -347,12 +442,12 @@ export const calculateTwoWeaponFighting = (
     return attacks;
   };
 
-  const primaryAttacks = buildAttacks(primaryWeapon, primaryPenalty, []);
+  const primaryAttacks = buildHandAttacks(primaryWeapon, primaryPenalty, false, []);
   const offHandExtra = [
     ...(feats.hasImprovedTwoWeaponFighting ? [5] : []),
     ...(feats.hasGreaterTwoWeaponFighting ? [10] : []),
   ];
-  const offHandAttacks = buildAttacks(offHandWeapon, offHandPenalty, offHandExtra);
+  const offHandAttacks = buildHandAttacks(offHandWeapon, offHandPenalty, true, offHandExtra);
 
   const formatAttacks = (attacks: { attackBonus: number }[]) =>
     attacks.map((a) => formatModifier(a.attackBonus)).join(" / ");
@@ -363,18 +458,16 @@ export const calculateTwoWeaponFighting = (
       weaponName: primaryWeapon.name,
       attacks: primaryAttacks,
       formattedAttack: formatAttacks(primaryAttacks),
-      extraDamage: primaryWeapon.extraDamage,
     },
     offHand: {
       slot: "offHand",
       weaponName: offHandWeapon.name,
       attacks: offHandAttacks,
       formattedAttack: formatAttacks(offHandAttacks),
-      extraDamage: offHandWeapon.extraDamage,
     },
     penaltyNote: feats.hasTwoWeaponFighting
       ? "Zweiwaffenkampf-Talent aktiv: -2/-2"
-      : `Standard-Abzüge: ${primaryPenalty}/${offHandPenalty}${offHandWeapon.isLight ? " (Nebenhand leicht)" : ""}`,
+      : `Standard-Abzüge: ${primaryPenalty}/${offHandPenalty}${(offHandWeapon as any).isLight ? " (Nebenhand leicht)" : ""}`,
   };
 };
 
@@ -387,20 +480,16 @@ export const parseLegacyWeaponDamage = (
 ): { baseDice: string; extraDamage?: string } => {
   if (!damageStr) return { baseDice: "1W6" };
   const trimmed = damageStr.trim();
-
   const baseDiceMatch = trimmed.match(/^(\d+[Ww]\d+)/);
   const baseDice = baseDiceMatch ? baseDiceMatch[1].toUpperCase() : "1W6";
-
   const extraMatch = trimmed.match(/\+\s*(\d+[Ww]\d+\s*[^\d+]+)/);
   const extraDamage = extraMatch ? `+${extraMatch[1].trim()}` : undefined;
-
   return { baseDice, extraDamage };
 };
 
-/** Liest den Verstärkungsbonus aus der üblichen Waffennamen-Konvention,
- * z.B. "Dolch des Eises +2" -> 2. Dieser Bonus wirkt auf Angriff UND Schaden,
- * NICHT auf Elementar-/Zusatzschaden (siehe extraDamage). */
 export const parseMagicBonusFromName = (name: string): number => {
   const match = name.match(/\+(\d+)\s*$/);
   return match ? parseInt(match[1], 10) : 0;
 };
+
+export const makeModifierId = () => `mod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
