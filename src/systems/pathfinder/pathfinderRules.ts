@@ -169,6 +169,32 @@ export const calculateArmorClass = (
   };
 };
 
+/** Kampfmanöverbonus (KMB) und Kampfmanöververteidigung (KMV).
+ * KMB = BAB + ST-Mod + Größenmod. | KMV = 10 + BAB + ST-Mod + GE-Mod + Größenmod. */
+export interface CombatManeuverResult {
+  kmb: number;
+  kmv: number;
+}
+
+export const calculateCombatManeuver = (
+  attrs: PathfinderAttributes,
+  level: number,
+  classId: string | undefined,
+  raceId: string | undefined
+): CombatManeuverResult => {
+  const cls = classId ? PATHFINDER_CLASSES[classId] : undefined;
+  const race = raceId ? PATHFINDER_RACES[raceId] : undefined;
+  const sizeMod = SIZE_MODIFIERS[race?.size ?? "medium"].cmbAndCmd;
+  const bab = calculateBAB(level, cls?.babProgression ?? "threeFourths");
+  const stMod = calculateModifier(attrs.ST);
+  const geMod = calculateModifier(attrs.GE);
+
+  return {
+    kmb: bab + stMod + sizeMod,
+    kmv: 10 + bab + stMod + geMod + sizeMod,
+  };
+};
+
 // ───────────────────────────────────────────────────────────
 // Kampf-Modifikatoren: Summierung nach Kontext
 // ───────────────────────────────────────────────────────────
@@ -217,7 +243,6 @@ export interface WeaponCalcInput {
   supportsOneHanded?: boolean;
   supportsTwoHanded?: boolean;
   modifiers?: CombatModifier[];
-  /** Legacy-Fallback aus älteren Importen */
   sneakAttackBonusAttack?: number;
   sneakAttackBonusDamage?: number;
 }
@@ -253,7 +278,6 @@ export const calculateWeaponGripVariants = (
   const geMod = calculateModifier(attrs.GE);
   const sneakDice = sneakAttackActive ? getSneakAttackDice(classId, level) : 0;
 
-  // Legacy-Flachfelder (ältere Importe) werden als impliziter Hinterhalt-Modifikator behandelt
   const legacySneakMod: CombatModifier[] =
     weapon.sneakAttackBonusAttack || weapon.sneakAttackBonusDamage
       ? [{
