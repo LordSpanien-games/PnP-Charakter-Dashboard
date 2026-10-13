@@ -88,7 +88,6 @@ const getTabForItem = (item: InventoryItem): CategoryTabId => {
   return "gear";
 };
 
-/** Klickbare Ladungs-Kästchen zum "Abstreichen" - unabhängig vom Bearbeitungsmodus nutzbar. */
 const ChargeTracker: React.FC<{
   current: number;
   max: number;
@@ -570,7 +569,7 @@ export const PathfinderPlugin: SystemPlugin = {
           </div>
         )}
 
-        {/* Aktive Kampfwaffen */}
+        {/* Aktive Kampfwaffen - mit getrennten Badges für Verstärkung vs. Magieschaden */}
         <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
           <div className="text-xs font-mono font-bold text-zinc-300">
             Aktive Kampfwaffen {sneakAttackActive && "(Hinterhältiger Angriff aktiv)"}
@@ -603,8 +602,11 @@ export const PathfinderPlugin: SystemPlugin = {
               <div className="flex flex-wrap gap-1.5">
                 <ValueBadge label="Angriff" value={result.attack} color="text-cyan-300" />
                 <ValueBadge label="Schaden" value={result.damage} color="text-rose-400" />
+                {result.extraDamage && (
+                  <ValueBadge label="Magieschaden" value={result.extraDamage} color="text-sky-300" />
+                )}
                 {!!item.weaponData?.magicBonus && (
-                  <ValueBadge label="Magie" value={`+${item.weaponData.magicBonus}`} color="text-indigo-300" />
+                  <ValueBadge label="Verstärkung" value={`+${item.weaponData.magicBonus}`} color="text-indigo-300" />
                 )}
                 {sneakAttackActive && result.sneakAttack && (
                   <>
@@ -628,6 +630,9 @@ export const PathfinderPlugin: SystemPlugin = {
                 <div className="flex flex-wrap gap-1.5">
                   <ValueBadge label="Angriff" value={twfResult.primary.formattedAttack} color="text-cyan-300" />
                   <ValueBadge label="Schaden" value={twfResult.primary.attacks[0].damage} color="text-rose-400" />
+                  {twfResult.primary.extraDamage && (
+                    <ValueBadge label="Magieschaden" value={twfResult.primary.extraDamage} color="text-sky-300" />
+                  )}
                 </div>
               </div>
 
@@ -639,6 +644,9 @@ export const PathfinderPlugin: SystemPlugin = {
                 <div className="flex flex-wrap gap-1.5">
                   <ValueBadge label="Angriff" value={twfResult.offHand.formattedAttack} color="text-cyan-300" />
                   <ValueBadge label="Schaden" value={twfResult.offHand.attacks[0].damage} color="text-rose-400" />
+                  {twfResult.offHand.extraDamage && (
+                    <ValueBadge label="Magieschaden" value={twfResult.offHand.extraDamage} color="text-sky-300" />
+                  )}
                 </div>
               </div>
             </>
@@ -720,10 +728,13 @@ export const PathfinderPlugin: SystemPlugin = {
                     <div className="flex flex-wrap gap-1.5">
                       <ValueBadge label="Ort" value={item.location === "equipped" ? "Am Mann" : "Eingelagert"} color={item.location === "equipped" ? "text-emerald-400" : "text-amber-400"} />
                       {item.category === "weapon" && item.weaponData?.baseDice && (
-                        <ValueBadge label="Schaden" value={`${item.weaponData.baseDice}${item.weaponData.extraDamage ? ` ${item.weaponData.extraDamage}` : ""}`} color="text-rose-400" />
+                        <ValueBadge label="Schaden" value={item.weaponData.baseDice} color="text-rose-400" />
+                      )}
+                      {item.category === "weapon" && item.weaponData?.extraDamage && (
+                        <ValueBadge label="Magieschaden" value={item.weaponData.extraDamage} color="text-sky-300" />
                       )}
                       {item.category === "weapon" && !!item.weaponData?.magicBonus && (
-                        <ValueBadge label="Magie" value={`+${item.weaponData.magicBonus}`} color="text-indigo-300" />
+                        <ValueBadge label="Verstärkung" value={`+${item.weaponData.magicBonus}`} color="text-indigo-300" />
                       )}
                       {item.category === "weapon" && item.isActiveWeapon && (
                         <ValueBadge
@@ -750,7 +761,6 @@ export const PathfinderPlugin: SystemPlugin = {
                   {/* Ausklappbarer Detailbereich */}
                   {isExpanded && (
                     <div className="px-3 pb-3 pt-1 border-t border-zinc-800 space-y-3">
-                      {/* Ladungen zum Abstreichen - immer nutzbar, egal ob Bearbeitungsmodus */}
                       {item.charges && (
                         <div className="space-y-1">
                           <span className="text-[10px] text-zinc-500 font-mono uppercase">Ladungen verwalten</span>
@@ -762,7 +772,6 @@ export const PathfinderPlugin: SystemPlugin = {
                         </div>
                       )}
 
-                      {/* Anzahl - immer nutzbar */}
                       {item.quantity !== undefined && (
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] text-zinc-500 font-mono uppercase">Anzahl</span>
@@ -772,7 +781,6 @@ export const PathfinderPlugin: SystemPlugin = {
                         </div>
                       )}
 
-                      {/* Vollständige Beschreibung - immer lesbar, nicht nur im Hover */}
                       {item.notes && (
                         <div>
                           <span className="text-[10px] text-zinc-500 font-mono uppercase">Beschreibung</span>
@@ -782,7 +790,6 @@ export const PathfinderPlugin: SystemPlugin = {
                         </div>
                       )}
 
-                      {/* Bearbeitungsfelder - nur im Bearbeitungsmodus */}
                       {isEditing && (
                         <div className="space-y-3 pt-2 border-t border-zinc-800">
                           <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-zinc-400">
@@ -843,13 +850,13 @@ export const PathfinderPlugin: SystemPlugin = {
                                   className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
                               </div>
                               <div>
-                                <label className="block text-[9px] text-zinc-500">Magie-Bonus</label>
+                                <label className="block text-[9px] text-zinc-500">Verstärkung (+X, wirkt auf Angriff & Schaden)</label>
                                 <input type="number" value={item.weaponData?.magicBonus ?? 0}
                                   onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, magicBonus: Number(e.target.value) } })}
                                   className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
                               </div>
                               <div>
-                                <label className="block text-[9px] text-zinc-500">Zusatzschaden (z.B. +1W6 Eis)</label>
+                                <label className="block text-[9px] text-zinc-500">Magieschaden (z.B. +1W6 Eis)</label>
                                 <input value={item.weaponData?.extraDamage || ""} placeholder="+1W6 Feuer"
                                   onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, extraDamage: e.target.value || undefined } })}
                                   className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
@@ -901,6 +908,7 @@ export const PathfinderPlugin: SystemPlugin = {
                             </div>
                           )}
 
+                          {/* Kategorie-Wechsel - frei wählbar, unabhängig vom Import */}
                           <div>
                             <label className="block text-[9px] text-zinc-500">Kategorie</label>
                             <select value={item.category || "gear"}
