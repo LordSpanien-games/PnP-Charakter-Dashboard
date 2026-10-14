@@ -80,6 +80,8 @@ export const makeId = () => `item_${Date.now()}_${Math.random().toString(36).sli
 
 export type ShadowrunMatrixAttribute = "attack" | "sleaze" | "dataProcessing" | "firewall";
 
+export const MATRIX_ATTR_ORDER: ShadowrunMatrixAttribute[] = ["attack", "sleaze", "dataProcessing", "firewall"];
+
 export const MATRIX_ATTR_LABELS: Record<ShadowrunMatrixAttribute, string> = {
   attack: "Angriff", sleaze: "Schleicher", dataProcessing: "Datenverarbeitung", firewall: "Firewall",
 };
@@ -122,8 +124,7 @@ export const MODE_LABELS: Record<string, string> = {
   "hot-vr": "Virtuelle Realität – Heiß (Hot-VR)",
 };
 
-/** Effektive Matrix-Attribute inkl. aller Boni durch aktive Programme -
- * generisch, unabhängig vom konkreten Programmnamen. */
+/** Effektive Matrix-Attribute inkl. aller Boni durch aktive Programme. */
 export const calculateEffectiveMatrixAttributes = (
   deck: ShadowrunCyberdeck
 ): { attack: number; sleaze: number; dataProcessing: number; firewall: number } => {
@@ -148,3 +149,28 @@ export const getActiveProgramDicePoolMods = (deck: ShadowrunCyberdeck, skillName
     }
     return sum;
   }, 0);
+
+/**
+ * Weist einem Matrix-Attribut einen neuen Basiswert aus dem festen Attribut-Pool
+ * zu. Trägt bereits ein anderes Attribut genau diesen Wert, wird einfach getauscht -
+ * so bleibt automatisch sichergestellt, dass alle Pool-Werte genau einmal vergeben sind.
+ */
+export const reassignDeckAttributeValue = (
+  configuration: ShadowrunCyberdeck["configuration"],
+  targetAttribute: ShadowrunMatrixAttribute,
+  newValue: number
+): ShadowrunCyberdeck["configuration"] => {
+  const next = { ...configuration };
+  const currentValueOfTarget = next[targetAttribute];
+
+  const otherAttrWithNewValue = MATRIX_ATTR_ORDER.find(
+    (attr) => attr !== targetAttribute && next[attr] === newValue
+  );
+
+  next[targetAttribute] = newValue;
+  if (otherAttrWithNewValue) {
+    next[otherAttrWithNewValue] = currentValueOfTarget;
+  }
+
+  return next;
+};
