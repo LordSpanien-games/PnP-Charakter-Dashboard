@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { Info, Plus, Minus, ChevronDown, ChevronRight } from "lucide-react";
+import { Info, Plus, Minus, ChevronDown, ChevronRight, Moon } from "lucide-react";
 import { SystemPlugin, AttributePool, PluginViewProps } from "../../core/SystemPlugin";
 import { GenericCharacter, createEmptyGenericCharacter, InventoryItem } from "../../core/types";
 import { ValueBadge, ChargeTracker } from "../../core/uiKit";
+import { applyRest } from "../../core/rest";
 import {
   ShadowrunAttributes,
   ATTR_KEYS,
@@ -24,6 +25,10 @@ import {
 } from "./shadowrunRules";
 
 const METATYPES = ["Mensch", "Elf", "Zwerg", "Ork", "Troll"];
+const SKILL_CATEGORY_LABELS: Record<string, string> = {
+  active: "Aktionsfertigkeiten",
+  knowledge: "Wissens-/Sprachfertigkeiten",
+};
 
 const getAttrs = (character: GenericCharacter): ShadowrunAttributes => ({
   KON: Number(character.attributes.KON) || 1,
@@ -88,6 +93,7 @@ const parseArmorValue = (raw: unknown): number => {
 const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<CategoryTabId>("all");
+  const [restMessage, setRestMessage] = useState<string | null>(null);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -111,6 +117,11 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
 
   const activeWeapons = character.inventory.filter((i) => i.category === "weapon" && i.location === "equipped");
   const armorItem = character.inventory.find((i) => i.category === "armor" && i.location === "equipped");
+
+  const lifestyle = character.systemData.lifestyle as string | undefined;
+  const lifestyleCost = character.systemData.lifestyleCost as number | undefined;
+  const nuyenHistory = (character.systemData.nuyenHistory as any[]) || [];
+  const nuyenEntries = Object.entries(character.currency || {});
 
   const updateAttr = (key: string, value: number) => onUpdate({ attributes: { ...character.attributes, [key]: value } });
   const updateSystemData = (key: string, value: unknown) => onUpdate({ systemData: { ...character.systemData, [key]: value } });
@@ -143,14 +154,79 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
       if (it.id !== id || !it.charges) return it;
       return { ...it, charges: { ...it.charges, current: Math.min(it.charges.max, Math.max(0, newCurrent)) } };
     }) });
+  const toggleSubItem = (itemId: string, subId: string) => {
+    onUpdate({
+      inventory: character.inventory.map((it) => {
+        if (it.id !== itemId || !it.subItems) return it;
+        return { ...it, subItems: it.subItems.map((s) => (s.id === subId ? { ...s, isActive: !s.isActive } : s)) };
+      }),
+    });
+  };
+
+  const handleRest = () => {
+    const { character: updated, summary } = applyRest(character);
+    onUpdate({ abilities: updated.abilities, inventory: updated.inventory });
+    const parts: string[] = [];
+    if (summary.refreshedAbilities.length) parts.push(`${summary.refreshedAbilities.length} Fähigkeit(en) aufgefrischt`);
+    if (summary.refreshedItems.length) parts.push(`${summary.refreshedItems.length} Gegenstands-Ladung(en) aufgefüllt`);
+    setRestMessage(parts.length ? parts.join(" · ") : "Nichts musste aufgefrischt werden.");
+  };
+
+  const updateSkillCategory = (index: number, category: string) => {
+    onUpdate({ skills: character.skills.map((s, i) => (i === index ? { ...s, category: category || undefined } : s)) });
+  };
 
   const filteredInventory = character.inventory.filter((item) => activeTab === "all" || getTabForItem(item) === activeTab);
 
   const getWeaponSkillValue = (skillName: string) =>
     character.skills.find((s) => s.name.toLowerCase() === skillName.toLowerCase())?.value ?? 0;
 
+  const skillGroups = {
+    active: character.skills.map((s, i) => ({ s, i })).filter(({ s }) => s.category === "active"),
+    knowledge: character.skills.map((s, i) => ({ s, i })).filter(({ s }) => s.category === "knowledge"),
+    none: character.skills.map((s, i) => ({ s, i })).filter(({ s }) => !s.category),
+  };
+
+  const renderSkillGroup = (label: string, entries: { s: any; i: number }[]) => (
+    <div className="space-y-1.5">
+      <div className="text-[10px] uppercase text-zinc-500 font-mono">{label} ({entries.length})</div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+        {entries.map(({ s, i }) => (
+          <div key={i} className="flex items-center justify-between gap-2 text-xs font-mono bg-black/40 px-2 py-1 rounded">
+            <span className="text-zinc-300 truncate">{s.name}</span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-white font-bold">{s.value}</span>
+              {isEditing && (
+                <select
+                  value={s.category || ""}
+                  onChange={(e) => updateSkillCategory(i, e.target.value)}
+                  className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-zinc-400 px-1 py-0.5"
+                >
+                  <option value="">–</option>
+                  <option value="active">Aktion</option>
+                  <option value="knowledge">Wissen</option>
+                </select>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
+      {/* Rast */}
+      <div className="flex items-center gap-3 p-3 bg-indigo-950/20 border border-indigo-900/40 rounded-xl">
+        <button
+          onClick={handleRest}
+          className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold rounded-lg text-xs"
+        >
+          <Moon size={14} /> Rast einlegen
+        </button>
+        {restMessage && <span className="text-xs text-indigo-300 font-mono">{restMessage}</span>}
+      </div>
+
       {/* Metatyp */}
       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl">
         <label className="text-[10px] text-zinc-500 uppercase font-mono">Metatyp</label>
@@ -244,18 +320,40 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         </div>
       )}
 
-      {/* Fertigkeiten */}
-      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+      {/* Lifestyle & Nuyen */}
+      {(nuyenEntries.length > 0 || lifestyle || nuyenHistory.length > 0) && (
+        <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+          <div className="text-xs font-mono font-bold text-zinc-300">Finanzen & Lifestyle</div>
+          <div className="flex flex-wrap gap-1.5">
+            {nuyenEntries.map(([unit, amount]) => (
+              <ValueBadge key={unit} label="Guthaben" value={`${amount} ${unit}`} color="text-emerald-400" />
+            ))}
+            {lifestyle && <ValueBadge label="Lifestyle" value={lifestyle} color="text-amber-300" />}
+            {lifestyleCost !== undefined && <ValueBadge label="Kosten/Monat" value={lifestyleCost} color="text-amber-300" />}
+          </div>
+          {nuyenHistory.length > 0 && (
+            <div className="space-y-1 pt-1">
+              <span className="text-[10px] text-zinc-500 font-mono uppercase">Letzte Transaktionen</span>
+              {nuyenHistory.slice(0, 5).map((h: any) => (
+                <div key={h.id} className="flex items-center justify-between text-[11px] font-mono">
+                  <span className="text-zinc-400 truncate">{h.description}</span>
+                  <span className={h.amount >= 0 ? "text-emerald-400" : "text-red-400"}>
+                    {h.amount >= 0 ? "+" : ""}{h.amount}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Fertigkeiten - gruppiert, Zuordnung manuell im Bearbeitungsmodus */}
+      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
         <div className="text-xs font-mono font-bold text-zinc-300">Fertigkeiten</div>
         {character.skills.length === 0 && <p className="text-xs text-zinc-600 font-mono">Keine Fertigkeiten hinterlegt.</p>}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-          {character.skills.map((s, idx) => (
-            <div key={idx} className="flex items-center justify-between text-xs font-mono bg-black/40 px-2 py-1 rounded">
-              <span className="text-zinc-300">{s.name}</span>
-              <span className="text-white font-bold">{s.value}</span>
-            </div>
-          ))}
-        </div>
+        {skillGroups.active.length > 0 && renderSkillGroup(SKILL_CATEGORY_LABELS.active, skillGroups.active)}
+        {skillGroups.knowledge.length > 0 && renderSkillGroup(SKILL_CATEGORY_LABELS.knowledge, skillGroups.knowledge)}
+        {skillGroups.none.length > 0 && renderSkillGroup("Ohne Zuordnung", skillGroups.none)}
       </div>
 
       {/* Waffen */}
@@ -296,9 +394,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
             const traits = character.abilities.filter((a) => a.type === "trait");
             const items = character.abilities.filter((a) => a.type === "item");
             const other = character.abilities.filter((a) => a.type !== "trait" && a.type !== "item");
-
-            const isNegativeTrait = (effect?: string) =>
-              !!effect && /^-/.test(effect.trim());
+            const isNegativeTrait = (effect?: string) => !!effect && /^-/.test(effect.trim());
 
             return (
               <>
@@ -377,6 +473,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         <div className="space-y-2">
           {filteredInventory.map((item) => {
             const isExpanded = expandedIds.has(item.id);
+            const activeSubCount = (item.subItems || []).filter((s) => s.isActive).length;
             return (
               <div key={item.id} className="bg-black/40 border border-zinc-800 rounded-lg overflow-hidden">
                 <div className="p-3 space-y-2">
@@ -406,11 +503,25 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
                     )}
                     {item.charges && <ValueBadge label="Ladungen" value={`${item.charges.current}/${item.charges.max}`} color="text-purple-300" />}
                     {item.quantity !== undefined && item.category !== "weapon" && item.category !== "armor" && <ValueBadge label="Anzahl" value={`${item.quantity}x`} color="text-zinc-200" />}
+                    {item.subItems && item.subItems.length > 0 && (
+                      <ValueBadge label="Chips" value={`${activeSubCount}/${item.subItems.length} aktiv`} color="text-sky-300" />
+                    )}
                   </div>
                 </div>
 
                 {isExpanded && (
                   <div className="px-3 pb-3 pt-1 border-t border-zinc-800 space-y-3">
+                    {item.subItems && item.subItems.length > 0 && (
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-zinc-500 font-mono uppercase">Chips einzeln aktivieren</span>
+                        {item.subItems.map((sub) => (
+                          <label key={sub.id} className="flex items-center gap-2 text-xs font-mono text-zinc-300 cursor-pointer">
+                            <input type="checkbox" checked={!!sub.isActive} onChange={() => toggleSubItem(item.id, sub.id)} />
+                            <span>{sub.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
                     {item.charges && (
                       <div className="space-y-1">
                         <span className="text-[10px] text-zinc-500 font-mono uppercase">Ladungen verwalten</span>
@@ -585,7 +696,7 @@ const ShadowrunCombatView: React.FC<PluginViewProps> = ({ character }) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// MATRIX-REITER (Decker) - mit Attribut-Umverteilung
+// MATRIX-REITER (Decker)
 // ═══════════════════════════════════════════════════════════
 
 const ShadowrunMatrixView: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
@@ -767,6 +878,15 @@ export const ShadowrunPlugin: SystemPlugin = {
     const char = createBase(raw.name || "Unbenannt", raw.subTitle, attrs);
     char.systemData.metatype = raw.race || raw.metatype || "Mensch";
 
+    // Lifestyle & Nuyen-Historie aus raw.currency übernehmen
+    if (raw.currency) {
+      const unit = raw.currency.unit || "¥";
+      char.currency = { [unit]: Number(raw.currency.amount) || 0 };
+      if (raw.currency.lifestyle) char.systemData.lifestyle = raw.currency.lifestyle;
+      if (raw.currency.lifestyleCost !== undefined) char.systemData.lifestyleCost = raw.currency.lifestyleCost;
+      if (Array.isArray(raw.currency.history)) char.systemData.nuyenHistory = raw.currency.history;
+    }
+
     const normalItems: InventoryItem[] = (raw.inventory || []).map((it: any) => ({
       id: makeId(),
       name: it.name,
@@ -782,19 +902,21 @@ export const ShadowrunPlugin: SystemPlugin = {
       charges: it.maxUses ? { max: it.maxUses, current: it.currentUses ?? it.maxUses, rechargeType: "manual" } : undefined,
     }));
 
+    // bodyMods (Cyberware/Bioware) -> Essenzkosten + einzeln schaltbare Chips als subItems
     const bodyModItems: InventoryItem[] = (raw.bodyMods || []).map((mod: any) => {
-      const chipNotes = mod.isChipjack && Array.isArray(mod.chips) && mod.chips.length > 0
-        ? " Eingesteckte Chips: " + mod.chips.map((c: any) => `${c.name}${c.isActive ? " (aktiv)" : ""}`).join(", ")
-        : "";
+      const subItems = mod.isChipjack && Array.isArray(mod.chips)
+        ? mod.chips.map((c: any) => ({ id: makeId(), name: c.name, isActive: !!c.isActive, notes: c.notes }))
+        : undefined;
       return {
         id: makeId(),
         name: mod.name,
         category: mod.category === "bioware" ? "bioware" : "cyberware",
         quantity: 1,
         location: "equipped",
-        notes: (mod.description || "") + chipNotes,
+        notes: mod.description || "",
         essenceCost: Number(mod.essenceCost) || 0,
         rating: mod.rating,
+        subItems,
       };
     });
 
@@ -804,7 +926,7 @@ export const ShadowrunPlugin: SystemPlugin = {
       char.systemData.cyberdeck = raw.cyberdeck;
     }
 
-    char.skills = (raw.skills || []).map((s: any) => ({ name: s.name, value: s.value, notes: s.note }));
+    char.skills = (raw.skills || []).map((s: any) => ({ name: s.name, value: s.value, notes: s.note, category: s.category }));
     char.abilities = raw.abilities || [];
 
     return char;
