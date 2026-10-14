@@ -7,12 +7,18 @@ import {
   ShadowrunAttributes,
   ATTR_KEYS,
   ATTR_LABELS,
+  ATTR_LEGACY_ALIASES,
   calculateLimits,
   calculateInitiative,
   calculateConditionMonitors,
   calculateEssence,
   calculateWeaponPool,
   makeId,
+  ShadowrunCyberdeck,
+  MATRIX_ATTR_LABELS,
+  MODE_LABELS,
+  calculateEffectiveMatrixAttributes,
+  calculateExtraProgramSlots,
 } from "./shadowrunRules";
 
 const METATYPES = ["Mensch", "Elf", "Zwerg", "Ork", "Troll"];
@@ -39,8 +45,9 @@ const createBase = (name: string, subTitle: string | undefined, attrs: Record<st
     ...base,
     attributes: attrs,
     resources: {
-      physical: { current: condMon.physical, max: condMon.physical },
-      stun: { current: condMon.stun, max: condMon.stun },
+      // current = bereits erlittener Schaden (0 bei neuem Charakter), nicht "verbleibend"
+      physical: { current: 0, max: condMon.physical },
+      stun: { current: 0, max: condMon.stun },
     },
     systemData: { metatype: "Mensch", initiativeDice: 1 },
   };
@@ -67,7 +74,7 @@ const getTabForItem = (item: InventoryItem): CategoryTabId => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// HAUPTSEITE (schlank, orientiert am Standardbogen)
+// HAUPTSEITE
 // ═══════════════════════════════════════════════════════════
 
 const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
@@ -91,10 +98,10 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
   const stun = character.resources.stun || { current: 0, max: 0 };
 
   const metatype = (character.systemData.metatype as string) || "Mensch";
+  const cyberdeck = character.systemData.cyberdeck as ShadowrunCyberdeck | undefined;
+  const effectiveAttrs = cyberdeck ? calculateEffectiveMatrixAttributes(cyberdeck) : null;
 
-  const activeWeapons = character.inventory.filter(
-    (i) => i.category === "weapon" && i.location === "equipped"
-  );
+  const activeWeapons = character.inventory.filter((i) => i.category === "weapon" && i.location === "equipped");
   const armorItem = character.inventory.find((i) => i.category === "armor" && i.location === "equipped");
 
   const updateAttr = (key: string, value: number) => onUpdate({ attributes: { ...character.attributes, [key]: value } });
@@ -161,7 +168,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         ))}
       </div>
 
-      {/* Kernwerte: Essenz, Initiative, Limits */}
+      {/* Essenz, Initiative, Limits */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Essenz</div>
@@ -185,7 +192,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         </div>
       </div>
 
-      {/* Zustandsmonitore */}
+      {/* Zustandsmonitore - Kästchen = erlittener Schaden */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-2">Körperlicher Schaden</div>
@@ -211,7 +218,25 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         </div>
       </div>
 
-      {/* Fertigkeiten (Rohliste, wie auf dem Standardbogen) */}
+      {/* Decker: Cyberdeck-Kompaktanzeige - nur sichtbar, wenn vorhanden */}
+      {cyberdeck && effectiveAttrs && (
+        <div className="p-4 bg-zinc-900 border border-cyan-900/40 rounded-xl space-y-2">
+          <div className="text-xs font-mono font-bold text-cyan-300">Cyberdeck: {cyberdeck.name}</div>
+          <div className="flex flex-wrap gap-1.5">
+            <ValueBadge label="Gerätestufe" value={cyberdeck.deviceRating} />
+            <ValueBadge label="Angriff" value={effectiveAttrs.attack} color="text-cyan-300" />
+            <ValueBadge label="Schleicher" value={effectiveAttrs.sleaze} color="text-cyan-300" />
+            <ValueBadge label="Datenverarb." value={effectiveAttrs.dataProcessing} color="text-cyan-300" />
+            <ValueBadge label="Firewall" value={effectiveAttrs.firewall} color="text-cyan-300" />
+            {cyberdeck.matrixCondition && (
+              <ValueBadge label="Matrix-Schaden" value={`${cyberdeck.matrixCondition.damage}/${cyberdeck.matrixCondition.max}`} color="text-purple-300" />
+            )}
+          </div>
+          <p className="text-[10px] text-zinc-500 font-mono italic">Programme & Details siehe Reiter "Matrix"</p>
+        </div>
+      )}
+
+      {/* Fertigkeiten */}
       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
         <div className="text-xs font-mono font-bold text-zinc-300">Fertigkeiten</div>
         {character.skills.length === 0 && <p className="text-xs text-zinc-600 font-mono">Keine Fertigkeiten hinterlegt.</p>}
@@ -225,7 +250,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         </div>
       </div>
 
-      {/* Aktive Waffen - schlanke Zeile mit Pool & Schadenscode */}
+      {/* Waffen */}
       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
         <div className="text-xs font-mono font-bold text-zinc-300">Waffen</div>
         {activeWeapons.length === 0 && <p className="text-xs text-zinc-600 font-mono">Keine Waffe am Mann.</p>}
@@ -256,7 +281,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         ) : <p className="text-xs text-zinc-600 font-mono">Keine Rüstung am Mann.</p>}
       </div>
 
-      {/* Qualitäten & Fähigkeiten (Rohliste) */}
+      {/* Qualitäten & Fähigkeiten */}
       {character.abilities.length > 0 && (
         <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
           <div className="text-xs font-mono font-bold text-zinc-300">Qualitäten & besondere Fähigkeiten</div>
@@ -510,6 +535,89 @@ const ShadowrunCombatView: React.FC<PluginViewProps> = ({ character }) => {
 };
 
 // ═══════════════════════════════════════════════════════════
+// MATRIX-REITER (Decker)
+// ═══════════════════════════════════════════════════════════
+
+const ShadowrunMatrixView: React.FC<PluginViewProps> = ({ character, onUpdate }) => {
+  const cyberdeck = character.systemData.cyberdeck as ShadowrunCyberdeck | undefined;
+
+  if (!cyberdeck) {
+    return <p className="text-xs text-zinc-600 font-mono">Dieser Charakter besitzt kein Cyberdeck.</p>;
+  }
+
+  const effectiveAttrs = calculateEffectiveMatrixAttributes(cyberdeck);
+  const extraSlots = calculateExtraProgramSlots(cyberdeck);
+
+  const updateDeck = (patch: Partial<ShadowrunCyberdeck>) => {
+    onUpdate({ systemData: { ...character.systemData, cyberdeck: { ...cyberdeck, ...patch } } });
+  };
+  const toggleProgram = (id: string) => {
+    updateDeck({ programs: cyberdeck.programs.map((p) => (p.id === id ? { ...p, isActive: !p.isActive } : p)) });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+        <div className="text-xs font-mono font-bold text-zinc-300">
+          {cyberdeck.name} {cyberdeck.manufacturer && `(${cyberdeck.manufacturer})`}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <ValueBadge label="Gerätestufe" value={cyberdeck.deviceRating} />
+          {cyberdeck.mode && <ValueBadge label="Modus" value={MODE_LABELS[cyberdeck.mode] || cyberdeck.mode} color="text-amber-300" />}
+          {extraSlots > 0 && <ValueBadge label="Zusatzslots" value={`+${extraSlots}`} color="text-emerald-400" />}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {(["attack", "sleaze", "dataProcessing", "firewall"] as const).map((key) => {
+          const base = cyberdeck.configuration[key];
+          const effective = effectiveAttrs[key];
+          const boosted = effective !== base;
+          return (
+            <div key={key} className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+              <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">{MATRIX_ATTR_LABELS[key]}</div>
+              <div className="text-xl font-bold text-white">{effective}</div>
+              {boosted && <div className="text-[9px] text-emerald-400 font-mono">(Basis {base})</div>}
+            </div>
+          );
+        })}
+      </div>
+
+      {cyberdeck.matrixCondition && (
+        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl">
+          <div className="text-[9px] uppercase text-zinc-500 font-mono mb-2">Matrix-Zustandsmonitor (Kästchen = Schaden)</div>
+          <ChargeTracker
+            current={cyberdeck.matrixCondition.damage}
+            max={cyberdeck.matrixCondition.max}
+            onToggle={(newDamage) => updateDeck({ matrixCondition: { ...cyberdeck.matrixCondition!, damage: newDamage } })}
+          />
+        </div>
+      )}
+
+      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+        <div className="text-xs font-mono font-bold text-zinc-300">Programme</div>
+        {cyberdeck.programs.length === 0 && <p className="text-xs text-zinc-600 font-mono">Keine Programme installiert.</p>}
+        {cyberdeck.programs.map((p) => (
+          <div key={p.id} className="p-2.5 bg-black/40 border border-zinc-800 rounded-lg space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={p.isActive} onChange={() => toggleProgram(p.id)} />
+                <span className="text-sm font-bold text-white">{p.name}</span>
+              </label>
+              <span className="text-[9px] uppercase px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400">
+                {p.type === "hacking" ? "Hacking" : p.type === "standard" ? "Standard" : "Spezial"}
+              </span>
+            </div>
+            <p className="text-xs text-zinc-500 font-mono">{p.description}</p>
+            {p.modifiers?.notes && <p className="text-[10px] text-cyan-400 font-mono">{p.modifiers.notes}</p>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════
 // PLUGIN-DEFINITION
 // ═══════════════════════════════════════════════════════════
 
@@ -531,7 +639,6 @@ export const ShadowrunPlugin: SystemPlugin = {
     createBase(name, subTitle, { KON: 1, GES: 1, REA: 1, STR: 1, CHA: 1, INT: 1, LOG: 1, WIL: 1, EDG: 1 }),
 
   rollAttributePool: (): AttributePool => ({
-    // Shadowrun wird nicht gewürfelt (Prioritäten-/Karma-System) - fester Startwert statt Zufall.
     values: [3, 3, 3, 3, 3, 3, 3, 3, 2],
     methodLabel: "Standard-Ausgangswerte (kein Würfeln, da Shadowrun über Prioritäten/Karma erstellt wird)",
   }),
@@ -557,28 +664,34 @@ export const ShadowrunPlugin: SystemPlugin = {
         return l.includes("essenz") || l.includes("konstitution") || l.includes("geschicklichkeit") || l.includes("willenskraft") || l.includes("reaktion");
       });
     }
-    return false;
+    return !!raw.cyberdeck || !!raw.bodyMods;
   },
 
-  // Hinweis: noch ungetestet gegen eine echte Shadowrun-Exportdatei - bitte bei Gelegenheit
-  // einmal eine echte Datei (z.B. Ghost) hochladen, damit ich die Feldnamen feinjustieren kann.
   migrateLegacy: (raw: any) => {
     const attrs: Record<string, number> = { KON: 1, GES: 1, REA: 1, STR: 1, CHA: 1, INT: 1, LOG: 1, WIL: 1, EDG: 1 };
     const sourceList = [...(raw.characteristics || []), ...(raw.stats || [])];
     sourceList.forEach((s: any) => {
       const label = (s.label || "").toUpperCase();
       ATTR_KEYS.forEach((key) => {
-        if (label === key || label.startsWith(ATTR_LABELS[key].toUpperCase().slice(0, 3))) {
+        const aliases = ATTR_LEGACY_ALIASES[key] || [key];
+        if (aliases.includes(label)) {
           const val = typeof s.value === "number" ? s.value : parseInt(String(s.value).replace(/[^0-9-]/g, ""), 10);
           if (!isNaN(val)) attrs[key] = val;
         }
       });
     });
+    // EDG und ESS stehen in manchen Exporten in raw.stats statt in characteristics
+    const edgeStat = (raw.stats || []).find((s: any) => (s.label || "").toUpperCase() === "EDGE");
+    if (edgeStat) {
+      const val = parseInt(String(edgeStat.value).replace(/[^0-9-]/g, ""), 10);
+      if (!isNaN(val)) attrs.EDG = val;
+    }
 
     const char = createBase(raw.name || "Unbenannt", raw.subTitle, attrs);
     char.systemData.metatype = raw.race || raw.metatype || "Mensch";
 
-    char.inventory = (raw.inventory || []).map((it: any) => ({
+    // Normale Inventar-Items
+    const normalItems: InventoryItem[] = (raw.inventory || []).map((it: any) => ({
       id: makeId(),
       name: it.name,
       category: it.category === "weapon" ? "weapon" : it.category || "gear",
@@ -593,6 +706,30 @@ export const ShadowrunPlugin: SystemPlugin = {
       charges: it.maxUses ? { max: it.maxUses, current: it.currentUses ?? it.maxUses, rechargeType: "manual" } : undefined,
     }));
 
+    // bodyMods (Cyberware/Bioware) -> werden zu Inventar-Posten mit Essenzkosten
+    const bodyModItems: InventoryItem[] = (raw.bodyMods || []).map((mod: any) => {
+      const chipNotes = mod.isChipjack && Array.isArray(mod.chips) && mod.chips.length > 0
+        ? " Eingesteckte Chips: " + mod.chips.map((c: any) => `${c.name}${c.isActive ? " (aktiv)" : ""}`).join(", ")
+        : "";
+      return {
+        id: makeId(),
+        name: mod.name,
+        category: mod.category === "bioware" ? "bioware" : "cyberware",
+        quantity: 1,
+        location: "equipped",
+        notes: (mod.description || "") + chipNotes,
+        essenceCost: Number(mod.essenceCost) || 0,
+        rating: mod.rating,
+      };
+    });
+
+    char.inventory = [...normalItems, ...bodyModItems];
+
+    // Cyberdeck - Struktur stimmt bereits mit unserem Typ überein, direkt übernehmen
+    if (raw.cyberdeck) {
+      char.systemData.cyberdeck = raw.cyberdeck;
+    }
+
     char.skills = (raw.skills || []).map((s: any) => ({ name: s.name, value: s.value, notes: s.note }));
     char.abilities = raw.abilities || [];
 
@@ -605,5 +742,6 @@ export const ShadowrunPlugin: SystemPlugin = {
 
   secondaryViews: [
     { id: "combat", label: "Kampf", Component: ShadowrunCombatView },
+    { id: "matrix", label: "Matrix", Component: ShadowrunMatrixView },
   ],
 };
