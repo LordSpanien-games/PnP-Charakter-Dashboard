@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Info, Plus, Minus, ChevronDown, ChevronRight, X, Moon } from "lucide-react";
+import { Info, Plus, Minus, ChevronDown, ChevronRight, X, Moon, BedDouble } from "lucide-react";
 import { SystemPlugin, AttributePool, PluginViewProps } from "../../core/SystemPlugin";
 import {
   GenericCharacter,
@@ -12,6 +12,7 @@ import {
 } from "../../core/types";
 import { rollPool, roll4d6DropLowest } from "../../core/dice";
 import { applyRest } from "../../core/rest";
+import { ValueBadge, ChargeTracker, ValueStepper, SourceReferenceBadge, SourceReferenceInput } from "../../core/uiKit";
 import {
   PathfinderAttributes,
   calculateModifier,
@@ -30,6 +31,7 @@ import {
   getChannelEnergy,
   getBardicPerformanceRounds,
   getStunningFistUses,
+  calculateNaturalHealingAmount,
   parseLegacyWeaponDamage,
   parseMagicBonusFromName,
   makeModifierId,
@@ -95,13 +97,6 @@ const createBase = (name: string, subTitle: string | undefined, attrs: Record<st
     },
   };
 };
-
-const ValueBadge: React.FC<{ label: string; value: React.ReactNode; color?: string }> = ({ label, value, color }) => (
-  <div className="bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded text-zinc-300 text-[11px] font-mono">
-    <span className="text-[9px] text-zinc-500 uppercase mr-1">{label}:</span>
-    <strong className={color || "text-zinc-200"}>{value}</strong>
-  </div>
-);
 
 const ModifierListEditor: React.FC<{
   modifiers: CombatModifier[];
@@ -173,22 +168,6 @@ const getTabForItem = (item: InventoryItem): CategoryTabId => {
   return "gear";
 };
 
-const ChargeTracker: React.FC<{ current: number; max: number; onToggle: (newCurrent: number) => void }> = ({ current, max, onToggle }) => (
-  <div className="flex items-center gap-1 flex-wrap">
-    {Array.from({ length: max }, (_, i) => {
-      const filled = i < current;
-      return (
-        <button key={i} onClick={() => onToggle(filled ? i : i + 1)} title={filled ? "Ladung verbrauchen" : "Ladung wiederherstellen"}
-          className={`w-5 h-5 rounded border text-[9px] font-mono font-bold transition-colors ${
-            filled ? "bg-purple-500/20 border-purple-500/50 text-purple-300" : "bg-zinc-900 border-zinc-700 text-zinc-600"
-          }`}>{i + 1}</button>
-      );
-    })}
-  </div>
-);
-
-/** Liefert den einfachsten, "besten" Angriff/Schaden einer aktiven Waffe für
- * die Hauptseite - eine Zeile, wie auf dem echten Papierbogen, ohne Breakdown. */
 const getSimpleWeaponLine = (
   item: InventoryItem,
   attrs: PathfinderAttributes,
@@ -218,7 +197,6 @@ const getSimpleWeaponLine = (
   return { attack: primaryGrip.attack, damage: `${primaryGrip.damage}${extra ? ` ${extra}` : ""}` };
 };
 
-/** Liest Tagesnutzung aus Freitext wie "1x/Tag" oder "2x/Tag". */
 const parseDailyUses = (usage?: string): number | undefined => {
   if (!usage) return undefined;
   const match = usage.match(/(\d+)\s*x/i);
@@ -226,7 +204,7 @@ const parseDailyUses = (usage?: string): number | undefined => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// HAUPTSEITE (schlank, papierbogen-ähnlich)
+// HAUPTSEITE
 // ═══════════════════════════════════════════════════════════
 
 const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
@@ -306,28 +284,58 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
     }) });
   };
 
-  const handleRest = () => {
+  const handleNightRest = () => {
+    const healAmount = calculateNaturalHealingAmount(level, false);
     const { character: updated, summary } = applyRest(character);
-    onUpdate({ abilities: updated.abilities, inventory: updated.inventory });
-    const parts: string[] = [];
+    const newHp = Math.min(hp.max ?? hp.current, hp.current + healAmount);
+    onUpdate({
+      abilities: updated.abilities,
+      inventory: updated.inventory,
+      resources: { ...character.resources, hp: { ...hp, current: newHp } },
+    });
+    const parts = [`+${healAmount} TP geheilt`];
     if (summary.refreshedAbilities.length) parts.push(`${summary.refreshedAbilities.length} Fähigkeit(en) aufgefrischt`);
-    if (summary.refreshedItems.length) parts.push(`${summary.refreshedItems.length} Gegenstands-Ladung(en) aufgefüllt`);
-    setRestMessage(parts.length ? parts.join(" · ") : "Nichts musste aufgefrischt werden.");
+    if (summary.refreshedItems.length) parts.push(`${summary.refreshedItems.length} Ladung(en) aufgefüllt`);
+    setRestMessage(`Nachtruhe (8h): ${parts.join(" · ")}`);
+  };
+
+  const handleBedRest = () => {
+    const healAmount = calculateNaturalHealingAmount(level, true);
+    const { character: updated, summary } = applyRest(character);
+    const newHp = Math.min(hp.max ?? hp.current, hp.current + healAmount);
+    onUpdate({
+      abilities: updated.abilities,
+      inventory: updated.inventory,
+      resources: { ...character.resources, hp: { ...hp, current: newHp } },
+    });
+    const parts = [`+${healAmount} TP geheilt`];
+    if (summary.refreshedAbilities.length) parts.push(`${summary.refreshedAbilities.length} Fähigkeit(en) aufgefrischt`);
+    if (summary.refreshedItems.length) parts.push(`${summary.refreshedItems.length} Ladung(en) aufgefüllt`);
+    setRestMessage(`Bettruhe (24h): ${parts.join(" · ")}`);
   };
 
   const filteredInventory = character.inventory.filter((item) => activeTab === "all" || getTabForItem(item) === activeTab);
 
   return (
     <div className="space-y-6">
-      {/* Rast */}
-      <div className="flex items-center gap-3 p-3 bg-indigo-950/20 border border-indigo-900/40 rounded-xl">
-        <button
-          onClick={handleRest}
-          className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold rounded-lg text-xs"
-        >
-          <Moon size={14} /> Rast einlegen
-        </button>
-        {restMessage && <span className="text-xs text-indigo-300 font-mono">{restMessage}</span>}
+      {/* Rast-Optionen */}
+      <div className="p-3 bg-indigo-950/20 border border-indigo-900/40 rounded-xl space-y-2">
+        <div className="text-xs font-mono font-bold text-indigo-300">Rast & Erholung</div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={handleNightRest}
+            className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold rounded-lg text-xs"
+          >
+            <Moon size={14} /> Nachtruhe (8h)
+          </button>
+          <button
+            onClick={handleBedRest}
+            className="flex items-center gap-2 px-3 py-1.5 bg-indigo-800 hover:bg-indigo-700 text-white font-mono font-bold rounded-lg text-xs"
+          >
+            <BedDouble size={14} /> Bettruhe (24h, doppelte Heilung)
+          </button>
+        </div>
+        {restMessage && <p className="text-xs text-indigo-300 font-mono">{restMessage}</p>}
       </div>
 
       {/* Klasse, Rasse, Level */}
@@ -373,17 +381,18 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         ))}
       </div>
 
-      {/* Kernwerte: TP, RK, Rettungswürfe */}
+      {/* Kernwerte: TP (mit +/- Stepper), RK, Rettungswürfe */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1.5">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Trefferpunkte</div>
-          {isEditing ? (
-            <div className="flex items-center justify-center gap-1">
-              <input type="number" value={hp.current} onChange={(e) => updateHp("current", Number(e.target.value))} className="w-12 bg-black border border-zinc-700 rounded-lg text-center text-sm font-bold text-white py-1" />
-              <span className="text-zinc-500">/</span>
-              <input type="number" value={hp.max ?? 0} onChange={(e) => updateHp("max", Number(e.target.value))} className="w-12 bg-black border border-zinc-700 rounded-lg text-center text-sm font-bold text-white py-1" />
+          <ValueStepper current={hp.current} max={hp.max} onChange={(v) => updateHp("current", v)} />
+          {isEditing && (
+            <div className="flex items-center justify-center gap-2 text-[10px] text-zinc-500 font-mono">
+              <span>Max</span>
+              <input type="number" value={hp.max ?? 0} onChange={(e) => updateHp("max", Number(e.target.value))}
+                className="w-14 bg-black border border-zinc-700 rounded px-1 py-0.5 text-white text-center" />
             </div>
-          ) : <div className="text-lg font-bold text-white">{hp.current} / {hp.max ?? "–"}</div>}
+          )}
         </div>
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Rüstungsklasse</div>
@@ -417,7 +426,7 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         )}
       </div>
 
-      {/* Waffen - nur eine schlanke Zeile pro Waffe */}
+      {/* Waffen */}
       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
         <div className="text-xs font-mono font-bold text-zinc-300 mb-1">Aktive Waffen</div>
         {activeWeapons.length === 0 && (
@@ -445,7 +454,7 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         )}
       </div>
 
-      {/* Inventar mit Kategorie-Reitern */}
+      {/* Inventar */}
       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <span className="text-xs font-mono font-bold text-zinc-300">Inventar</span>
@@ -510,7 +519,7 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
                     {item.category === "armor" && <ValueBadge label="Rüstung" value={`+${item.armorData?.armorBonus ?? 0}`} color="text-cyan-300" />}
                     {item.charges && <ValueBadge label="Ladungen" value={`${item.charges.current}/${item.charges.max}`} color="text-purple-300" />}
                     {item.quantity !== undefined && item.category !== "weapon" && item.category !== "armor" && <ValueBadge label="Anzahl" value={`${item.quantity}x`} color="text-zinc-200" />}
-                    {item.sourceReference && <ValueBadge label="Quelle" value={item.sourceReference} color="text-amber-300" />}
+                    {item.sourceReference && <SourceReferenceBadge value={item.sourceReference} />}
                   </div>
                 </div>
 
@@ -611,10 +620,7 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
                           </select>
                         </div>
 
-                        <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
-                          <span>Regelwerk-Seite</span>
-                          <input value={item.sourceReference || ""} placeholder="z.B. GRW S. 112" onChange={(e) => updateInventoryItem(item.id, { sourceReference: e.target.value || undefined })} className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-white" />
-                        </div>
+                        <SourceReferenceInput value={item.sourceReference} onChange={(v) => updateInventoryItem(item.id, { sourceReference: v || undefined })} />
 
                         <div>
                           <label className="block text-[10px] text-zinc-400 font-mono mb-1">Beschreibung / Effekt bearbeiten</label>
@@ -795,7 +801,7 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
 // TALENTE & FÄHIGKEITEN-REITER
 // ═══════════════════════════════════════════════════════════
 
-const PathfinderTalentsView: React.FC<PluginViewProps> = ({ character, onUpdate }) => {
+const PathfinderTalentsView: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
   const abilities = character.abilities || [];
 
   const updateAbility = (index: number, patch: Partial<Ability>) => {
@@ -838,7 +844,10 @@ const PathfinderTalentsView: React.FC<PluginViewProps> = ({ character, onUpdate 
                 <div key={globalIndex} className="p-2.5 bg-black/40 border border-zinc-800 rounded-lg space-y-1.5">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span className="text-sm font-bold text-white">{ability.name}</span>
-                    {ability.usage && <ValueBadge label="Nutzung" value={ability.usage} color="text-purple-300" />}
+                    <div className="flex items-center gap-1.5">
+                      {ability.usage && <ValueBadge label="Nutzung" value={ability.usage} color="text-purple-300" />}
+                      {ability.sourceReference && <SourceReferenceBadge value={ability.sourceReference} />}
+                    </div>
                   </div>
                   {ability.effect && (
                     <p className="text-xs text-zinc-400 font-mono">{ability.effect}</p>
@@ -848,6 +857,12 @@ const PathfinderTalentsView: React.FC<PluginViewProps> = ({ character, onUpdate 
                       current={current ?? max}
                       max={max}
                       onToggle={(newCurrent) => setAbilityUse(globalIndex, newCurrent)}
+                    />
+                  )}
+                  {isEditing && (
+                    <SourceReferenceInput
+                      value={ability.sourceReference}
+                      onChange={(v) => updateAbility(globalIndex, { sourceReference: v || undefined })}
                     />
                   )}
                 </div>
