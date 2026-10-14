@@ -10,8 +10,6 @@ export const getSystem = (id: string): SystemPlugin | undefined => registry.get(
 
 export const getAllSystems = (): SystemPlugin[] => Array.from(registry.values());
 
-/** Probiert bei jedem registrierten Plugin detectLegacy() durch, um
- * herauszufinden, zu welchem System ein altes/fremdes JSON gehört. */
 export const detectSystemForLegacyJson = (raw: any): SystemPlugin | undefined => {
   for (const plugin of registry.values()) {
     try {
