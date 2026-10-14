@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Info, Plus, Minus, ChevronDown, ChevronRight, X } from "lucide-react";
+import { Info, Plus, Minus, ChevronDown, ChevronRight, X, Moon } from "lucide-react";
 import { SystemPlugin, AttributePool, PluginViewProps } from "../../core/SystemPlugin";
 import {
   GenericCharacter,
@@ -11,6 +11,7 @@ import {
   Ability,
 } from "../../core/types";
 import { rollPool, roll4d6DropLowest } from "../../core/dice";
+import { applyRest } from "../../core/rest";
 import {
   PathfinderAttributes,
   calculateModifier,
@@ -217,8 +218,7 @@ const getSimpleWeaponLine = (
   return { attack: primaryGrip.attack, damage: `${primaryGrip.damage}${extra ? ` ${extra}` : ""}` };
 };
 
-/** Liest Tagesnutzung aus Freitext wie "1x/Tag" oder "2x/Tag".
- * "Situativ" oder "Aktiv / Passiv" liefern bewusst kein Zähler-Ergebnis. */
+/** Liest Tagesnutzung aus Freitext wie "1x/Tag" oder "2x/Tag". */
 const parseDailyUses = (usage?: string): number | undefined => {
   if (!usage) return undefined;
   const match = usage.match(/(\d+)\s*x/i);
@@ -232,6 +232,7 @@ const parseDailyUses = (usage?: string): number | undefined => {
 const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<CategoryTabId>("all");
+  const [restMessage, setRestMessage] = useState<string | null>(null);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -305,10 +306,30 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
     }) });
   };
 
+  const handleRest = () => {
+    const { character: updated, summary } = applyRest(character);
+    onUpdate({ abilities: updated.abilities, inventory: updated.inventory });
+    const parts: string[] = [];
+    if (summary.refreshedAbilities.length) parts.push(`${summary.refreshedAbilities.length} Fähigkeit(en) aufgefrischt`);
+    if (summary.refreshedItems.length) parts.push(`${summary.refreshedItems.length} Gegenstands-Ladung(en) aufgefüllt`);
+    setRestMessage(parts.length ? parts.join(" · ") : "Nichts musste aufgefrischt werden.");
+  };
+
   const filteredInventory = character.inventory.filter((item) => activeTab === "all" || getTabForItem(item) === activeTab);
 
   return (
     <div className="space-y-6">
+      {/* Rast */}
+      <div className="flex items-center gap-3 p-3 bg-indigo-950/20 border border-indigo-900/40 rounded-xl">
+        <button
+          onClick={handleRest}
+          className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold rounded-lg text-xs"
+        >
+          <Moon size={14} /> Rast einlegen
+        </button>
+        {restMessage && <span className="text-xs text-indigo-300 font-mono">{restMessage}</span>}
+      </div>
+
       {/* Klasse, Rasse, Level */}
       <div className="grid grid-cols-3 gap-3 p-4 bg-zinc-900 border border-zinc-800 rounded-xl">
         <div>
@@ -396,7 +417,7 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         )}
       </div>
 
-      {/* Waffen - nur eine schlanke Zeile pro Waffe, wie auf dem echten Bogen */}
+      {/* Waffen - nur eine schlanke Zeile pro Waffe */}
       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
         <div className="text-xs font-mono font-bold text-zinc-300 mb-1">Aktive Waffen</div>
         {activeWeapons.length === 0 && (
@@ -473,11 +494,19 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
 
                   <div className="flex flex-wrap gap-1.5">
                     <ValueBadge label="Ort" value={item.location === "equipped" ? "Am Mann" : "Eingelagert"} color={item.location === "equipped" ? "text-emerald-400" : "text-amber-400"} />
-                    {item.category === "weapon" && item.weaponData?.baseDice && <ValueBadge label="Schaden" value={item.weaponData.baseDice} color="text-rose-400" />}
-                    {item.category === "weapon" && item.weaponData?.extraDamage && <ValueBadge label="Magieschaden" value={item.weaponData.extraDamage} color="text-sky-300" />}
-                    {item.category === "weapon" && !!item.weaponData?.magicBonus && <ValueBadge label="Verstärkung" value={`+${item.weaponData.magicBonus}`} color="text-indigo-300" />}
+                    {item.category === "weapon" && item.weaponData?.baseDice && (
+                      <ValueBadge label="Schaden" value={item.weaponData.baseDice} color="text-rose-400" />
+                    )}
+                    {item.category === "weapon" && item.weaponData?.extraDamage && (
+                      <ValueBadge label="Magieschaden" value={item.weaponData.extraDamage} color="text-sky-300" />
+                    )}
+                    {item.category === "weapon" && !!item.weaponData?.magicBonus && (
+                      <ValueBadge label="Verstärkung" value={`+${item.weaponData.magicBonus}`} color="text-indigo-300" />
+                    )}
                     {item.category === "weapon" && item.weaponData?.supportsTwoHanded && <ValueBadge label="Griff" value="1H/2H" color="text-zinc-200" />}
-                    {item.category === "weapon" && item.isActiveWeapon && <ValueBadge label="Aktiv" value={item.weaponData?.weaponSlot === "offHand" ? "Nebenhand" : item.weaponData?.weaponSlot === "twoHanded" ? "beidhändig" : "Haupthand"} color="text-orange-400" />}
+                    {item.category === "weapon" && item.isActiveWeapon && (
+                      <ValueBadge label="Aktiv" value={item.weaponData?.weaponSlot === "offHand" ? "Nebenhand" : item.weaponData?.weaponSlot === "twoHanded" ? "beidhändig" : "Haupthand"} color="text-orange-400" />
+                    )}
                     {item.category === "armor" && <ValueBadge label="Rüstung" value={`+${item.armorData?.armorBonus ?? 0}`} color="text-cyan-300" />}
                     {item.charges && <ValueBadge label="Ladungen" value={`${item.charges.current}/${item.charges.max}`} color="text-purple-300" />}
                     {item.quantity !== undefined && item.category !== "weapon" && item.category !== "armor" && <ValueBadge label="Anzahl" value={`${item.quantity}x`} color="text-zinc-200" />}
@@ -605,7 +634,7 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
 };
 
 // ═══════════════════════════════════════════════════════════
-// KAMPF-REITER (alle Berechnungen, nicht auf dem Papierbogen)
+// KAMPF-REITER
 // ═══════════════════════════════════════════════════════════
 
 const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
@@ -669,7 +698,6 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
 
   return (
     <div className="space-y-6">
-      {/* GAB & Kampfmanöver */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Basis-Angriffsbonus</div>
@@ -689,7 +717,6 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
         </div>
       </div>
 
-      {/* Zweiwaffenkampf-Talente + Charakter-Kampfmodifikatoren */}
       {isEditing && (
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
           <div className="flex flex-wrap gap-4 text-[11px] font-mono text-zinc-400">
@@ -706,7 +733,6 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
         </div>
       )}
 
-      {/* Aktive Kampfwaffen - vollständige Aufschlüsselung mit Grip-Varianten & Hinterhalt */}
       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
         <div className="text-xs font-mono font-bold text-zinc-300">Vollständige Angriffsberechnung</div>
 
