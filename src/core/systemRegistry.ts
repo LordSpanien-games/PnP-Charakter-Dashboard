@@ -1,41 +1,24 @@
-import { GenericCharacter, Ability, InventoryItem } from "./types";
+import { SystemPlugin } from "./SystemPlugin";
 
-export interface RestSummary {
-  refreshedAbilities: string[];
-  refreshedItems: string[];
-}
+const registry = new Map<string, SystemPlugin>();
 
-/**
- * Generische Rast-Funktion: Setzt alle Fähigkeiten mit Tagesnutzung
- * (maxUses/currentUses) und alle Inventar-Ladungen mit rechargeType "rest"
- * wieder auf ihren Maximalwert. Funktioniert identisch für jedes System-
- * Plugin, da sie nur auf generischen Feldern arbeitet - kein Dateneingriff
- * pro Regelsystem nötig.
- */
-export const applyRest = (
-  character: GenericCharacter
-): { character: GenericCharacter; summary: RestSummary } => {
-  const refreshedAbilities: string[] = [];
-  const refreshedItems: string[] = [];
+export const registerSystem = (plugin: SystemPlugin): void => {
+  registry.set(plugin.id, plugin);
+};
 
-  const abilities: Ability[] = character.abilities.map((a) => {
-    if (a.maxUses !== undefined && a.currentUses !== a.maxUses) {
-      refreshedAbilities.push(a.name);
-      return { ...a, currentUses: a.maxUses };
+export const getSystem = (id: string): SystemPlugin | undefined => registry.get(id);
+
+export const getAllSystems = (): SystemPlugin[] => Array.from(registry.values());
+
+/** Probiert bei jedem registrierten Plugin detectLegacy() durch, um
+ * herauszufinden, zu welchem System ein altes/fremdes JSON gehört. */
+export const detectSystemForLegacyJson = (raw: any): SystemPlugin | undefined => {
+  for (const plugin of registry.values()) {
+    try {
+      if (plugin.detectLegacy(raw)) return plugin;
+    } catch {
+      // defekten Detector ignorieren, weiter probieren
     }
-    return a;
-  });
-
-  const inventory: InventoryItem[] = character.inventory.map((it) => {
-    if (it.charges && it.charges.rechargeType === "rest" && it.charges.current !== it.charges.max) {
-      refreshedItems.push(it.name);
-      return { ...it, charges: { ...it.charges, current: it.charges.max } };
-    }
-    return it;
-  });
-
-  return {
-    character: { ...character, abilities, inventory },
-    summary: { refreshedAbilities, refreshedItems },
-  };
+  }
+  return undefined;
 };
