@@ -23,6 +23,9 @@ export interface SkillValue {
   value: number | string;
   notes?: string;
   sourceReference?: string;
+  /** Optionale freie Gruppierung, z.B. "active" / "knowledge" bei Shadowrun -
+   * wird NICHT automatisch aus dem Namen erkannt, sondern manuell zugeordnet. */
+  category?: string;
   [extra: string]: unknown;
 }
 
@@ -48,7 +51,6 @@ export interface ItemCharges {
   rechargeAmount?: number;
 }
 
-/** Wann ein Kampf-Modifikator wirkt. "always" gilt immer zusätzlich zum jeweiligen Kontext. */
 export type CombatModifierContext =
   | "always"
   | "oneHandedOnly"
@@ -58,12 +60,6 @@ export type CombatModifierContext =
 
 export type CombatModifierSourceType = "weapon" | "talent" | "class" | "race" | "skill" | "custom";
 
-/**
- * Generischer Kampf-Modifikator: kann an einer Waffe (weaponData.modifiers)
- * oder am Charakter selbst (systemData.combatModifiers, für Talente/Rasse/
- * Klasse/Skill-Boni, die nicht an eine bestimmte Waffe gebunden sind) hängen.
- * Mehrere Quellen summieren sich automatisch je nach aktuellem Kontext.
- */
 export interface CombatModifier {
   id: string;
   label: string;
@@ -71,7 +67,6 @@ export interface CombatModifier {
   context: CombatModifierContext;
   attackBonus?: number;
   damageBonus?: number;
-  /** Zusätzlicher Schaden als Text, z.B. "+1W6 Eis" oder "+5 Blutung" */
   extraDamageDice?: string;
 }
 
@@ -83,22 +78,26 @@ export interface WeaponItemData {
   baseDice?: string;
   damageAttribute?: "ST" | "GE" | "NONE";
   attackAttribute?: "ST" | "GE";
-  /** @deprecated Nutze stattdessen modifiers mit context "sneakAttackOnly" */
   sneakAttackBonusAttack?: number;
-  /** @deprecated Nutze stattdessen modifiers mit context "sneakAttackOnly" */
   sneakAttackBonusDamage?: number;
   extraDamage?: string;
   weaponSlot?: WeaponSlot;
-  /** Ob diese Waffe einhändig geführt werden kann (Default: true) */
   supportsOneHanded?: boolean;
-  /** Ob diese Waffe zweihändig geführt werden kann (Default: false) */
   supportsTwoHanded?: boolean;
-  /** Waffeneigene Kampf-Modifikatoren, z.B. ein Schurkenkurzschwert-Bonus nur bei Hinterhalt */
   modifiers?: CombatModifier[];
 }
 
 export interface ArmorItemData {
   armorBonus: number;
+}
+
+/** Generisches, einzeln schaltbares Unterelement an einem Inventar-Gegenstand -
+ * z.B. ein einzelner Soft-Chip in einer Chipbuchse. Systemunabhängig nutzbar. */
+export interface InventorySubItem {
+  id: string;
+  name: string;
+  isActive?: boolean;
+  notes?: string;
 }
 
 export interface InventoryItem {
@@ -113,6 +112,7 @@ export interface InventoryItem {
   armorData?: ArmorItemData;
   charges?: ItemCharges;
   sourceReference?: string;
+  subItems?: InventorySubItem[];
   [extra: string]: unknown;
 }
 
