@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { Info, Plus, Minus, ChevronDown, ChevronRight, Moon } from "lucide-react";
+import { Info, Plus, Minus, ChevronDown, ChevronRight, HeartPulse, Stethoscope } from "lucide-react";
 import { SystemPlugin, AttributePool, PluginViewProps } from "../../core/SystemPlugin";
 import { GenericCharacter, createEmptyGenericCharacter, InventoryItem } from "../../core/types";
-import { ValueBadge, ChargeTracker } from "../../core/uiKit";
+import { ValueBadge, ChargeTracker, ValueStepper, SourceReferenceBadge, SourceReferenceInput } from "../../core/uiKit";
 import { applyRest } from "../../core/rest";
 import {
   ShadowrunAttributes,
@@ -94,6 +94,8 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<CategoryTabId>("all");
   const [restMessage, setRestMessage] = useState<string | null>(null);
+  const [healPhysicalAmount, setHealPhysicalAmount] = useState(1);
+  const [healStunAmount, setHealStunAmount] = useState(1);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -163,13 +165,29 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
     });
   };
 
-  const handleRest = () => {
+  const handleNaturalHealing = () => {
     const { character: updated, summary } = applyRest(character);
-    onUpdate({ abilities: updated.abilities, inventory: updated.inventory });
-    const parts: string[] = [];
+    const newPhysicalCurrent = Math.max(0, physical.current - healPhysicalAmount);
+    const newStunCurrent = Math.max(0, stun.current - healStunAmount);
+    onUpdate({
+      abilities: updated.abilities,
+      inventory: updated.inventory,
+      resources: {
+        ...character.resources,
+        physical: { ...physical, current: newPhysicalCurrent },
+        stun: { ...stun, current: newStunCurrent },
+      },
+    });
+    const parts = [`Körperlich -${healPhysicalAmount}`, `Geistig -${healStunAmount}`];
     if (summary.refreshedAbilities.length) parts.push(`${summary.refreshedAbilities.length} Fähigkeit(en) aufgefrischt`);
-    if (summary.refreshedItems.length) parts.push(`${summary.refreshedItems.length} Gegenstands-Ladung(en) aufgefüllt`);
-    setRestMessage(parts.length ? parts.join(" · ") : "Nichts musste aufgefrischt werden.");
+    if (summary.refreshedItems.length) parts.push(`${summary.refreshedItems.length} Ladung(en) aufgefüllt`);
+    setRestMessage(`Natürliche Heilung: ${parts.join(" · ")}`);
+  };
+
+  const handleFirstAid = () => {
+    const newPhysicalCurrent = Math.max(0, physical.current - healPhysicalAmount);
+    onUpdate({ resources: { ...character.resources, physical: { ...physical, current: newPhysicalCurrent } } });
+    setRestMessage(`Erste Hilfe: Körperlich -${healPhysicalAmount}`);
   };
 
   const updateSkillCategory = (index: number, category: string) => {
@@ -216,15 +234,28 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
 
   return (
     <div className="space-y-6">
-      {/* Rast */}
-      <div className="flex items-center gap-3 p-3 bg-indigo-950/20 border border-indigo-900/40 rounded-xl">
-        <button
-          onClick={handleRest}
-          className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold rounded-lg text-xs"
-        >
-          <Moon size={14} /> Rast einlegen
-        </button>
-        {restMessage && <span className="text-xs text-indigo-300 font-mono">{restMessage}</span>}
+      {/* Heilung & Erholung */}
+      <div className="p-3 bg-indigo-950/20 border border-indigo-900/40 rounded-xl space-y-2">
+        <div className="text-xs font-mono font-bold text-indigo-300">Heilung & Erholung</div>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="block text-[9px] text-zinc-500 font-mono uppercase">Körperlich heilen</label>
+            <input type="number" min={0} value={healPhysicalAmount} onChange={(e) => setHealPhysicalAmount(Number(e.target.value))}
+              className="w-16 bg-black border border-zinc-700 rounded px-1.5 py-1 text-white text-center text-sm" />
+          </div>
+          <div>
+            <label className="block text-[9px] text-zinc-500 font-mono uppercase">Geistig heilen</label>
+            <input type="number" min={0} value={healStunAmount} onChange={(e) => setHealStunAmount(Number(e.target.value))}
+              className="w-16 bg-black border border-zinc-700 rounded px-1.5 py-1 text-white text-center text-sm" />
+          </div>
+          <button onClick={handleNaturalHealing} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold rounded-lg text-xs">
+            <HeartPulse size={14} /> Natürliche Heilung
+          </button>
+          <button onClick={handleFirstAid} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-800 hover:bg-indigo-700 text-white font-mono font-bold rounded-lg text-xs">
+            <Stethoscope size={14} /> Erste Hilfe (nur körperlich)
+          </button>
+        </div>
+        {restMessage && <p className="text-xs text-indigo-300 font-mono">{restMessage}</p>}
       </div>
 
       {/* Metatyp */}
@@ -276,24 +307,24 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         </div>
       </div>
 
-      {/* Zustandsmonitore */}
+      {/* Zustandsmonitore - mit Plus/Minus-Anzeige */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl">
-          <div className="text-[9px] uppercase text-zinc-500 font-mono mb-2">Körperlicher Schaden</div>
-          <ChargeTracker current={physical.current} max={physical.max ?? 0} onToggle={(v) => updateResource("physical", "current", v)} />
+        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+          <div className="text-[9px] uppercase text-zinc-500 font-mono">Körperlicher Schaden</div>
+          <ValueStepper current={physical.current} max={physical.max} onChange={(v) => updateResource("physical", "current", v)} />
           {isEditing && (
-            <div className="flex items-center gap-2 mt-2 text-[10px] text-zinc-500 font-mono">
+            <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono">
               <span>Max</span>
               <input type="number" value={physical.max ?? 0} onChange={(e) => updateResource("physical", "max", Number(e.target.value))}
                 className="w-14 bg-black border border-zinc-700 rounded px-1 py-0.5 text-white text-center" />
             </div>
           )}
         </div>
-        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl">
-          <div className="text-[9px] uppercase text-zinc-500 font-mono mb-2">Geistiger Schaden (Stun)</div>
-          <ChargeTracker current={stun.current} max={stun.max ?? 0} onToggle={(v) => updateResource("stun", "current", v)} />
+        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+          <div className="text-[9px] uppercase text-zinc-500 font-mono">Geistiger Schaden (Stun)</div>
+          <ValueStepper current={stun.current} max={stun.max} onChange={(v) => updateResource("stun", "current", v)} />
           {isEditing && (
-            <div className="flex items-center gap-2 mt-2 text-[10px] text-zinc-500 font-mono">
+            <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono">
               <span>Max</span>
               <input type="number" value={stun.max ?? 0} onChange={(e) => updateResource("stun", "max", Number(e.target.value))}
                 className="w-14 bg-black border border-zinc-700 rounded px-1 py-0.5 text-white text-center" />
@@ -347,7 +378,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         </div>
       )}
 
-      {/* Fertigkeiten - gruppiert, Zuordnung manuell im Bearbeitungsmodus */}
+      {/* Fertigkeiten */}
       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
         <div className="text-xs font-mono font-bold text-zinc-300">Fertigkeiten</div>
         {character.skills.length === 0 && <p className="text-xs text-zinc-600 font-mono">Keine Fertigkeiten hinterlegt.</p>}
@@ -396,42 +427,49 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
             const other = character.abilities.filter((a) => a.type !== "trait" && a.type !== "item");
             const isNegativeTrait = (effect?: string) => !!effect && /^-/.test(effect.trim());
 
+            const renderAbilityRow = (a: any, idx: number, colorClass?: string) => {
+              const globalIndex = character.abilities.indexOf(a);
+              return (
+                <div key={idx} className="space-y-1">
+                  <div className="text-xs font-mono flex items-center gap-1.5 flex-wrap">
+                    <span className={`font-bold ${colorClass || "text-white"}`}>{a.name}</span>
+                    {a.effect && <span className="text-zinc-500">— {a.effect}</span>}
+                    {a.sourceReference && <SourceReferenceBadge value={a.sourceReference} />}
+                  </div>
+                  {isEditing && (
+                    <SourceReferenceInput
+                      value={a.sourceReference}
+                      onChange={(v) =>
+                        onUpdate({
+                          abilities: character.abilities.map((ab, i) =>
+                            i === globalIndex ? { ...ab, sourceReference: v || undefined } : ab
+                          ),
+                        })
+                      }
+                    />
+                  )}
+                </div>
+              );
+            };
+
             return (
               <>
                 {traits.length > 0 && (
                   <div className="space-y-1.5">
                     <div className="text-xs font-mono font-bold text-zinc-300">Qualitäten</div>
-                    {traits.map((a, idx) => {
-                      const negative = isNegativeTrait(a.effect);
-                      return (
-                        <div key={idx} className="text-xs font-mono flex items-center gap-1.5">
-                          <span className={`font-bold ${negative ? "text-red-400" : "text-emerald-400"}`}>{a.name}</span>
-                          {a.effect && <span className="text-zinc-500">— {a.effect}</span>}
-                        </div>
-                      );
-                    })}
+                    {traits.map((a, idx) => renderAbilityRow(a, idx, isNegativeTrait(a.effect) ? "text-red-400" : "text-emerald-400"))}
                   </div>
                 )}
                 {items.length > 0 && (
                   <div className="space-y-1.5">
                     <div className="text-xs font-mono font-bold text-zinc-300">Augmentierungs-Fähigkeiten</div>
-                    {items.map((a, idx) => (
-                      <div key={idx} className="text-xs font-mono text-zinc-300 flex items-center gap-1.5">
-                        <span className="font-bold text-white">{a.name}</span>
-                        {a.effect && <span className="text-zinc-500">— {a.effect}</span>}
-                      </div>
-                    ))}
+                    {items.map((a, idx) => renderAbilityRow(a, idx))}
                   </div>
                 )}
                 {other.length > 0 && (
                   <div className="space-y-1.5">
                     <div className="text-xs font-mono font-bold text-zinc-300">Weitere Fähigkeiten</div>
-                    {other.map((a, idx) => (
-                      <div key={idx} className="text-xs font-mono text-zinc-300 flex items-center gap-1.5">
-                        <span className="font-bold text-white">{a.name}</span>
-                        {a.effect && <span className="text-zinc-500">— {a.effect}</span>}
-                      </div>
-                    ))}
+                    {other.map((a, idx) => renderAbilityRow(a, idx))}
                   </div>
                 )}
               </>
@@ -440,7 +478,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         </div>
       )}
 
-      {/* Inventar mit Kategorie-Reitern */}
+      {/* Inventar */}
       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <span className="text-xs font-mono font-bold text-zinc-300">Inventar</span>
@@ -506,6 +544,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
                     {item.subItems && item.subItems.length > 0 && (
                       <ValueBadge label="Chips" value={`${activeSubCount}/${item.subItems.length} aktiv`} color="text-sky-300" />
                     )}
+                    {item.sourceReference && <SourceReferenceBadge value={item.sourceReference} />}
                   </div>
                 </div>
 
@@ -617,6 +656,8 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
                           </select>
                         </div>
 
+                        <SourceReferenceInput value={item.sourceReference} onChange={(v) => updateInventoryItem(item.id, { sourceReference: v || undefined })} />
+
                         <div>
                           <label className="block text-[10px] text-zinc-400 font-mono mb-1">Beschreibung / Effekt bearbeiten</label>
                           <textarea value={item.notes || ""} onChange={(e) => updateInventoryItem(item.id, { notes: e.target.value || undefined })}
@@ -696,7 +737,7 @@ const ShadowrunCombatView: React.FC<PluginViewProps> = ({ character }) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// MATRIX-REITER (Decker)
+// MATRIX-REITER
 // ═══════════════════════════════════════════════════════════
 
 const ShadowrunMatrixView: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
@@ -773,12 +814,12 @@ const ShadowrunMatrixView: React.FC<PluginViewProps> = ({ character, isEditing, 
       </div>
 
       {cyberdeck.matrixCondition && (
-        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl">
-          <div className="text-[9px] uppercase text-zinc-500 font-mono mb-2">Matrix-Zustandsmonitor (Kästchen = Schaden)</div>
-          <ChargeTracker
+        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+          <div className="text-[9px] uppercase text-zinc-500 font-mono">Matrix-Zustandsmonitor</div>
+          <ValueStepper
             current={cyberdeck.matrixCondition.damage}
             max={cyberdeck.matrixCondition.max}
-            onToggle={(newDamage) => updateDeck({ matrixCondition: { ...cyberdeck.matrixCondition!, damage: newDamage } })}
+            onChange={(newDamage) => updateDeck({ matrixCondition: { ...cyberdeck.matrixCondition!, damage: newDamage } })}
           />
         </div>
       )}
@@ -878,7 +919,6 @@ export const ShadowrunPlugin: SystemPlugin = {
     const char = createBase(raw.name || "Unbenannt", raw.subTitle, attrs);
     char.systemData.metatype = raw.race || raw.metatype || "Mensch";
 
-    // Lifestyle & Nuyen-Historie aus raw.currency übernehmen
     if (raw.currency) {
       const unit = raw.currency.unit || "¥";
       char.currency = { [unit]: Number(raw.currency.amount) || 0 };
@@ -902,7 +942,6 @@ export const ShadowrunPlugin: SystemPlugin = {
       charges: it.maxUses ? { max: it.maxUses, current: it.currentUses ?? it.maxUses, rechargeType: "manual" } : undefined,
     }));
 
-    // bodyMods (Cyberware/Bioware) -> Essenzkosten + einzeln schaltbare Chips als subItems
     const bodyModItems: InventoryItem[] = (raw.bodyMods || []).map((mod: any) => {
       const subItems = mod.isChipjack && Array.isArray(mod.chips)
         ? mod.chips.map((c: any) => ({ id: makeId(), name: c.name, isActive: !!c.isActive, notes: c.notes }))
