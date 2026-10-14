@@ -1,7 +1,15 @@
 import React, { useState } from "react";
 import { Info, Plus, Minus, ChevronDown, ChevronRight, X } from "lucide-react";
 import { SystemPlugin, AttributePool, PluginViewProps } from "../../core/SystemPlugin";
-import { GenericCharacter, createEmptyGenericCharacter, InventoryItem, CombatModifier, CombatModifierContext, CombatModifierSourceType } from "../../core/types";
+import {
+  GenericCharacter,
+  createEmptyGenericCharacter,
+  InventoryItem,
+  CombatModifier,
+  CombatModifierContext,
+  CombatModifierSourceType,
+  Ability,
+} from "../../core/types";
 import { rollPool, roll4d6DropLowest } from "../../core/dice";
 import {
   PathfinderAttributes,
@@ -47,6 +55,15 @@ const SOURCE_LABELS: Record<CombatModifierSourceType, string> = {
 };
 
 const GRIP_LABELS: Record<string, string> = { oneHanded: "Einhändig", twoHanded: "Zweihändig" };
+
+const TYPE_LABELS: Record<string, string> = {
+  class: "Klassenmerkmale",
+  talent: "Talente",
+  race: "Rassenfähigkeiten",
+  gnome: "Rassenfähigkeiten",
+  item: "Ausrüstungs-Fähigkeiten",
+  other: "Weitere Fähigkeiten",
+};
 
 const getAttrs = (character: GenericCharacter): PathfinderAttributes => ({
   ST: Number(character.attributes.ST) || 10,
@@ -200,6 +217,14 @@ const getSimpleWeaponLine = (
   return { attack: primaryGrip.attack, damage: `${primaryGrip.damage}${extra ? ` ${extra}` : ""}` };
 };
 
+/** Liest Tagesnutzung aus Freitext wie "1x/Tag" oder "2x/Tag".
+ * "Situativ" oder "Aktiv / Passiv" liefern bewusst kein Zähler-Ergebnis. */
+const parseDailyUses = (usage?: string): number | undefined => {
+  if (!usage) return undefined;
+  const match = usage.match(/(\d+)\s*x/i);
+  return match ? parseInt(match[1], 10) : undefined;
+};
+
 // ═══════════════════════════════════════════════════════════
 // HAUPTSEITE (schlank, papierbogen-ähnlich)
 // ═══════════════════════════════════════════════════════════
@@ -327,7 +352,7 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         ))}
       </div>
 
-      {/* Kernwerte: TP, RK, Rettungswürfe - wie auf dem echten Bogen, ohne Berechnungs-Details */}
+      {/* Kernwerte: TP, RK, Rettungswürfe */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Trefferpunkte</div>
@@ -351,7 +376,7 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         ))}
       </div>
 
-      {/* Hinterhalt-Toggle + Klassen-Features (wie "Besondere Fähigkeiten" auf dem Papierbogen) */}
+      {/* Hinterhalt-Toggle + Klassen-Features */}
       <div className="flex flex-wrap gap-3">
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Hinterhalt aktiv?</div>
@@ -371,9 +396,7 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         )}
       </div>
 
-      {/* Waffen - nur eine schlanke Zeile pro Waffe, wie auf dem echten Bogen.
-          Alle Berechnungs-Details (Grip-Varianten, Hinterhalt-Aufschlüsselung,
-          Zweiwaffenkampf) stehen im separaten "Kampf"-Reiter. */}
+      {/* Waffen - nur eine schlanke Zeile pro Waffe, wie auf dem echten Bogen */}
       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
         <div className="text-xs font-mono font-bold text-zinc-300 mb-1">Aktive Waffen</div>
         {activeWeapons.length === 0 && (
@@ -743,6 +766,75 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
 };
 
 // ═══════════════════════════════════════════════════════════
+// TALENTE & FÄHIGKEITEN-REITER
+// ═══════════════════════════════════════════════════════════
+
+const PathfinderTalentsView: React.FC<PluginViewProps> = ({ character, onUpdate }) => {
+  const abilities = character.abilities || [];
+
+  const updateAbility = (index: number, patch: Partial<Ability>) => {
+    onUpdate({ abilities: abilities.map((a, i) => (i === index ? { ...a, ...patch } : a)) });
+  };
+
+  const setAbilityUse = (index: number, newCurrent: number) => {
+    const ability = abilities[index];
+    const max = ability.maxUses ?? parseDailyUses(ability.usage) ?? 0;
+    if (max <= 0) return;
+    updateAbility(index, { maxUses: max, currentUses: Math.min(max, Math.max(0, newCurrent)) });
+  };
+
+  const groups: Record<string, Ability[]> = {};
+  abilities.forEach((a) => {
+    const key = a.type || "other";
+    (groups[key] = groups[key] || []).push(a);
+  });
+
+  const orderedKeys = ["class", "talent", "race", "gnome", "item", "other"].filter((k) => groups[k]?.length);
+  Object.keys(groups).forEach((k) => {
+    if (!orderedKeys.includes(k)) orderedKeys.push(k);
+  });
+
+  if (abilities.length === 0) {
+    return <p className="text-xs text-zinc-600 font-mono">Keine Talente oder Fähigkeiten hinterlegt.</p>;
+  }
+
+  return (
+    <div className="space-y-6">
+      {orderedKeys.map((key) => (
+        <div key={key} className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+          <div className="text-xs font-mono font-bold text-zinc-300">{TYPE_LABELS[key] || key}</div>
+          <div className="space-y-2">
+            {groups[key].map((ability) => {
+              const globalIndex = abilities.indexOf(ability);
+              const max = ability.maxUses ?? parseDailyUses(ability.usage);
+              const current = ability.currentUses ?? max;
+              return (
+                <div key={globalIndex} className="p-2.5 bg-black/40 border border-zinc-800 rounded-lg space-y-1.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-sm font-bold text-white">{ability.name}</span>
+                    {ability.usage && <ValueBadge label="Nutzung" value={ability.usage} color="text-purple-300" />}
+                  </div>
+                  {ability.effect && (
+                    <p className="text-xs text-zinc-400 font-mono">{ability.effect}</p>
+                  )}
+                  {max !== undefined && max > 0 && (
+                    <ChargeTracker
+                      current={current ?? max}
+                      max={max}
+                      onToggle={(newCurrent) => setAbilityUse(globalIndex, newCurrent)}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════
 // PLUGIN-DEFINITION
 // ═══════════════════════════════════════════════════════════
 
@@ -901,5 +993,6 @@ export const PathfinderPlugin: SystemPlugin = {
 
   secondaryViews: [
     { id: "combat", label: "Kampf", Component: PathfinderCombatView },
+    { id: "talents", label: "Talente & Fähigkeiten", Component: PathfinderTalentsView },
   ],
 };
