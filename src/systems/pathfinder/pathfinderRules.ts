@@ -517,3 +517,7 @@ export const parseMagicBonusFromName = (name: string): number => {
 };
 
 export const makeModifierId = () => `mod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+/** Natürliche Heilung nach Pathfinder-Kernregeln:
+ * Nachtruhe = 1 TP pro Charakterlevel, vollständige Bettruhe = doppelte Rate. */
+export const calculateNaturalHealingAmount = (level: number, bedRest: boolean): number =>
+  bedRest ? level * 2 : level;
