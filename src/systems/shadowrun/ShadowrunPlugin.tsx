@@ -15,10 +15,12 @@ import {
   calculateWeaponPool,
   makeId,
   ShadowrunCyberdeck,
+  MATRIX_ATTR_ORDER,
   MATRIX_ATTR_LABELS,
   MODE_LABELS,
   calculateEffectiveMatrixAttributes,
   calculateExtraProgramSlots,
+  reassignDeckAttributeValue,
 } from "./shadowrunRules";
 
 const METATYPES = ["Mensch", "Elf", "Zwerg", "Ork", "Troll"];
@@ -198,7 +200,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         </div>
       </div>
 
-      {/* Zustandsmonitore - Kästchen = erlittener Schaden */}
+      {/* Zustandsmonitore */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-2">Körperlicher Schaden</div>
@@ -224,7 +226,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         </div>
       </div>
 
-      {/* Decker: Cyberdeck-Kompaktanzeige - nur sichtbar, wenn vorhanden */}
+      {/* Decker: Cyberdeck-Kompaktanzeige */}
       {cyberdeck && effectiveAttrs && (
         <div className="p-4 bg-zinc-900 border border-cyan-900/40 rounded-xl space-y-2">
           <div className="text-xs font-mono font-bold text-cyan-300">Cyberdeck: {cyberdeck.name}</div>
@@ -238,7 +240,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
               <ValueBadge label="Matrix-Schaden" value={`${cyberdeck.matrixCondition.damage}/${cyberdeck.matrixCondition.max}`} color="text-purple-300" />
             )}
           </div>
-          <p className="text-[10px] text-zinc-500 font-mono italic">Programme & Details siehe Reiter "Matrix"</p>
+          <p className="text-[10px] text-zinc-500 font-mono italic">Programme & Attribut-Umverteilung siehe Reiter "Matrix"</p>
         </div>
       )}
 
@@ -287,7 +289,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         ) : <p className="text-xs text-zinc-600 font-mono">Keine Rüstung am Mann.</p>}
       </div>
 
-      {/* Qualitäten & Fähigkeiten - gruppiert nach Typ, Qualitäten optisch nach +/- markiert */}
+      {/* Qualitäten & Fähigkeiten */}
       {character.abilities.length > 0 && (
         <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
           {(() => {
@@ -583,10 +585,10 @@ const ShadowrunCombatView: React.FC<PluginViewProps> = ({ character }) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// MATRIX-REITER (Decker)
+// MATRIX-REITER (Decker) - mit Attribut-Umverteilung
 // ═══════════════════════════════════════════════════════════
 
-const ShadowrunMatrixView: React.FC<PluginViewProps> = ({ character, onUpdate }) => {
+const ShadowrunMatrixView: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
   const cyberdeck = character.systemData.cyberdeck as ShadowrunCyberdeck | undefined;
 
   if (!cyberdeck) {
@@ -602,6 +604,9 @@ const ShadowrunMatrixView: React.FC<PluginViewProps> = ({ character, onUpdate })
   const toggleProgram = (id: string) => {
     updateDeck({ programs: cyberdeck.programs.map((p) => (p.id === id ? { ...p, isActive: !p.isActive } : p)) });
   };
+  const changeBaseAttributeValue = (attribute: typeof MATRIX_ATTR_ORDER[number], newValue: number) => {
+    updateDeck({ configuration: reassignDeckAttributeValue(cyberdeck.configuration, attribute, newValue) });
+  };
 
   return (
     <div className="space-y-6">
@@ -614,21 +619,46 @@ const ShadowrunMatrixView: React.FC<PluginViewProps> = ({ character, onUpdate })
           {cyberdeck.mode && <ValueBadge label="Modus" value={MODE_LABELS[cyberdeck.mode] || cyberdeck.mode} color="text-amber-300" />}
           {extraSlots > 0 && <ValueBadge label="Zusatzslots" value={`+${extraSlots}`} color="text-emerald-400" />}
         </div>
+        <p className="text-[10px] text-zinc-500 font-mono">
+          Fester Attribut-Pool des Decks: {cyberdeck.attributeArray.join(" / ")}
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {(["attack", "sleaze", "dataProcessing", "firewall"] as const).map((key) => {
-          const base = cyberdeck.configuration[key];
-          const effective = effectiveAttrs[key];
-          const boosted = effective !== base;
-          return (
-            <div key={key} className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-              <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">{MATRIX_ATTR_LABELS[key]}</div>
-              <div className="text-xl font-bold text-white">{effective}</div>
-              {boosted && <div className="text-[9px] text-emerald-400 font-mono">(Basis {base})</div>}
-            </div>
-          );
-        })}
+      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+        <div className="text-xs font-mono font-bold text-zinc-300">
+          Matrix-Attribute {isEditing && "(Grundwerte neu zuordnen)"}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {MATRIX_ATTR_ORDER.map((key) => {
+            const base = cyberdeck.configuration[key];
+            const effective = effectiveAttrs[key];
+            const boosted = effective !== base;
+            return (
+              <div key={key} className="p-3 bg-black/40 border border-zinc-800 rounded-xl text-center space-y-1.5">
+                <div className="text-[9px] uppercase text-zinc-500 font-mono">{MATRIX_ATTR_LABELS[key]}</div>
+                {isEditing ? (
+                  <select
+                    value={base}
+                    onChange={(e) => changeBaseAttributeValue(key, Number(e.target.value))}
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg text-center text-lg font-bold text-white py-1"
+                  >
+                    {cyberdeck.attributeArray.map((v, idx) => (
+                      <option key={idx} value={v}>{v}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="text-xl font-bold text-white">{effective}</div>
+                )}
+                {boosted && !isEditing && <div className="text-[9px] text-emerald-400 font-mono">(Basis {base})</div>}
+              </div>
+            );
+          })}
+        </div>
+        {isEditing && (
+          <p className="text-[10px] text-zinc-500 font-mono italic">
+            Wählst du einen Wert, der bereits einem anderen Attribut zugewiesen ist, werden beide einfach vertauscht.
+          </p>
+        )}
       </div>
 
       {cyberdeck.matrixCondition && (
@@ -728,7 +758,6 @@ export const ShadowrunPlugin: SystemPlugin = {
         }
       });
     });
-    // EDG und ESS stehen in manchen Exporten in raw.stats statt in characteristics
     const edgeStat = (raw.stats || []).find((s: any) => (s.label || "").toUpperCase() === "EDGE");
     if (edgeStat) {
       const val = parseInt(String(edgeStat.value).replace(/[^0-9-]/g, ""), 10);
@@ -738,7 +767,6 @@ export const ShadowrunPlugin: SystemPlugin = {
     const char = createBase(raw.name || "Unbenannt", raw.subTitle, attrs);
     char.systemData.metatype = raw.race || raw.metatype || "Mensch";
 
-    // Normale Inventar-Items (inkl. Fix für Rüstungswerte als Text, z.B. "9 (Panzerweste)")
     const normalItems: InventoryItem[] = (raw.inventory || []).map((it: any) => ({
       id: makeId(),
       name: it.name,
@@ -754,7 +782,6 @@ export const ShadowrunPlugin: SystemPlugin = {
       charges: it.maxUses ? { max: it.maxUses, current: it.currentUses ?? it.maxUses, rechargeType: "manual" } : undefined,
     }));
 
-    // bodyMods (Cyberware/Bioware) -> werden zu Inventar-Posten mit Essenzkosten
     const bodyModItems: InventoryItem[] = (raw.bodyMods || []).map((mod: any) => {
       const chipNotes = mod.isChipjack && Array.isArray(mod.chips) && mod.chips.length > 0
         ? " Eingesteckte Chips: " + mod.chips.map((c: any) => `${c.name}${c.isActive ? " (aktiv)" : ""}`).join(", ")
@@ -773,7 +800,6 @@ export const ShadowrunPlugin: SystemPlugin = {
 
     char.inventory = [...normalItems, ...bodyModItems];
 
-    // Cyberdeck - Struktur stimmt bereits mit unserem Typ überein, direkt übernehmen
     if (raw.cyberdeck) {
       char.systemData.cyberdeck = raw.cyberdeck;
     }
