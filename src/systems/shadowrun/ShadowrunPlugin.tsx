@@ -45,7 +45,6 @@ const createBase = (name: string, subTitle: string | undefined, attrs: Record<st
     ...base,
     attributes: attrs,
     resources: {
-      // current = bereits erlittener Schaden (0 bei neuem Charakter), nicht "verbleibend"
       physical: { current: 0, max: condMon.physical },
       stun: { current: 0, max: condMon.stun },
     },
@@ -71,6 +70,13 @@ const getTabForItem = (item: InventoryItem): CategoryTabId => {
   if (cat === "consumable" || cat === "drug" || cat === "ammo") return "consumable";
   if (cat === "electronics" || cat === "matrix") return "electronics";
   return "gear";
+};
+
+/** Liest die erste Zahl aus einem Rüstungswert-String wie "9 (Panzerweste)" -> 9 */
+const parseArmorValue = (raw: unknown): number => {
+  if (typeof raw === "number") return raw;
+  const match = String(raw ?? "").match(/-?\d+/);
+  return match ? parseInt(match[0], 10) : 0;
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -281,16 +287,58 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         ) : <p className="text-xs text-zinc-600 font-mono">Keine Rüstung am Mann.</p>}
       </div>
 
-      {/* Qualitäten & Fähigkeiten */}
+      {/* Qualitäten & Fähigkeiten - gruppiert nach Typ, Qualitäten optisch nach +/- markiert */}
       {character.abilities.length > 0 && (
-        <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
-          <div className="text-xs font-mono font-bold text-zinc-300">Qualitäten & besondere Fähigkeiten</div>
-          {character.abilities.map((a, idx) => (
-            <div key={idx} className="text-xs font-mono text-zinc-300 flex items-center gap-1.5">
-              <span className="font-bold text-white">{a.name}</span>
-              {a.effect && <span className="text-zinc-500">— {a.effect}</span>}
-            </div>
-          ))}
+        <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
+          {(() => {
+            const traits = character.abilities.filter((a) => a.type === "trait");
+            const items = character.abilities.filter((a) => a.type === "item");
+            const other = character.abilities.filter((a) => a.type !== "trait" && a.type !== "item");
+
+            const isNegativeTrait = (effect?: string) =>
+              !!effect && /^-/.test(effect.trim());
+
+            return (
+              <>
+                {traits.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="text-xs font-mono font-bold text-zinc-300">Qualitäten</div>
+                    {traits.map((a, idx) => {
+                      const negative = isNegativeTrait(a.effect);
+                      return (
+                        <div key={idx} className="text-xs font-mono flex items-center gap-1.5">
+                          <span className={`font-bold ${negative ? "text-red-400" : "text-emerald-400"}`}>{a.name}</span>
+                          {a.effect && <span className="text-zinc-500">— {a.effect}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {items.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="text-xs font-mono font-bold text-zinc-300">Augmentierungs-Fähigkeiten</div>
+                    {items.map((a, idx) => (
+                      <div key={idx} className="text-xs font-mono text-zinc-300 flex items-center gap-1.5">
+                        <span className="font-bold text-white">{a.name}</span>
+                        {a.effect && <span className="text-zinc-500">— {a.effect}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {other.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="text-xs font-mono font-bold text-zinc-300">Weitere Fähigkeiten</div>
+                    {other.map((a, idx) => (
+                      <div key={idx} className="text-xs font-mono text-zinc-300 flex items-center gap-1.5">
+                        <span className="font-bold text-white">{a.name}</span>
+                        {a.effect && <span className="text-zinc-500">— {a.effect}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 
@@ -690,7 +738,7 @@ export const ShadowrunPlugin: SystemPlugin = {
     const char = createBase(raw.name || "Unbenannt", raw.subTitle, attrs);
     char.systemData.metatype = raw.race || raw.metatype || "Mensch";
 
-    // Normale Inventar-Items
+    // Normale Inventar-Items (inkl. Fix für Rüstungswerte als Text, z.B. "9 (Panzerweste)")
     const normalItems: InventoryItem[] = (raw.inventory || []).map((it: any) => ({
       id: makeId(),
       name: it.name,
@@ -701,7 +749,7 @@ export const ShadowrunPlugin: SystemPlugin = {
       srWeapon: it.category === "weapon"
         ? { skillName: it.skillName || "Pistolen", attackAttribute: "GES", damageCode: it.damage || "6P", ap: it.ap || "0", poolBonus: 0 }
         : undefined,
-      armorData: it.category === "armor" ? { armorBonus: Number(it.armorValue) || 0 } : undefined,
+      armorData: it.category === "armor" ? { armorBonus: parseArmorValue(it.armorValue) } : undefined,
       essenceCost: it.essenceCost,
       charges: it.maxUses ? { max: it.maxUses, current: it.currentUses ?? it.maxUses, rechargeType: "manual" } : undefined,
     }));
