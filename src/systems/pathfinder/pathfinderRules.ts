@@ -195,8 +195,33 @@ export const calculateCombatManeuver = (
   };
 };
 
+/** Summiert Charakter-weite KMB-, KMV- und RK-Boni aus freien Modifikatoren
+ * (z.B. Talente wie "Ausweichen" oder "Verteidigung mit zwei Waffen"). */
+export interface MiscCombatBonusSum {
+  kmbBonus: number;
+  kmvBonus: number;
+  acBonus: number;
+}
+
+export const sumMiscCombatBonuses = (
+  modifiers: CombatModifier[],
+  activeContexts: CombatModifierContext[]
+): MiscCombatBonusSum => {
+  let kmbBonus = 0;
+  let kmvBonus = 0;
+  let acBonus = 0;
+  modifiers.forEach((mod) => {
+    if (mod.context === "always" || activeContexts.includes(mod.context)) {
+      kmbBonus += mod.kmbBonus ?? 0;
+      kmvBonus += mod.kmvBonus ?? 0;
+      acBonus += mod.acBonus ?? 0;
+    }
+  });
+  return { kmbBonus, kmvBonus, acBonus };
+};
+
 // ───────────────────────────────────────────────────────────
-// Kampf-Modifikatoren: Summierung nach Kontext
+// Kampf-Modifikatoren: Summierung nach Kontext (Angriff/Schaden)
 // ───────────────────────────────────────────────────────────
 
 export const sumCombatModifiers = (
@@ -434,7 +459,7 @@ export const calculateTwoWeaponFighting = (
     const rawDmgMod = dmgAttr === "GE" ? geMod : dmgAttr === "ST" ? stMod : 0;
     const dmgMod = isOffHand && rawDmgMod > 0 ? Math.floor(rawDmgMod * 0.5) : rawDmgMod;
 
-    const contexts: CombatModifierContext[] = ["oneHandedOnly"];
+    const contexts: CombatModifierContext[] = ["oneHandedOnly", "twoWeaponFightingOnly"];
     if (isOffHand) contexts.push("offHandOnly");
     if (sneakDice > 0 || hasAnyModifierForContext([weaponMods, charMods], "sneakAttackOnly")) {
       contexts.push("sneakAttackOnly");
@@ -496,6 +521,13 @@ export const calculateTwoWeaponFighting = (
 };
 
 // ───────────────────────────────────────────────────────────
+// Natürliche Heilung
+// ───────────────────────────────────────────────────────────
+
+export const calculateNaturalHealingAmount = (level: number, bedRest: boolean): number =>
+  bedRest ? level * 2 : level;
+
+// ───────────────────────────────────────────────────────────
 // Legacy-Import-Hilfsfunktionen
 // ───────────────────────────────────────────────────────────
 
@@ -517,7 +549,3 @@ export const parseMagicBonusFromName = (name: string): number => {
 };
 
 export const makeModifierId = () => `mod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-/** Natürliche Heilung nach Pathfinder-Kernregeln:
- * Nachtruhe = 1 TP pro Charakterlevel, vollständige Bettruhe = doppelte Rate. */
-export const calculateNaturalHealingAmount = (level: number, bedRest: boolean): number =>
-  bedRest ? level * 2 : level;
