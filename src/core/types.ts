@@ -18,13 +18,19 @@ export interface ResourceState {
   [extra: string]: unknown;
 }
 
+/** Getrennte Buchreferenz & Weblink - beide gleichzeitig und unabhängig
+ * voneinander nutzbar, kein einzelnes Textfeld mehr. */
+export interface SourceReference {
+  book?: string;
+  page?: string;
+  url?: string;
+}
+
 export interface SkillValue {
   name: string;
   value: number | string;
   notes?: string;
-  sourceReference?: string;
-  /** Optionale freie Gruppierung, z.B. "active" / "knowledge" bei Shadowrun -
-   * wird NICHT automatisch aus dem Namen erkannt, sondern manuell zugeordnet. */
+  sourceReference?: SourceReference;
   category?: string;
   [extra: string]: unknown;
 }
@@ -36,7 +42,7 @@ export interface Weapon {
   critical?: string;
   note?: string;
   range?: string;
-  sourceReference?: string;
+  sourceReference?: SourceReference;
   [extra: string]: unknown;
 }
 
@@ -69,11 +75,8 @@ export interface CombatModifier {
   attackBonus?: number;
   damageBonus?: number;
   extraDamageDice?: string;
-  /** Bonus auf den Kampfmanöverbonus (KMB) */
   kmbBonus?: number;
-  /** Bonus auf die Kampfmanöververteidigung (KMV) */
   kmvBonus?: number;
-  /** Bonus auf die Rüstungsklasse (RK), z.B. Ausweichbonus oder Schildbonus */
   acBonus?: number;
 }
 
@@ -98,8 +101,6 @@ export interface ArmorItemData {
   armorBonus: number;
 }
 
-/** Generisches, einzeln schaltbares Unterelement an einem Inventar-Gegenstand -
- * z.B. ein einzelner Soft-Chip in einer Chipbuchse. Systemunabhängig nutzbar. */
 export interface InventorySubItem {
   id: string;
   name: string;
@@ -118,7 +119,7 @@ export interface InventoryItem {
   weaponData?: WeaponItemData;
   armorData?: ArmorItemData;
   charges?: ItemCharges;
-  sourceReference?: string;
+  sourceReference?: SourceReference;
   subItems?: InventorySubItem[];
   [extra: string]: unknown;
 }
@@ -130,17 +131,21 @@ export interface Ability {
   type?: string;
   maxUses?: number;
   currentUses?: number;
-  sourceReference?: string;
+  sourceReference?: SourceReference;
   [extra: string]: unknown;
 }
 
+/** Erweiterte Party-Struktur: Name/Spielername immer sichtbar, Rest optional
+ * und nur bei Bedarf (Hover/Edit) gezeigt. */
 export interface PartyMember {
   name: string;
-  note?: string;
   playerName?: string;
   race?: string;
   occupation?: string;
   class?: string;
+  note?: string;
+  status?: string;
+  hp?: { current: number; max?: number };
   [extra: string]: unknown;
 }
 
