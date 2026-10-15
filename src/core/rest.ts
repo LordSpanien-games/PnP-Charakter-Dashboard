@@ -5,13 +5,6 @@ export interface RestSummary {
   refreshedItems: string[];
 }
 
-/**
- * Generische Rast-Funktion: Setzt alle Fähigkeiten mit Tagesnutzung
- * (maxUses/currentUses) und alle Inventar-Ladungen mit rechargeType "rest"
- * wieder auf ihren Maximalwert. Funktioniert identisch für jedes System-
- * Plugin, da sie nur auf generischen Feldern arbeitet - kein Dateneingriff
- * pro Regelsystem nötig.
- */
 export const applyRest = (
   character: GenericCharacter
 ): { character: GenericCharacter; summary: RestSummary } => {
