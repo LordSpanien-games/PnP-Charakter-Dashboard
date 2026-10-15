@@ -2,7 +2,15 @@ import React, { useState } from "react";
 import { Info, Plus, Minus, ChevronDown, ChevronRight, HeartPulse, Stethoscope } from "lucide-react";
 import { SystemPlugin, AttributePool, PluginViewProps } from "../../core/SystemPlugin";
 import { GenericCharacter, createEmptyGenericCharacter, InventoryItem } from "../../core/types";
-import { ValueBadge, ChargeTracker, ValueStepper, SourceReferenceBadge, SourceReferenceInput } from "../../core/uiKit";
+import {
+  ValueBadge,
+  ChargeTracker,
+  ValueStepper,
+  SourceReferenceBadges,
+  SourceReferenceEditor,
+  PartyCard,
+  CurrencyHistoryCard,
+} from "../../core/uiKit";
 import { applyRest } from "../../core/rest";
 import {
   ShadowrunAttributes,
@@ -79,7 +87,8 @@ const getTabForItem = (item: InventoryItem): CategoryTabId => {
   return "gear";
 };
 
-/** Liest die erste Zahl aus einem Rüstungswert-String wie "9 (Panzerweste)" -> 9 */
+/** Liest die erste Zahl aus einem Rüstungswert-String wie "9 (Panzerweste)" -> 9,
+ * funktioniert auch für negative Werte wie "-6". */
 const parseArmorValue = (raw: unknown): number => {
   if (typeof raw === "number") return raw;
   const match = String(raw ?? "").match(/-?\d+/);
@@ -194,6 +203,8 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
     onUpdate({ skills: character.skills.map((s, i) => (i === index ? { ...s, category: category || undefined } : s)) });
   };
 
+  const updateParty = (party: typeof character.party) => onUpdate({ party });
+
   const filteredInventory = character.inventory.filter((item) => activeTab === "all" || getTabForItem(item) === activeTab);
 
   const getWeaponSkillValue = (skillName: string) =>
@@ -307,7 +318,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         </div>
       </div>
 
-      {/* Zustandsmonitore - mit Plus/Minus-Anzeige */}
+      {/* Zustandsmonitore */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
           <div className="text-[9px] uppercase text-zinc-500 font-mono">Körperlicher Schaden</div>
@@ -348,33 +359,6 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
             )}
           </div>
           <p className="text-[10px] text-zinc-500 font-mono italic">Programme & Attribut-Umverteilung siehe Reiter "Matrix"</p>
-        </div>
-      )}
-
-      {/* Lifestyle & Nuyen */}
-      {(nuyenEntries.length > 0 || lifestyle || nuyenHistory.length > 0) && (
-        <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
-          <div className="text-xs font-mono font-bold text-zinc-300">Finanzen & Lifestyle</div>
-          <div className="flex flex-wrap gap-1.5">
-            {nuyenEntries.map(([unit, amount]) => (
-              <ValueBadge key={unit} label="Guthaben" value={`${amount} ${unit}`} color="text-emerald-400" />
-            ))}
-            {lifestyle && <ValueBadge label="Lifestyle" value={lifestyle} color="text-amber-300" />}
-            {lifestyleCost !== undefined && <ValueBadge label="Kosten/Monat" value={lifestyleCost} color="text-amber-300" />}
-          </div>
-          {nuyenHistory.length > 0 && (
-            <div className="space-y-1 pt-1">
-              <span className="text-[10px] text-zinc-500 font-mono uppercase">Letzte Transaktionen</span>
-              {nuyenHistory.slice(0, 5).map((h: any) => (
-                <div key={h.id} className="flex items-center justify-between text-[11px] font-mono">
-                  <span className="text-zinc-400 truncate">{h.description}</span>
-                  <span className={h.amount >= 0 ? "text-emerald-400" : "text-red-400"}>
-                    {h.amount >= 0 ? "+" : ""}{h.amount}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
 
@@ -434,15 +418,15 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
                   <div className="text-xs font-mono flex items-center gap-1.5 flex-wrap">
                     <span className={`font-bold ${colorClass || "text-white"}`}>{a.name}</span>
                     {a.effect && <span className="text-zinc-500">— {a.effect}</span>}
-                    {a.sourceReference && <SourceReferenceBadge value={a.sourceReference} />}
+                    <SourceReferenceBadges value={a.sourceReference} />
                   </div>
                   {isEditing && (
-                    <SourceReferenceInput
+                    <SourceReferenceEditor
                       value={a.sourceReference}
                       onChange={(v) =>
                         onUpdate({
                           abilities: character.abilities.map((ab, i) =>
-                            i === globalIndex ? { ...ab, sourceReference: v || undefined } : ab
+                            i === globalIndex ? { ...ab, sourceReference: v } : ab
                           ),
                         })
                       }
@@ -544,7 +528,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
                     {item.subItems && item.subItems.length > 0 && (
                       <ValueBadge label="Chips" value={`${activeSubCount}/${item.subItems.length} aktiv`} color="text-sky-300" />
                     )}
-                    {item.sourceReference && <SourceReferenceBadge value={item.sourceReference} />}
+                    <SourceReferenceBadges value={item.sourceReference} />
                   </div>
                 </div>
 
@@ -656,7 +640,12 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
                           </select>
                         </div>
 
-                        <SourceReferenceInput value={item.sourceReference} onChange={(v) => updateInventoryItem(item.id, { sourceReference: v || undefined })} />
+                        <div>
+                          <span className="text-[10px] uppercase text-zinc-500 font-mono">Regelwerk-Referenz</span>
+                          <div className="mt-1">
+                            <SourceReferenceEditor value={item.sourceReference} onChange={(v) => updateInventoryItem(item.id, { sourceReference: v })} />
+                          </div>
+                        </div>
 
                         <div>
                           <label className="block text-[10px] text-zinc-400 font-mono mb-1">Beschreibung / Effekt bearbeiten</label>
@@ -672,6 +661,29 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
           })}
         </div>
       </div>
+
+      {/* Lifestyle & Nuyen */}
+      {(nuyenEntries.length > 0 || lifestyle || nuyenHistory.length > 0) && (
+        <CurrencyHistoryCard
+          title="Finanzen & Lifestyle"
+          balanceDisplay={nuyenEntries.length > 0 ? nuyenEntries.map(([unit, amount]) => `${amount} ${unit}`).join(", ") : undefined}
+          entries={nuyenHistory.map((h: any) => ({
+            id: h.id,
+            description: h.description,
+            amount: h.amount,
+            balanceAfter: h.balanceAfter,
+          }))}
+        />
+      )}
+      {(lifestyle || lifestyleCost !== undefined) && (
+        <div className="flex flex-wrap gap-1.5 -mt-3">
+          {lifestyle && <ValueBadge label="Lifestyle" value={lifestyle} color="text-amber-300" />}
+          {lifestyleCost !== undefined && <ValueBadge label="Kosten/Monat" value={lifestyleCost} color="text-amber-300" />}
+        </div>
+      )}
+
+      {/* Gruppe - ganz unten */}
+      <PartyCard party={character.party} isEditing={isEditing} onUpdate={updateParty} />
     </div>
   );
 };
@@ -967,6 +979,9 @@ export const ShadowrunPlugin: SystemPlugin = {
 
     char.skills = (raw.skills || []).map((s: any) => ({ name: s.name, value: s.value, notes: s.note, category: s.category }));
     char.abilities = raw.abilities || [];
+
+    // Party-Mitglieder übernehmen
+    char.party = raw.party || [];
 
     return char;
   },
