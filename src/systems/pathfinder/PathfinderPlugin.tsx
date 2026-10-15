@@ -12,7 +12,15 @@ import {
 } from "../../core/types";
 import { rollPool, roll4d6DropLowest } from "../../core/dice";
 import { applyRest } from "../../core/rest";
-import { ValueBadge, ChargeTracker, ValueStepper, SourceReferenceBadge, SourceReferenceInput } from "../../core/uiKit";
+import {
+  ValueBadge,
+  ChargeTracker,
+  ValueStepper,
+  SourceReferenceBadge,
+  SourceReferenceInput,
+  PartyCard,
+  CurrencyHistoryCard,
+} from "../../core/uiKit";
 import {
   PathfinderAttributes,
   calculateModifier,
@@ -32,6 +40,7 @@ import {
   getBardicPerformanceRounds,
   getStunningFistUses,
   calculateNaturalHealingAmount,
+  sumMiscCombatBonuses,
   parseLegacyWeaponDamage,
   parseMagicBonusFromName,
   makeModifierId,
@@ -48,9 +57,10 @@ const ATTR_LABELS: Record<string, string> = {
 const CONTEXT_LABELS: Record<CombatModifierContext, string> = {
   always: "Immer",
   oneHandedOnly: "Nur einhändig",
-  twoHandedOnly: "Nur zweihändig",
+  twoHandedOnly: "Nur zweihändig (Griff)",
   offHandOnly: "Nur Nebenhand",
   sneakAttackOnly: "Nur Hinterhalt",
+  twoWeaponFightingOnly: "Nur bei Zweiwaffenkampf",
 };
 
 const SOURCE_LABELS: Record<CombatModifierSourceType, string> = {
@@ -101,7 +111,8 @@ const createBase = (name: string, subTitle: string | undefined, attrs: Record<st
 const ModifierListEditor: React.FC<{
   modifiers: CombatModifier[];
   onChange: (next: CombatModifier[]) => void;
-}> = ({ modifiers, onChange }) => {
+  showMiscFields?: boolean;
+}> = ({ modifiers, onChange, showMiscFields }) => {
   const addModifier = () => {
     onChange([...modifiers, { id: makeModifierId(), label: "Neuer Modifikator", sourceType: "custom", context: "always" }]);
   };
@@ -121,7 +132,7 @@ const ModifierListEditor: React.FC<{
               value={mod.label}
               onChange={(e) => updateModifier(mod.id, { label: e.target.value })}
               className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-white font-mono"
-              placeholder="Bezeichnung, z.B. Schurkenkurzschwert-Bonus"
+              placeholder="Bezeichnung, z.B. Ausweichen"
             />
             <button onClick={() => removeModifier(mod.id)} className="text-red-400 hover:text-red-300 shrink-0"><X size={14} /></button>
           </div>
@@ -141,6 +152,16 @@ const ModifierListEditor: React.FC<{
           </div>
           <input value={mod.extraDamageDice || ""} onChange={(e) => updateModifier(mod.id, { extraDamageDice: e.target.value || undefined })}
             placeholder="Zusatzschaden, z.B. +1W6 Feuer oder +5 Blutung" className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono" />
+          {showMiscFields && (
+            <div className="grid grid-cols-3 gap-1.5">
+              <input type="number" value={mod.kmbBonus ?? 0} onChange={(e) => updateModifier(mod.id, { kmbBonus: Number(e.target.value) })}
+                placeholder="KMB +X" title="Bonus auf KMB" className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono" />
+              <input type="number" value={mod.kmvBonus ?? 0} onChange={(e) => updateModifier(mod.id, { kmvBonus: Number(e.target.value) })}
+                placeholder="KMV +X" title="Bonus auf KMV" className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono" />
+              <input type="number" value={mod.acBonus ?? 0} onChange={(e) => updateModifier(mod.id, { acBonus: Number(e.target.value) })}
+                placeholder="RK +X" title="Bonus auf Rüstungsklasse" className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono" />
+            </div>
+          )}
         </div>
       ))}
       <button onClick={addModifier} className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-[11px] font-mono font-bold rounded-lg text-zinc-300">
@@ -227,6 +248,7 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
   const cls = classId ? PATHFINDER_CLASSES[classId] : undefined;
   const race = raceId ? PATHFINDER_RACES[raceId] : undefined;
   const sneakAttackActive = Boolean(character.systemData.sneakAttackActive);
+  const charModifiers = getCharModifiers(character);
 
   const saves = calculateSavingThrows(attrs, level, classId);
   const armorItem = character.inventory.find((i) => i.category === "armor" && i.location === "equipped");
@@ -240,6 +262,9 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
   const primaryWeapon = activeWeapons.find((w) => w.weaponData?.weaponSlot === "primary" || !w.weaponData?.weaponSlot) || activeWeapons[0];
   const offHandWeapon = activeWeapons.find((w) => w.weaponData?.weaponSlot === "offHand" && w !== primaryWeapon);
   const isTwoWeaponMode = !!primaryWeapon && !!offHandWeapon;
+
+  const miscBonuses = sumMiscCombatBonuses(charModifiers, isTwoWeaponMode ? ["twoWeaponFightingOnly"] : []);
+  const totalArmorClass = ac.armorClass + miscBonuses.acBonus;
 
   const chaMod = calculateModifier(attrs.CH);
   const sneakDice = getSneakAttackDice(classId, level);
@@ -316,6 +341,9 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
 
   const filteredInventory = character.inventory.filter((item) => activeTab === "all" || getTabForItem(item) === activeTab);
 
+  const currencyBalance = character.systemData.currencyBalance as number | undefined;
+  const currencyUnit = (character.systemData.currencyUnit as string) || "GM";
+
   return (
     <div className="space-y-6">
       {/* Rast-Optionen */}
@@ -381,7 +409,7 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         ))}
       </div>
 
-      {/* Kernwerte: TP (mit +/- Stepper), RK, Rettungswürfe */}
+      {/* Kernwerte: TP, RK (inkl. Modifikator-Boni), Rettungswürfe */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1.5">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Trefferpunkte</div>
@@ -396,7 +424,10 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         </div>
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Rüstungsklasse</div>
-          <div className="text-xl font-bold text-white">{ac.armorClass}</div>
+          <div className="text-xl font-bold text-white">{totalArmorClass}</div>
+          {miscBonuses.acBonus !== 0 && (
+            <div className="text-[9px] text-emerald-400 font-mono">(Basis {ac.armorClass} {miscBonuses.acBonus >= 0 ? "+" : ""}{miscBonuses.acBonus})</div>
+          )}
         </div>
         {(["fortitude", "reflex", "will"] as const).map((key) => (
           <div key={key} className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
@@ -453,6 +484,16 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
           </>
         )}
       </div>
+
+      {/* Gruppe */}
+      <PartyCard party={character.party} />
+
+      {/* Vermögen */}
+      <CurrencyHistoryCard
+        title="Vermögen"
+        balanceDisplay={currencyBalance !== undefined ? `${currencyBalance} ${currencyUnit}` : undefined}
+        entries={(character.systemData.currencyHistory as any[]) || []}
+      />
 
       {/* Inventar */}
       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
@@ -667,6 +708,10 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
   const offHandWeapon = activeWeapons.find((w) => w.weaponData?.weaponSlot === "offHand" && w !== primaryWeapon);
   const isTwoWeaponMode = !!primaryWeapon && !!offHandWeapon;
 
+  const miscBonuses = sumMiscCombatBonuses(charModifiers, isTwoWeaponMode ? ["twoWeaponFightingOnly"] : []);
+  const totalKmb = maneuver.kmb + miscBonuses.kmbBonus;
+  const totalKmv = maneuver.kmv + miscBonuses.kmvBonus;
+
   const updateSystemData = (key: string, value: unknown) => onUpdate({ systemData: { ...character.systemData, [key]: value } });
 
   const singleResults = !isTwoWeaponMode
@@ -715,11 +760,13 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
         </div>
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">KMB</div>
-          <div className="text-lg font-bold text-white">{formatModifier(maneuver.kmb)}</div>
+          <div className="text-lg font-bold text-white">{formatModifier(totalKmb)}</div>
+          {miscBonuses.kmbBonus !== 0 && <div className="text-[9px] text-emerald-400 font-mono">(Basis {formatModifier(maneuver.kmb)})</div>}
         </div>
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">KMV</div>
-          <div className="text-lg font-bold text-white">{maneuver.kmv}</div>
+          <div className="text-lg font-bold text-white">{totalKmv}</div>
+          {miscBonuses.kmvBonus !== 0 && <div className="text-[9px] text-emerald-400 font-mono">(Basis {maneuver.kmv})</div>}
         </div>
       </div>
 
@@ -731,9 +778,11 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={hasGreaterTwoWeaponFighting} onChange={(e) => updateSystemData("hasGreaterTwoWeaponFighting", e.target.checked)} />Meisterlicher Zweiwaffenkampf</label>
           </div>
           <div>
-            <span className="text-[10px] uppercase text-zinc-500 font-mono">Charakter-Kampfmodifikatoren (Talente, Rasse, Klasse, Skills – nicht an eine Waffe gebunden)</span>
+            <span className="text-[10px] uppercase text-zinc-500 font-mono">
+              Charakter-Kampfmodifikatoren (Talente, Rasse, Klasse, Skills – nicht an eine Waffe gebunden, kann auch KMB/KMV/RK beeinflussen)
+            </span>
             <div className="mt-1.5">
-              <ModifierListEditor modifiers={charModifiers} onChange={(next) => updateSystemData("combatModifiers", next)} />
+              <ModifierListEditor modifiers={charModifiers} onChange={(next) => updateSystemData("combatModifiers", next)} showMiscFields />
             </div>
           </div>
         </div>
@@ -1024,6 +1073,24 @@ export const PathfinderPlugin: SystemPlugin = {
 
     char.skills = (raw.skills || []).map((s: any) => ({ name: s.name, value: s.value, notes: s.note }));
     char.abilities = raw.abilities || [];
+
+    // Party-Mitglieder übernehmen - fehlte bisher komplett in der Migration
+    char.party = raw.party || [];
+
+    // Münz-/Währungsverlauf übernehmen, falls vorhanden
+    if (raw.currency) {
+      const hist = Array.isArray(raw.currency.history) ? raw.currency.history : [];
+      char.systemData.currencyHistory = hist.map((h: any) => ({
+        id: h.id || makeId(),
+        description: h.description || h.type || "Transaktion",
+        amount: Number(h.amount) || 0,
+        balanceAfter: h.balanceAfter,
+        detail: h.coinDetails,
+        timestamp: h.timestamp,
+      }));
+      char.systemData.currencyBalance = raw.currency.amount ?? hist[0]?.balanceAfter;
+      char.systemData.currencyUnit = "GM";
+    }
 
     return char;
   },
