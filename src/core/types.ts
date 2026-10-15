@@ -56,7 +56,8 @@ export type CombatModifierContext =
   | "oneHandedOnly"
   | "twoHandedOnly"
   | "offHandOnly"
-  | "sneakAttackOnly";
+  | "sneakAttackOnly"
+  | "twoWeaponFightingOnly";
 
 export type CombatModifierSourceType = "weapon" | "talent" | "class" | "race" | "skill" | "custom";
 
@@ -68,6 +69,12 @@ export interface CombatModifier {
   attackBonus?: number;
   damageBonus?: number;
   extraDamageDice?: string;
+  /** Bonus auf den Kampfmanöverbonus (KMB) */
+  kmbBonus?: number;
+  /** Bonus auf die Kampfmanöververteidigung (KMV) */
+  kmvBonus?: number;
+  /** Bonus auf die Rüstungsklasse (RK), z.B. Ausweichbonus oder Schildbonus */
+  acBonus?: number;
 }
 
 export interface WeaponItemData {
@@ -130,6 +137,10 @@ export interface Ability {
 export interface PartyMember {
   name: string;
   note?: string;
+  playerName?: string;
+  race?: string;
+  occupation?: string;
+  class?: string;
   [extra: string]: unknown;
 }
 
