@@ -1,5 +1,6 @@
 import React from "react";
 import { Plus, Minus } from "lucide-react";
+import { PartyMember } from "./types";
 
 export const ValueBadge: React.FC<{ label: string; value: React.ReactNode; color?: string }> = ({ label, value, color }) => (
   <div className="bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded text-zinc-300 text-[11px] font-mono">
@@ -34,12 +35,6 @@ export const ChargeTracker: React.FC<{
   </div>
 );
 
-/**
- * Zeigt gleichzeitig den aktuellen und maximalen Wert mit +/- Knöpfen an -
- * z.B. "7 / 10" für Trefferpunkte oder Schaden. Funktioniert in beide
- * Richtungen: current kann je nach System "verbleibende Gesundheit" oder
- * "erlittener Schaden" bedeuten, die Komponente selbst ist dafür neutral.
- */
 export const ValueStepper: React.FC<{
   current: number;
   max?: number;
@@ -70,8 +65,6 @@ export const ValueStepper: React.FC<{
 
 export const isUrl = (value?: string): boolean => !!value && /^https?:\/\//i.test(value.trim());
 
-/** Zeigt eine Regelwerk-Referenz an - als klickbaren Link, wenn es eine URL
- * ist, sonst als normaler Text-Badge (z.B. "GRW S. 112"). */
 export const SourceReferenceBadge: React.FC<{ value: string }> = ({ value }) => {
   if (isUrl(value)) {
     return (
@@ -92,8 +85,6 @@ export const SourceReferenceBadge: React.FC<{ value: string }> = ({ value }) => 
   );
 };
 
-/** Eingabefeld für Regelwerk-Referenz, akzeptiert sowohl Buchseiten-Text
- * als auch Links. */
 export const SourceReferenceInput: React.FC<{
   value?: string;
   onChange: (v: string) => void;
@@ -108,3 +99,70 @@ export const SourceReferenceInput: React.FC<{
     />
   </div>
 );
+
+/** Generische Gruppenanzeige - funktioniert für jedes System, da PartyMember
+ * nur Name als Pflichtfeld hat, alles andere ist optional. */
+export const PartyCard: React.FC<{ party: PartyMember[] }> = ({ party }) => {
+  if (!party || party.length === 0) return null;
+  return (
+    <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+      <div className="text-xs font-mono font-bold text-zinc-300">Gruppe</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {party.map((p, idx) => (
+          <div key={idx} className="p-2.5 bg-black/40 border border-zinc-800 rounded-lg">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-bold text-white">{p.name}</span>
+              {p.playerName && (
+                <span className="text-[10px] text-zinc-500 font-mono shrink-0">Spieler: {p.playerName}</span>
+              )}
+            </div>
+            <div className="text-xs text-zinc-400 font-mono mt-0.5">
+              {[p.race, p.class, p.occupation].filter(Boolean).join(" · ") || "–"}
+            </div>
+            {p.note && <p className="text-[11px] text-zinc-500 font-mono mt-1">{p.note}</p>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export interface CurrencyHistoryEntryDisplay {
+  id: string;
+  description: string;
+  amount: number;
+  balanceAfter?: number;
+  detail?: string;
+  timestamp?: string;
+}
+
+/** Generische Finanz-/Transaktionskarte - funktioniert unabhängig davon,
+ * ob die Währung Nuyen, Goldmünzen oder etwas anderes ist. */
+export const CurrencyHistoryCard: React.FC<{
+  title: string;
+  balanceDisplay?: string;
+  entries: CurrencyHistoryEntryDisplay[];
+}> = ({ title, balanceDisplay, entries }) => {
+  if ((!entries || entries.length === 0) && !balanceDisplay) return null;
+  return (
+    <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+      <div className="text-xs font-mono font-bold text-zinc-300">{title}</div>
+      {balanceDisplay && <ValueBadge label="Guthaben" value={balanceDisplay} color="text-emerald-400" />}
+      {entries && entries.length > 0 && (
+        <div className="space-y-1 pt-1">
+          <span className="text-[10px] text-zinc-500 font-mono uppercase">Letzte Transaktionen</span>
+          {entries.slice(0, 5).map((h) => (
+            <div key={h.id} className="flex items-center justify-between text-[11px] font-mono gap-2">
+              <span className="text-zinc-400 truncate flex-1">
+                {h.description}{h.detail ? ` (${h.detail})` : ""}
+              </span>
+              <span className={h.amount >= 0 ? "text-emerald-400 shrink-0" : "text-red-400 shrink-0"}>
+                {h.amount >= 0 ? "+" : ""}{h.amount}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
