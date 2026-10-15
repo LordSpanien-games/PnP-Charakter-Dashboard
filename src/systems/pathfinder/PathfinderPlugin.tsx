@@ -16,8 +16,8 @@ import {
   ValueBadge,
   ChargeTracker,
   ValueStepper,
-  SourceReferenceBadge,
-  SourceReferenceInput,
+  SourceReferenceBadges,
+  SourceReferenceEditor,
   PartyCard,
   CurrencyHistoryCard,
 } from "../../core/uiKit";
@@ -344,6 +344,8 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
   const currencyBalance = character.systemData.currencyBalance as number | undefined;
   const currencyUnit = (character.systemData.currencyUnit as string) || "GM";
 
+  const updateParty = (party: typeof character.party) => onUpdate({ party });
+
   return (
     <div className="space-y-6">
       {/* Rast-Optionen */}
@@ -409,7 +411,7 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         ))}
       </div>
 
-      {/* Kernwerte: TP, RK (inkl. Modifikator-Boni), Rettungswürfe */}
+      {/* Kernwerte: TP, RK, Rettungswürfe */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1.5">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Trefferpunkte</div>
@@ -485,16 +487,6 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         )}
       </div>
 
-      {/* Gruppe */}
-      <PartyCard party={character.party} />
-
-      {/* Vermögen */}
-      <CurrencyHistoryCard
-        title="Vermögen"
-        balanceDisplay={currencyBalance !== undefined ? `${currencyBalance} ${currencyUnit}` : undefined}
-        entries={(character.systemData.currencyHistory as any[]) || []}
-      />
-
       {/* Inventar */}
       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -560,7 +552,7 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
                     {item.category === "armor" && <ValueBadge label="Rüstung" value={`+${item.armorData?.armorBonus ?? 0}`} color="text-cyan-300" />}
                     {item.charges && <ValueBadge label="Ladungen" value={`${item.charges.current}/${item.charges.max}`} color="text-purple-300" />}
                     {item.quantity !== undefined && item.category !== "weapon" && item.category !== "armor" && <ValueBadge label="Anzahl" value={`${item.quantity}x`} color="text-zinc-200" />}
-                    {item.sourceReference && <SourceReferenceBadge value={item.sourceReference} />}
+                    <SourceReferenceBadges value={item.sourceReference} />
                   </div>
                 </div>
 
@@ -661,7 +653,12 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
                           </select>
                         </div>
 
-                        <SourceReferenceInput value={item.sourceReference} onChange={(v) => updateInventoryItem(item.id, { sourceReference: v || undefined })} />
+                        <div>
+                          <span className="text-[10px] uppercase text-zinc-500 font-mono">Regelwerk-Referenz</span>
+                          <div className="mt-1">
+                            <SourceReferenceEditor value={item.sourceReference} onChange={(v) => updateInventoryItem(item.id, { sourceReference: v })} />
+                          </div>
+                        </div>
 
                         <div>
                           <label className="block text-[10px] text-zinc-400 font-mono mb-1">Beschreibung / Effekt bearbeiten</label>
@@ -676,6 +673,16 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
           })}
         </div>
       </div>
+
+      {/* Vermögen */}
+      <CurrencyHistoryCard
+        title="Vermögen"
+        balanceDisplay={currencyBalance !== undefined ? `${currencyBalance} ${currencyUnit}` : undefined}
+        entries={(character.systemData.currencyHistory as any[]) || []}
+      />
+
+      {/* Gruppe - ganz unten */}
+      <PartyCard party={character.party} isEditing={isEditing} onUpdate={updateParty} />
     </div>
   );
 };
@@ -895,7 +902,7 @@ const PathfinderTalentsView: React.FC<PluginViewProps> = ({ character, isEditing
                     <span className="text-sm font-bold text-white">{ability.name}</span>
                     <div className="flex items-center gap-1.5">
                       {ability.usage && <ValueBadge label="Nutzung" value={ability.usage} color="text-purple-300" />}
-                      {ability.sourceReference && <SourceReferenceBadge value={ability.sourceReference} />}
+                      <SourceReferenceBadges value={ability.sourceReference} />
                     </div>
                   </div>
                   {ability.effect && (
@@ -909,9 +916,9 @@ const PathfinderTalentsView: React.FC<PluginViewProps> = ({ character, isEditing
                     />
                   )}
                   {isEditing && (
-                    <SourceReferenceInput
+                    <SourceReferenceEditor
                       value={ability.sourceReference}
-                      onChange={(v) => updateAbility(globalIndex, { sourceReference: v || undefined })}
+                      onChange={(v) => updateAbility(globalIndex, { sourceReference: v })}
                     />
                   )}
                 </div>
@@ -1033,7 +1040,7 @@ export const PathfinderPlugin: SystemPlugin = {
         location: "equipped",
         isActiveWeapon: true,
         notes: w.note || w.notes,
-        sourceReference: w.sourceReference || w.page,
+        sourceReference: w.page ? { page: w.page } : undefined,
         weaponData: {
           isMelee,
           isFinesse: !!w.isFinesse,
@@ -1063,7 +1070,7 @@ export const PathfinderPlugin: SystemPlugin = {
           category: it.category || "gear",
           quantity: it.quantity ?? 1,
           notes: it.notes,
-          sourceReference: it.page || it.sourceReference,
+          sourceReference: it.page ? { page: it.page } : undefined,
           location: it.status === "stored" ? "stored" : "equipped",
           charges: it.maxUses
             ? { max: it.maxUses, current: it.currentUses ?? it.maxUses, rechargeType: "rest" }
@@ -1074,7 +1081,7 @@ export const PathfinderPlugin: SystemPlugin = {
     char.skills = (raw.skills || []).map((s: any) => ({ name: s.name, value: s.value, notes: s.note }));
     char.abilities = raw.abilities || [];
 
-    // Party-Mitglieder übernehmen - fehlte bisher komplett in der Migration
+    // Party-Mitglieder übernehmen
     char.party = raw.party || [];
 
     // Münz-/Währungsverlauf übernehmen, falls vorhanden
