@@ -10,6 +10,8 @@ import {
   SourceReferenceEditor,
   PartyCard,
   CurrencyHistoryCard,
+  EditableEntryList,
+  SimpleEntry,
 } from "../../core/uiKit";
 import {
   ATTR_KEYS,
@@ -22,6 +24,7 @@ import {
   calculateHitPoints,
   calculateMagicPoints,
   calculateMaxSanity,
+  calculateMovementRate,
   calculateDamageBonus,
   findSkillValue,
   parseCocDamage,
@@ -109,14 +112,24 @@ const CthulhuOverview: React.FC<PluginViewProps> = ({ character, isEditing, onUp
   const mythosValue = findSkillValue(character.skills, "mythos");
   const dmgBonus = calculateDamageBonus(attrs.ST, attrs.GR);
 
+  const manualMov = character.systemData.movementRate as number | undefined;
+  const movementRate = manualMov ?? calculateMovementRate(attrs.ST, attrs.GE, attrs.GR);
+
   const activeWeapons = character.inventory.filter((i) => i.category === "weapon" && i.location === "equipped");
   const currencyBalance = character.systemData.currencyBalance as number | undefined;
   const currencyUnit = (character.systemData.currencyUnit as string) || "$";
 
   const updateAttr = (key: string, value: number) => onUpdate({ attributes: { ...character.attributes, [key]: value } });
+  const updateSystemData = (key: string, value: unknown) => onUpdate({ systemData: { ...character.systemData, [key]: value } });
   const updateResource = (key: "hp" | "sanity" | "luck" | "mp", field: "current" | "max", value: number) =>
     onUpdate({ resources: { ...character.resources, [key]: { ...character.resources[key], [field]: value } } });
   const updateParty = (party: typeof character.party) => onUpdate({ party });
+
+  const toggleSkillChecked = (index: number) => {
+    onUpdate({
+      skills: character.skills.map((s, i) => (i === index ? { ...s, checked: !(s as any).checked } : s)),
+    });
+  };
 
   const updateInventoryItem = (id: string, patch: Partial<InventoryItem>) => {
     onUpdate({ inventory: character.inventory.map((it) => (it.id === id ? { ...it, ...patch } : it)) });
@@ -208,32 +221,45 @@ const CthulhuOverview: React.FC<PluginViewProps> = ({ character, isEditing, onUp
           onChange={(v) => updateResource("mp", "current", v)} onMaxChange={(v) => updateResource("mp", "max", v)} />
       </div>
 
-      {/* Schadensbonus & Mythos-Hinweis */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Schadensbonus, Mythos, Bewegungsrate */}
+      <div className="grid grid-cols-3 gap-3">
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Schadensbonus / Bauen</div>
-          <div className="text-lg font-bold text-white">{dmgBonus.damageBonus} <span className="text-zinc-500 text-sm">(Bauen {dmgBonus.build})</span></div>
+          <div className="text-lg font-bold text-white">{dmgBonus.damageBonus}</div>
+          <div className="text-[9px] text-zinc-500 font-mono">Bauen {dmgBonus.build}</div>
         </div>
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Max. Stabilität (99 - Mythos)</div>
           <div className="text-lg font-bold text-white">{calculateMaxSanity(mythosValue)}</div>
           <div className="text-[9px] text-zinc-500 font-mono">Cthulhu-Mythos: {mythosValue}</div>
         </div>
+        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
+          <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Bewegungsrate (MOV)</div>
+          {isEditing ? (
+            <input type="number" value={movementRate} onChange={(e) => updateSystemData("movementRate", Number(e.target.value))}
+              className="w-full bg-black border border-zinc-700 rounded-lg text-center text-lg font-bold text-white py-1" />
+          ) : <div className="text-lg font-bold text-white">{movementRate}</div>}
+        </div>
       </div>
 
-      {/* Fertigkeiten */}
+      {/* Fertigkeiten mit Entwicklungs-Checkbox direkt in der Liste */}
       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
-        <div className="text-xs font-mono font-bold text-zinc-300">Fertigkeiten</div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-mono font-bold text-zinc-300">Fertigkeiten</span>
+          <span className="text-[10px] text-zinc-500 font-mono">☑ = erfolgreich genutzt (für Entwicklungsphase)</span>
+        </div>
         {character.skills.length === 0 && <p className="text-xs text-zinc-600 font-mono">Keine Fertigkeiten hinterlegt.</p>}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
           {character.skills.map((s, idx) => {
             const val = Number(s.value) || 0;
             const th = calculateThresholds(val);
+            const checked = !!(s as any).checked;
             return (
-              <div key={idx} className="flex items-center justify-between text-xs font-mono bg-black/40 px-2 py-1 rounded">
-                <span className="text-zinc-300 truncate">{s.name}</span>
-                <span className="text-white font-bold shrink-0 ml-1">{val}% <span className="text-zinc-500">({th.hard}/{th.extreme})</span></span>
-              </div>
+              <label key={idx} className="flex items-center gap-1.5 text-xs font-mono bg-black/40 px-2 py-1 rounded cursor-pointer">
+                <input type="checkbox" checked={checked} onChange={() => toggleSkillChecked(idx)} />
+                <span className="text-zinc-300 truncate flex-1">{s.name}</span>
+                <span className="text-white font-bold shrink-0">{val}% <span className="text-zinc-500">({th.hard}/{th.extreme})</span></span>
+              </label>
             );
           })}
         </div>
@@ -639,6 +665,102 @@ const CthulhuDevelopmentView: React.FC<PluginViewProps> = ({ character, onUpdate
 };
 
 // ═══════════════════════════════════════════════════════════
+// HINTERGRUND-REITER
+// ═══════════════════════════════════════════════════════════
+
+const CthulhuBackgroundView: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
+  const getEntries = (key: string): SimpleEntry[] => (character.systemData[key] as SimpleEntry[]) || [];
+  const setEntries = (key: string, entries: SimpleEntry[]) =>
+    onUpdate({ systemData: { ...character.systemData, [key]: entries } });
+
+  const ideology = (character.systemData.ideology as string) || "";
+
+  return (
+    <div className="space-y-6">
+      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+        <div className="text-xs font-mono font-bold text-zinc-300">Ideologie / Glaube</div>
+        {isEditing ? (
+          <textarea
+            value={ideology}
+            onChange={(e) => onUpdate({ systemData: { ...character.systemData, ideology: e.target.value || undefined } })}
+            placeholder="Weltanschauung, Religion, moralische Überzeugungen..."
+            className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-xs text-white font-mono min-h-[60px]"
+          />
+        ) : (
+          <p className="text-xs text-zinc-300 font-mono whitespace-pre-wrap">{ideology || "–"}</p>
+        )}
+      </div>
+
+      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl">
+        <EditableEntryList
+          label="Wichtige Personen im Leben"
+          entries={getEntries("importantPeople")}
+          isEditing={isEditing}
+          onUpdate={(e) => setEntries("importantPeople", e)}
+          titlePlaceholder="Name der Person"
+          descriptionPlaceholder="Beziehung / Bedeutung..."
+        />
+      </div>
+
+      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl">
+        <EditableEntryList
+          label="Bedeutsame Orte"
+          entries={getEntries("meaningfulLocations")}
+          isEditing={isEditing}
+          onUpdate={(e) => setEntries("meaningfulLocations", e)}
+          titlePlaceholder="Ortsname"
+          descriptionPlaceholder="Warum bedeutsam..."
+        />
+      </div>
+
+      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl">
+        <EditableEntryList
+          label="Geschätzter Besitz"
+          entries={getEntries("treasuredPossessions")}
+          isEditing={isEditing}
+          onUpdate={(e) => setEntries("treasuredPossessions", e)}
+          titlePlaceholder="Gegenstand"
+          descriptionPlaceholder="Warum wertvoll..."
+        />
+      </div>
+
+      <div className="p-4 bg-zinc-900 border border-amber-900/40 rounded-xl">
+        <EditableEntryList
+          label="Phobien & Manien"
+          entries={getEntries("phobiasManias")}
+          isEditing={isEditing}
+          onUpdate={(e) => setEntries("phobiasManias", e)}
+          titlePlaceholder="z.B. Klaustrophobie"
+          descriptionPlaceholder="Entstehung / Auswirkung..."
+        />
+      </div>
+
+      <div className="p-4 bg-zinc-900 border border-red-900/40 rounded-xl">
+        <EditableEntryList
+          label="Verletzungen & Narben"
+          entries={getEntries("injuriesScars")}
+          isEditing={isEditing}
+          onUpdate={(e) => setEntries("injuriesScars", e)}
+          titlePlaceholder="z.B. Narbe am linken Arm"
+          descriptionPlaceholder="Wie entstanden..."
+        />
+      </div>
+
+      <div className="p-4 bg-zinc-900 border border-purple-900/40 rounded-xl">
+        <EditableEntryList
+          label="Begegnungen mit seltsamen Wesenheiten & Folianten"
+          entries={getEntries("mythosEncounters")}
+          isEditing={isEditing}
+          onUpdate={(e) => setEntries("mythosEncounters", e)}
+          titlePlaceholder="Was wurde erlebt/gelesen"
+          descriptionPlaceholder="Details & Auswirkungen..."
+        />
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════
 // PLUGIN-FACTORY (für CoC 7e & CoC 1920er)
 // ═══════════════════════════════════════════════════════════
 
@@ -819,6 +941,20 @@ const buildCocPlugin = (config: CocVariantConfig): SystemPlugin => ({
     char.abilities = raw.abilities || [];
     char.party = raw.party || [];
 
+    // Hintergrund-Felder übernehmen, falls im alten Format vorhanden
+    if (raw.background) {
+      char.systemData.ideology = raw.background.ideology;
+      char.systemData.importantPeople = raw.background.importantPeople || [];
+      char.systemData.meaningfulLocations = raw.background.meaningfulLocations || [];
+      char.systemData.treasuredPossessions = raw.background.treasuredPossessions || [];
+      char.systemData.phobiasManias = raw.background.phobiasManias || [];
+      char.systemData.injuriesScars = raw.background.injuriesScars || [];
+      char.systemData.mythosEncounters = raw.background.mythosEncounters || raw.background.encounters || [];
+    }
+    if (raw.movementRate !== undefined) {
+      char.systemData.movementRate = raw.movementRate;
+    }
+
     if (raw.currency) {
       const hist = Array.isArray(raw.currency.history) ? raw.currency.history : [];
       char.systemData.currencyHistory = hist.map((h: any) => ({
@@ -842,6 +978,7 @@ const buildCocPlugin = (config: CocVariantConfig): SystemPlugin => ({
   secondaryViews: [
     { id: "combat", label: "Kampf", Component: CthulhuCombatView },
     { id: "development", label: "Entwicklung", Component: CthulhuDevelopmentView },
+    { id: "background", label: "Hintergrund", Component: CthulhuBackgroundView },
   ],
 });
 
