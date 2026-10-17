@@ -5,7 +5,6 @@ export const ATTR_LABELS: Record<string, string> = {
   ER: "Erscheinung", IN: "Intelligenz", MA: "Macht", BI: "Bildung",
 };
 
-/** Alternative Schreibweisen in alten Importdateien. */
 export const ATTR_LEGACY_ALIASES: Record<string, string[]> = {
   ST: ["ST", "STR", "STÄRKE"],
   KO: ["KO", "CON", "KONSTITUTION"],
@@ -21,12 +20,6 @@ export const rollDie = (sides: number): number => Math.floor(Math.random() * sid
 const roll3d6x5 = (): number => (rollDie(6) + rollDie(6) + rollDie(6)) * 5;
 const roll2d6plus6x5 = (): number => (rollDie(6) + rollDie(6) + 6) * 5;
 
-/**
- * Erzeugt die 8 Charakteristiken in ATTR_KEYS-Reihenfolge mit der jeweils
- * korrekten CoC-7e-Würfelformel (3W6×5 bzw. (2W6+6)×5). Reihenfolge ist
- * fix - kein freies Vertauschen wie bei Pathfinder, da sich die
- * Würfelmethoden je Attribut unterscheiden.
- */
 export const rollCocAttributePool = (): number[] => [
   roll3d6x5(),       // ST
   roll3d6x5(),       // KO
@@ -58,16 +51,24 @@ export const calculateThresholds = (value: number): Thresholds => ({
 
 export const calculateHitPoints = (ko: number, gr: number): number => Math.floor((ko + gr) / 10);
 export const calculateMagicPoints = (ma: number): number => Math.floor(ma / 5);
-
-/** Jeder Punkt Cthulhu-Mythos senkt die maximale Geistige Stabilität dauerhaft um 1. */
 export const calculateMaxSanity = (mythosValue: number): number => Math.max(0, 99 - mythosValue);
+
+/**
+ * Bewegungsrate (MOV) nach Standardregel: beide Werte unter GR -> 7,
+ * beide über GR -> 9, sonst 8. Bewusst ohne Altersmodifikator - der
+ * lässt sich am Charakter bei Bedarf manuell überschreiben.
+ */
+export const calculateMovementRate = (st: number, ge: number, gr: number): number => {
+  if (st < gr && ge < gr) return 7;
+  if (st > gr && ge > gr) return 9;
+  return 8;
+};
 
 export interface DamageBonusResult {
   build: number;
   damageBonus: string;
 }
 
-/** Schadensbonus & Bauen nach ST+GR (CoC-7e-Standardtabelle, nach oben erweitert). */
 export const calculateDamageBonus = (st: number, gr: number): DamageBonusResult => {
   const sum = st + gr;
   const table: { max: number; build: number; db: string }[] = [
@@ -96,8 +97,6 @@ export const findSkillValue = (
   return typeof found.value === "number" ? found.value : parseInt(String(found.value), 10) || 0;
 };
 
-/** Zerlegt einen Schadens-String wie "1W6+SchB" in Basiswürfel + Flag,
- * ob der Schadensbonus automatisch angehängt werden soll. */
 export const parseCocDamage = (damageStr: string | undefined): { baseDice: string; useDamageBonus: boolean } => {
   if (!damageStr) return { baseDice: "1W6", useDamageBonus: false };
   const useDamageBonus = /schb/i.test(damageStr);
