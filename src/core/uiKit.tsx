@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Minus, Trash2, Info } from "lucide-react";
+import { Plus, Minus, Trash2 } from "lucide-react";
 import { PartyMember, SourceReference } from "./types";
 
 export const ValueBadge: React.FC<{ label: string; value: React.ReactNode; color?: string }> = ({ label, value, color }) => (
@@ -70,7 +70,6 @@ export const ValueStepper: React.FC<{
 const hasAnySourceContent = (ref?: SourceReference): boolean =>
   !!ref && (!!ref.book?.trim() || !!ref.page?.trim() || !!ref.url?.trim());
 
-/** Zeigt Buchreferenz und/oder Weblink als getrennte Badges. */
 export const SourceReferenceBadges: React.FC<{ value?: SourceReference }> = ({ value }) => {
   if (!hasAnySourceContent(value)) return null;
   const bookLabel = [value?.book, value?.page ? `S. ${value.page}` : undefined].filter(Boolean).join(" ");
@@ -95,7 +94,6 @@ export const SourceReferenceBadges: React.FC<{ value?: SourceReference }> = ({ v
   );
 };
 
-/** Eingabe für Buch, Seite und Link - alle drei unabhängig voneinander. */
 export const SourceReferenceEditor: React.FC<{
   value?: SourceReference;
   onChange: (next: SourceReference) => void;
@@ -328,6 +326,85 @@ export const CurrencyHistoryCard: React.FC<{
           ))}
         </div>
       )}
+    </div>
+  );
+};
+
+// ───────────────────────────────────────────────────────────
+// Generische Titel+Beschreibung-Liste (z.B. Hintergrund-Einträge)
+// ───────────────────────────────────────────────────────────
+
+export interface SimpleEntry {
+  id: string;
+  title: string;
+  description?: string;
+}
+
+const makeEntryId = () => `entry_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+export const EditableEntryList: React.FC<{
+  label: string;
+  entries: SimpleEntry[];
+  isEditing: boolean;
+  onUpdate: (entries: SimpleEntry[]) => void;
+  titlePlaceholder?: string;
+  descriptionPlaceholder?: string;
+}> = ({ label, entries, isEditing, onUpdate, titlePlaceholder, descriptionPlaceholder }) => {
+  if (!isEditing && (!entries || entries.length === 0)) return null;
+
+  const updateEntry = (index: number, patch: Partial<SimpleEntry>) => {
+    onUpdate(entries.map((e, i) => (i === index ? { ...e, ...patch } : e)));
+  };
+  const removeEntry = (index: number) => {
+    onUpdate(entries.filter((_, i) => i !== index));
+  };
+  const addEntry = () => {
+    onUpdate([...entries, { id: makeEntryId(), title: "" }]);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] uppercase text-zinc-500 font-mono">{label}</span>
+        {isEditing && (
+          <button onClick={addEntry} className="flex items-center gap-1 px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono rounded-lg text-zinc-300">
+            <Plus size={10} /> Hinzufügen
+          </button>
+        )}
+      </div>
+      {entries.length === 0 && <p className="text-[11px] text-zinc-600 font-mono">Keine Einträge.</p>}
+      <div className="space-y-1.5">
+        {entries.map((entry, idx) => (
+          <div key={entry.id} className="p-2 bg-black/40 border border-zinc-800 rounded-lg">
+            {isEditing ? (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <input
+                    value={entry.title}
+                    onChange={(e) => updateEntry(idx, { title: e.target.value })}
+                    placeholder={titlePlaceholder || "Titel"}
+                    className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-white font-mono font-bold"
+                  />
+                  <button onClick={() => removeEntry(idx)} className="text-red-400 hover:text-red-300 shrink-0">
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+                <textarea
+                  value={entry.description || ""}
+                  onChange={(e) => updateEntry(idx, { description: e.target.value || undefined })}
+                  placeholder={descriptionPlaceholder || "Beschreibung..."}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-white font-mono min-h-[36px]"
+                />
+              </div>
+            ) : (
+              <>
+                <div className="text-xs font-bold text-white font-mono">{entry.title || "–"}</div>
+                {entry.description && <p className="text-[11px] text-zinc-400 font-mono mt-0.5">{entry.description}</p>}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
