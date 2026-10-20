@@ -90,10 +90,17 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
       const existing = userSkills.find((s) => {
         const sName = (s?.name || "").toLowerCase();
         const defName = def.name.toLowerCase();
-        return sName === defName || (sName.length >= 5 && sName.startsWith(defName.slice(0, 5)));
+        return (
+          sName === defName ||
+          (sName.length >= 5 && sName.startsWith(defName.slice(0, 5)))
+        );
       });
       const attrMod = attributeMap[def.attr]?.mod || 0;
-      const ranks = existing ? (typeof existing.value === "number" ? existing.value : parseInt(String(existing.value).replace(/[^0-9-]/g, ""), 10) || 0) : 0;
+      const rawVal = existing ? existing.value : 0;
+      const ranks =
+        typeof rawVal === "number"
+          ? rawVal
+          : parseInt(String(rawVal).replace(/[^0-9-]/g, ""), 10) || 0;
       const isClassSkill = existing?.trained ?? false;
       const classBonus = isClassSkill && ranks > 0 ? 3 : 0;
       const totalBonus = attrMod + ranks + classBonus;
@@ -103,7 +110,9 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
 
   const handleUpdateSkillRanks = (skillName: string, newRanks: number) => {
     const currentSkills = [...(character.skills || [])];
-    const idx = currentSkills.findIndex((s) => (s?.name || "").toLowerCase() === skillName.toLowerCase());
+    const idx = currentSkills.findIndex(
+      (s) => (s?.name || "").toLowerCase() === skillName.toLowerCase()
+    );
     if (idx >= 0) {
       currentSkills[idx] = { ...currentSkills[idx], value: newRanks };
     } else {
@@ -114,7 +123,9 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
 
   const handleToggleClassSkill = (skillName: string) => {
     const currentSkills = [...(character.skills || [])];
-    const idx = currentSkills.findIndex((s) => (s?.name || "").toLowerCase() === skillName.toLowerCase());
+    const idx = currentSkills.findIndex(
+      (s) => (s?.name || "").toLowerCase() === skillName.toLowerCase()
+    );
     if (idx >= 0) {
       currentSkills[idx] = { ...currentSkills[idx], trained: !currentSkills[idx].trained };
     } else {
@@ -123,7 +134,9 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
     onUpdateData({ skills: currentSkills });
   };
 
-  const visibleSkills = showAllSkills ? mergedSkills : mergedSkills.filter((s) => s.ranks > 0);
+  const visibleSkills = showAllSkills
+    ? mergedSkills
+    : mergedSkills.filter((s) => s.ranks > 0);
   const learnedCount = mergedSkills.filter((s) => s.ranks > 0).length;
 
   return (
@@ -158,12 +171,14 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
         isEditing={isEditing}
       />
 
-      {/* ── FERTIGKEITEN DASHBOARD-BLOCK ── */}
+      {/* ── FERTIGKEITEN ── */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
         {/* Header + Toggle */}
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-bold text-white uppercase tracking-wide">Fertigkeiten</h3>
+            <h3 className="text-sm font-bold text-white uppercase tracking-wide">
+              Fertigkeiten
+            </h3>
             <p className="text-[10px] text-zinc-500 font-mono mt-0.5">
               {learnedCount} von {mergedSkills.length} belegt
             </p>
@@ -181,7 +196,6 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
           </button>
         </div>
 
-        {/* Skills-Tabelle */}
         {visibleSkills.length === 0 ? (
           <p className="text-xs text-zinc-600 font-mono italic">
             Noch keine Fertigkeitsränge vergeben. Klicke auf „Alle anzeigen".
@@ -193,12 +207,12 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
               <div className="col-span-1 text-center" title="Klassenfertigkeit">KF</div>
               <div className="col-span-5">Fertigkeit</div>
               <div className="col-span-1 text-center">Attr</div>
-              <div className="col-span-1 text-center font-bold text-zinc-300">Ges</div>
+              <div className="col-span-2 text-center font-bold text-zinc-300">Gesamt</div>
               <div className="col-span-1 text-center">AttrMod</div>
-              <div className="col-span-1 text-center">Ränge</div>
-              <div className="col-span-2 text-center text-[8px]">Flags</div>
+              <div className="col-span-2 text-center">Ränge</div>
             </div>
 
+            {/* Skill-Zeilen */}
             <div className="space-y-0.5 max-h-[520px] overflow-y-auto pr-1">
               {visibleSkills.map((skill) => (
                 <div
@@ -222,13 +236,23 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
                   </div>
 
                   {/* Name */}
-                  <div className="col-span-5 truncate text-zinc-200 font-mono text-[11px] flex items-center gap-1">
-                    <span className="truncate">{skill.name}</span>
+                  <div className="col-span-5 flex items-center gap-1 font-mono text-[11px]">
+                    <span
+                      className={`truncate ${
+                        skill.ranks > 0 ? "text-zinc-200" : "text-zinc-600"
+                      }`}
+                    >
+                      {skill.name}
+                    </span>
                     {skill.armorPenalty && (
-                      <span className="text-[8px] text-zinc-500" title="Rüstungsmalus">✦</span>
+                      <span className="text-[8px] text-zinc-500 shrink-0" title="Rüstungsmalus">
+                        ✦
+                      </span>
                     )}
                     {skill.trainedOnly && (
-                      <span className="text-[8px] text-amber-500" title="Nur geübt">†</span>
+                      <span className="text-[8px] text-amber-500 shrink-0" title="Nur geübt">
+                        †
+                      </span>
                     )}
                   </div>
 
@@ -238,7 +262,7 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
                   </div>
 
                   {/* Gesamtbonus */}
-                  <div className="col-span-1 text-center font-black text-amber-400 font-mono text-[11px]">
+                  <div className="col-span-2 text-center font-black text-amber-400 font-mono text-[11px]">
                     {formatPathfinderModifier(skill.totalBonus)}
                   </div>
 
@@ -247,8 +271,8 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
                     {formatPathfinderModifier(skill.attrMod)}
                   </div>
 
-                  {/* Ränge (editierbar) */}
-                  <div className="col-span-1 text-center">
+                  {/* Ränge editierbar */}
+                  <div className="col-span-2 text-center">
                     {isEditing ? (
                       <input
                         type="number"
@@ -256,27 +280,29 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
                         max={20}
                         value={skill.ranks}
                         onChange={(e) =>
-                          handleUpdateSkillRanks(skill.name, parseInt(e.target.value, 10) || 0)
+                          handleUpdateSkillRanks(
+                            skill.name,
+                            parseInt(e.target.value, 10) || 0
+                          )
                         }
                         className="w-full text-center bg-zinc-950 border border-zinc-700 rounded font-mono font-bold text-[10px] text-white outline-none focus:border-amber-500 py-0.5"
                       />
                     ) : (
-                      <span className="font-mono text-zinc-300 text-[10px]">{skill.ranks}</span>
-                    )}
-                  </div>
-
-                  {/* Flags */}
-                  <div className="col-span-2 flex justify-center gap-1 text-[8px]">
-                    {skill.isClassSkill && skill.ranks > 0 && (
-                      <span className="px-1 py-0.5 bg-amber-500/20 text-amber-400 rounded font-mono">KF+3</span>
+                      <span
+                        className={`font-mono text-[10px] ${
+                          skill.ranks > 0 ? "text-zinc-300" : "text-zinc-700"
+                        }`}
+                      >
+                        {skill.ranks > 0 ? skill.ranks : "—"}
+                      </span>
                     )}
                   </div>
                 </div>
               ))}
             </div>
 
-            <p className="text-[9px] text-zinc-600 font-mono">
-              ✦ = Rüstungsmalus &nbsp;|&nbsp; † = Nur geübt &nbsp;|&nbsp; KF+3 = Klassenfertigkeitsbonus
+            <p className="text-[9px] text-zinc-600 font-mono pt-1 border-t border-zinc-800">
+              ✦ = Rüstungsmalus &nbsp;|&nbsp; † = Nur geübt &nbsp;|&nbsp; KF = Klassenfertigkeit (+3 Bonus bei ≥1 Rang)
             </p>
           </>
         )}
