@@ -349,27 +349,19 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
 
   return (
     <div className="space-y-6">
-      {/* Rast-Optionen */}
       <div className="p-3 bg-indigo-950/20 border border-indigo-900/40 rounded-xl space-y-2">
         <div className="text-xs font-mono font-bold text-indigo-300">Rast & Erholung</div>
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={handleNightRest}
-            className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold rounded-lg text-xs"
-          >
+          <button onClick={handleNightRest} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold rounded-lg text-xs">
             <Moon size={14} /> Nachtruhe (8h)
           </button>
-          <button
-            onClick={handleBedRest}
-            className="flex items-center gap-2 px-3 py-1.5 bg-indigo-800 hover:bg-indigo-700 text-white font-mono font-bold rounded-lg text-xs"
-          >
+          <button onClick={handleBedRest} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-800 hover:bg-indigo-700 text-white font-mono font-bold rounded-lg text-xs">
             <BedDouble size={14} /> Bettruhe (24h, doppelte Heilung)
           </button>
         </div>
         {restMessage && <p className="text-xs text-indigo-300 font-mono">{restMessage}</p>}
       </div>
 
-      {/* Klasse, Rasse, Level */}
       <div className="grid grid-cols-3 gap-3 p-4 bg-zinc-900 border border-zinc-800 rounded-xl">
         <div>
           <label className="text-[10px] text-zinc-500 uppercase font-mono">Klasse</label>
@@ -398,7 +390,6 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         </div>
       </div>
 
-      {/* Attribute */}
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
         {ATTR_KEYS.map((key) => (
           <div key={key} className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
@@ -412,7 +403,6 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         ))}
       </div>
 
-      {/* Kernwerte: TP, RK, Rettungswürfe */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1.5">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Trefferpunkte</div>
@@ -440,7 +430,6 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         ))}
       </div>
 
-      {/* Hinterhalt-Toggle + Klassen-Features */}
       <div className="flex flex-wrap gap-3">
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
           <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Hinterhalt aktiv?</div>
@@ -460,7 +449,6 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         )}
       </div>
 
-      {/* Waffen */}
       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
         <div className="text-xs font-mono font-bold text-zinc-300 mb-1">Aktive Waffen</div>
         {activeWeapons.length === 0 && (
@@ -488,7 +476,6 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         )}
       </div>
 
-      {/* Inventar */}
       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <span className="text-xs font-mono font-bold text-zinc-300">Inventar</span>
@@ -675,14 +662,12 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
         </div>
       </div>
 
-      {/* Vermögen */}
       <CurrencyHistoryCard
         title="Vermögen"
         balanceDisplay={currencyBalance !== undefined ? `${currencyBalance} ${currencyUnit}` : undefined}
         entries={(character.systemData.currencyHistory as any[]) || []}
       />
 
-      {/* Gruppe - ganz unten */}
       <PartyCard party={character.party} isEditing={isEditing} onUpdate={updateParty} />
     </div>
   );
@@ -1000,7 +985,6 @@ const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, is
 
   return (
     <div className="space-y-4">
-      {/* Steuerung - verschwindet beim Drucken */}
       <div className="no-print flex flex-wrap gap-2 p-3 bg-zinc-900 border border-zinc-800 rounded-xl">
         <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-orange-500 hover:bg-orange-400 text-black font-mono font-bold rounded-lg text-xs">
           <Printer size={14} /> Als PDF drucken / exportieren
@@ -1010,9 +994,7 @@ const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, is
         </button>
       </div>
 
-      {/* Druckbarer Bogen */}
       <div className="printable-sheet print-page bg-white text-black p-6 rounded-xl space-y-4 font-serif">
-        {/* Kopfzeile */}
         <div className="border-b-2 border-black pb-2 avoid-break">
           <h1 className="text-2xl font-bold">{character.name}</h1>
           <p className="text-sm">
@@ -1021,7 +1003,6 @@ const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, is
           </p>
         </div>
 
-        {/* Attribute */}
         <table className="w-full text-sm avoid-break">
           <thead>
             <tr>{ATTR_KEYS.map((k) => (<th key={k} className="border px-2 py-1 text-center">{k}</th>))}</tr>
@@ -1037,7 +1018,6 @@ const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, is
           </tbody>
         </table>
 
-        {/* Abgeleitete Werte */}
         <table className="w-full text-sm avoid-break">
           <thead>
             <tr>
@@ -1061,7 +1041,6 @@ const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, is
           </tbody>
         </table>
 
-        {/* Rettungswürfe mit Freitext-Sondernotizen */}
         <table className="w-full text-sm avoid-break">
           <thead>
             <tr>
@@ -1086,13 +1065,33 @@ const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, is
           </div>
         ) : (
           (fortNote || refNote || willNote) && (
-            <p className="text-xs italic">
-              {[fortNote, refNote, willNote].filter(Boolean).join(" · ")}
-            </p>
+            <p className="text-xs italic">{[fortNote, refNote, willNote].filter(Boolean).join(" · ")}</p>
           )
         )}
 
-        {/* Waffentabelle (Nahkampf/Fernkampf) */}
+        {/* NEU: Fertigkeiten-Tabelle */}
+        <div className="avoid-break">
+          <h2 className="font-bold border-b border-black">Fertigkeiten</h2>
+          {character.skills.length === 0 ? (
+            <p className="text-xs italic">Keine Fertigkeiten hinterlegt.</p>
+          ) : (
+            <table className="w-full text-sm mt-1">
+              <thead>
+                <tr><th className="border px-2 py-1 text-left">Fertigkeit</th><th className="border px-2 py-1">Wert</th><th className="border px-2 py-1">Geübt</th></tr>
+              </thead>
+              <tbody>
+                {character.skills.map((s, idx) => (
+                  <tr key={idx}>
+                    <td className="border px-2 py-1">{s.name}</td>
+                    <td className="border px-2 py-1 text-center">{s.value}</td>
+                    <td className="border px-2 py-1 text-center">{(s as any).trained ? "✓" : ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
         <div className="avoid-break">
           <h2 className="font-bold border-b border-black">Waffen</h2>
           {activeWeapons.length === 0 ? (
@@ -1118,7 +1117,6 @@ const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, is
           )}
         </div>
 
-        {/* Angriffstabelle wie im Original: Angriff / Hand / Wurf / Schaden */}
         {activeWeapons.length > 0 && (
           <div className="avoid-break">
             <h2 className="font-bold border-b border-black">Angriffsablauf</h2>
@@ -1132,9 +1130,7 @@ const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, is
                     <td className="border px-2 py-1">{idx + 1}.</td>
                     <td className="border px-2 py-1">{primaryWeapon?.name || "–"}</td>
                     <td className="border px-2 py-1">{formatModifier(b)}</td>
-                    <td className="border px-2 py-1">
-                      {singleResults[0]?.result.grips[0]?.damage || "–"}
-                    </td>
+                    <td className="border px-2 py-1">{singleResults[0]?.result.grips[0]?.damage || "–"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1142,7 +1138,6 @@ const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, is
           </div>
         )}
 
-        {/* Hinterhalt-Tabelle wie im Original, falls aktiv */}
         {sneakAttackActive && sneakDice > 0 && singleResults[0]?.result.grips[0]?.sneakAttack && (
           <div className="avoid-break">
             <h2 className="font-bold border-b border-black">Hinterhältiger Angriff</h2>
@@ -1160,32 +1155,24 @@ const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, is
           </div>
         )}
 
-        {/* Talente & Fähigkeiten */}
         <div className="force-page-break avoid-break">
           <h2 className="font-bold border-b border-black">Talente & Fähigkeiten</h2>
           <ul className="text-sm list-disc pl-5">
             {character.abilities.map((a, idx) => (
-              <li key={idx}>
-                <strong>{a.name}</strong>{a.usage ? ` (${a.usage})` : ""}{a.effect ? ` — ${a.effect}` : ""}
-              </li>
+              <li key={idx}><strong>{a.name}</strong>{a.usage ? ` (${a.usage})` : ""}{a.effect ? ` — ${a.effect}` : ""}</li>
             ))}
           </ul>
         </div>
 
-        {/* Inventar mit vollem Beschreibungstext */}
         <div className="avoid-break">
           <h2 className="font-bold border-b border-black">Besitz & Ausrüstung</h2>
           <ul className="text-sm list-disc pl-5">
             {character.inventory.map((item) => (
-              <li key={item.id}>
-                <strong>{item.name}</strong>{item.quantity !== undefined ? ` ×${item.quantity}` : ""}
-                {item.notes ? ` — ${item.notes}` : ""}
-              </li>
+              <li key={item.id}><strong>{item.name}</strong>{item.quantity !== undefined ? ` ×${item.quantity}` : ""}{item.notes ? ` — ${item.notes}` : ""}</li>
             ))}
           </ul>
         </div>
 
-        {/* Gruppe */}
         {character.party.length > 0 && (
           <div className="avoid-break">
             <h2 className="font-bold border-b border-black">Gruppe</h2>
@@ -1206,13 +1193,10 @@ const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, is
           </div>
         )}
 
-        {/* Finanzen */}
         {(character.systemData.currencyBalance !== undefined || (character.systemData.currencyHistory as any[])?.length > 0) && (
           <div className="avoid-break">
             <h2 className="font-bold border-b border-black">Finanzen</h2>
-            <p className="text-sm">
-              Guthaben: {character.systemData.currencyBalance as number} {(character.systemData.currencyUnit as string) || "GM"}
-            </p>
+            <p className="text-sm">Guthaben: {character.systemData.currencyBalance as number} {(character.systemData.currencyUnit as string) || "GM"}</p>
             <ul className="text-xs list-disc pl-5">
               {((character.systemData.currencyHistory as any[]) || []).slice(0, 10).map((h: any) => (
                 <li key={h.id}>{h.description}{h.detail ? ` (${h.detail})` : ""}</li>
@@ -1224,10 +1208,6 @@ const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, is
     </div>
   );
 };
-
-// ═══════════════════════════════════════════════════════════
-// PLUGIN-DEFINITION
-// ═══════════════════════════════════════════════════════════
 
 export const PathfinderPlugin: SystemPlugin = {
   id: "pathfinder",
@@ -1372,7 +1352,7 @@ export const PathfinderPlugin: SystemPlugin = {
         }))),
     ];
 
-    char.skills = (raw.skills || []).map((s: any) => ({ name: s.name, value: s.value, notes: s.note }));
+    char.skills = (raw.skills || []).map((s: any) => ({ name: s.name, value: s.value, notes: s.note, trained: s.trained, checked: s.checked }));
     char.abilities = raw.abilities || [];
     char.party = raw.party || [];
 
