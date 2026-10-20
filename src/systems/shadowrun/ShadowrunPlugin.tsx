@@ -31,12 +31,9 @@ import {
   calculateExtraProgramSlots,
   reassignDeckAttributeValue,
 } from "./shadowrunRules";
+import { ShadowrunSkillsBlock } from "./ShadowrunSkillsBlock";
 
 const METATYPES = ["Mensch", "Elf", "Zwerg", "Ork", "Troll"];
-const SKILL_CATEGORY_LABELS: Record<string, string> = {
-  active: "Aktionsfertigkeiten",
-  knowledge: "Wissens-/Sprachfertigkeiten",
-};
 
 const getAttrs = (character: GenericCharacter): ShadowrunAttributes => ({
   KON: Number(character.attributes.KON) || 1,
@@ -87,8 +84,6 @@ const getTabForItem = (item: InventoryItem): CategoryTabId => {
   return "gear";
 };
 
-/** Liest die erste Zahl aus einem Rüstungswert-String wie "9 (Panzerweste)" -> 9,
- * funktioniert auch für negative Werte wie "-6". */
 const parseArmorValue = (raw: unknown): number => {
   if (typeof raw === "number") return raw;
   const match = String(raw ?? "").match(/-?\d+/);
@@ -134,15 +129,18 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
   const nuyenHistory = (character.systemData.nuyenHistory as any[]) || [];
   const nuyenEntries = Object.entries(character.currency || {});
 
-  const updateAttr = (key: string, value: number) => onUpdate({ attributes: { ...character.attributes, [key]: value } });
-  const updateSystemData = (key: string, value: unknown) => onUpdate({ systemData: { ...character.systemData, [key]: value } });
+  const updateAttr = (key: string, value: number) =>
+    onUpdate({ attributes: { ...character.attributes, [key]: value } });
+  const updateSystemData = (key: string, value: unknown) =>
+    onUpdate({ systemData: { ...character.systemData, [key]: value } });
   const updateResource = (key: "physical" | "stun", field: "current" | "max", value: number) =>
     onUpdate({ resources: { ...character.resources, [key]: { ...character.resources[key], [field]: value } } });
 
   const updateInventoryItem = (id: string, patch: Partial<InventoryItem>) => {
     onUpdate({ inventory: character.inventory.map((it) => (it.id === id ? { ...it, ...patch } : it)) });
   };
-  const removeInventoryItem = (id: string) => onUpdate({ inventory: character.inventory.filter((it) => it.id !== id) });
+  const removeInventoryItem = (id: string) =>
+    onUpdate({ inventory: character.inventory.filter((it) => it.id !== id) });
   const addInventoryItem = (category: CategoryTabId) => {
     const base: InventoryItem = {
       id: makeId(),
@@ -199,49 +197,14 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
     setRestMessage(`Erste Hilfe: Körperlich -${healPhysicalAmount}`);
   };
 
-  const updateSkillCategory = (index: number, category: string) => {
-    onUpdate({ skills: character.skills.map((s, i) => (i === index ? { ...s, category: category || undefined } : s)) });
-  };
-
   const updateParty = (party: typeof character.party) => onUpdate({ party });
 
-  const filteredInventory = character.inventory.filter((item) => activeTab === "all" || getTabForItem(item) === activeTab);
+  const filteredInventory = character.inventory.filter(
+    (item) => activeTab === "all" || getTabForItem(item) === activeTab
+  );
 
   const getWeaponSkillValue = (skillName: string) =>
     character.skills.find((s) => s.name.toLowerCase() === skillName.toLowerCase())?.value ?? 0;
-
-  const skillGroups = {
-    active: character.skills.map((s, i) => ({ s, i })).filter(({ s }) => s.category === "active"),
-    knowledge: character.skills.map((s, i) => ({ s, i })).filter(({ s }) => s.category === "knowledge"),
-    none: character.skills.map((s, i) => ({ s, i })).filter(({ s }) => !s.category),
-  };
-
-  const renderSkillGroup = (label: string, entries: { s: any; i: number }[]) => (
-    <div className="space-y-1.5">
-      <div className="text-[10px] uppercase text-zinc-500 font-mono">{label} ({entries.length})</div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-        {entries.map(({ s, i }) => (
-          <div key={i} className="flex items-center justify-between gap-2 text-xs font-mono bg-black/40 px-2 py-1 rounded">
-            <span className="text-zinc-300 truncate">{s.name}</span>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-white font-bold">{s.value}</span>
-              {isEditing && (
-                <select
-                  value={s.category || ""}
-                  onChange={(e) => updateSkillCategory(i, e.target.value)}
-                  className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-zinc-400 px-1 py-0.5"
-                >
-                  <option value="">–</option>
-                  <option value="active">Aktion</option>
-                  <option value="knowledge">Wissen</option>
-                </select>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -358,18 +321,16 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
               <ValueBadge label="Matrix-Schaden" value={`${cyberdeck.matrixCondition.damage}/${cyberdeck.matrixCondition.max}`} color="text-purple-300" />
             )}
           </div>
-          <p className="text-[10px] text-zinc-500 font-mono italic">Programme & Attribut-Umverteilung siehe Reiter "Matrix"</p>
+          <p className="text-[10px] text-zinc-500 font-mono italic">Programme & Attribut-Umverteilung siehe Reiter „Matrix"</p>
         </div>
       )}
 
-      {/* Fertigkeiten */}
-      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
-        <div className="text-xs font-mono font-bold text-zinc-300">Fertigkeiten</div>
-        {character.skills.length === 0 && <p className="text-xs text-zinc-600 font-mono">Keine Fertigkeiten hinterlegt.</p>}
-        {skillGroups.active.length > 0 && renderSkillGroup(SKILL_CATEGORY_LABELS.active, skillGroups.active)}
-        {skillGroups.knowledge.length > 0 && renderSkillGroup(SKILL_CATEGORY_LABELS.knowledge, skillGroups.knowledge)}
-        {skillGroups.none.length > 0 && renderSkillGroup("Ohne Zuordnung", skillGroups.none)}
-      </div>
+      {/* ── FERTIGKEITEN (neue Komponente mit Toggle) ── */}
+      <ShadowrunSkillsBlock
+        character={character}
+        isEditing={isEditing}
+        onUpdate={onUpdate}
+      />
 
       {/* Waffen */}
       <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
@@ -388,7 +349,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
             </div>
           );
         })}
-        <p className="text-[10px] text-zinc-500 font-mono italic">Vollständige Herleitung siehe Reiter "Kampf"</p>
+        <p className="text-[10px] text-zinc-500 font-mono italic">Vollständige Herleitung siehe Reiter „Kampf"</p>
       </div>
 
       {/* Rüstung */}
@@ -572,7 +533,6 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
                           <input type="checkbox" checked={item.location === "equipped"} onChange={(e) => updateInventoryItem(item.id, { location: e.target.checked ? "equipped" : "stored" })} />
                           Am Körper getragen
                         </label>
-
                         {item.category === "weapon" && (
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             <div><label className="block text-[9px] text-zinc-500">Verknüpfte Fertigkeit</label>
@@ -599,21 +559,18 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
                             </div>
                           </div>
                         )}
-
                         {item.category === "armor" && (
                           <div><label className="block text-[9px] text-zinc-500">Panzerungswert</label>
                             <input type="number" value={item.armorData?.armorBonus ?? 0} onChange={(e) => updateInventoryItem(item.id, { armorData: { armorBonus: Number(e.target.value) } })}
                               className="w-24 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
                           </div>
                         )}
-
                         {(item.category === "cyberware" || item.category === "bioware") && (
                           <div><label className="block text-[9px] text-zinc-500">Essenzkosten</label>
                             <input type="number" step="0.1" value={item.essenceCost ?? 0} onChange={(e) => updateInventoryItem(item.id, { essenceCost: Number(e.target.value) })}
                               className="w-24 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
                           </div>
                         )}
-
                         <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
                           <input type="checkbox" checked={!!item.charges} onChange={(e) => updateInventoryItem(item.id, { charges: e.target.checked ? { max: 1, current: 1, rechargeType: "manual" } : undefined })} />
                           Hat Ladungen (Munition/Dosen)
@@ -625,7 +582,6 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
                               className="w-14 bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-white text-center" />
                           </div>
                         )}
-
                         <div>
                           <label className="block text-[9px] text-zinc-500">Kategorie</label>
                           <select value={item.category || "gear"} onChange={(e) => updateInventoryItem(item.id, { category: e.target.value })}
@@ -639,14 +595,12 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
                             <option value="gear">Sonstiges</option>
                           </select>
                         </div>
-
                         <div>
                           <span className="text-[10px] uppercase text-zinc-500 font-mono">Regelwerk-Referenz</span>
                           <div className="mt-1">
                             <SourceReferenceEditor value={item.sourceReference} onChange={(v) => updateInventoryItem(item.id, { sourceReference: v })} />
                           </div>
                         </div>
-
                         <div>
                           <label className="block text-[10px] text-zinc-400 font-mono mb-1">Beschreibung / Effekt bearbeiten</label>
                           <textarea value={item.notes || ""} onChange={(e) => updateInventoryItem(item.id, { notes: e.target.value || undefined })}
@@ -682,7 +636,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         </div>
       )}
 
-      {/* Gruppe - ganz unten */}
+      {/* Gruppe */}
       <PartyCard party={character.party} isEditing={isEditing} onUpdate={updateParty} />
     </div>
   );
@@ -977,10 +931,13 @@ export const ShadowrunPlugin: SystemPlugin = {
       char.systemData.cyberdeck = raw.cyberdeck;
     }
 
-    char.skills = (raw.skills || []).map((s: any) => ({ name: s.name, value: s.value, notes: s.note, category: s.category }));
+    char.skills = (raw.skills || []).map((s: any) => ({
+      name: s.name,
+      value: s.value,
+      notes: s.note,
+      category: s.category,
+    }));
     char.abilities = raw.abilities || [];
-
-    // Party-Mitglieder übernehmen
     char.party = raw.party || [];
 
     return char;
