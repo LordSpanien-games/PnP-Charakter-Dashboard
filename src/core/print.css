@@ -1,0 +1,54 @@
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-sheet,
+  .printable-sheet * {
+    visibility: visible;
+  }
+  .printable-sheet {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none !important;
+  }
+  @page {
+    margin: 12mm;
+  }
+  .print-page {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  .avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .force-page-break {
+    break-before: page;
+    page-break-before: always;
+  }
+  .print-page input,
+  .print-page textarea,
+  .print-page select {
+    border-bottom: 1px solid #71717a !important;
+    border-top: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    background: transparent !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+  }
+  .print-page table,
+  .print-page th,
+  .print-page td {
+    border: 1px solid #000 !important;
+    color: #000 !important;
+  }
+}
