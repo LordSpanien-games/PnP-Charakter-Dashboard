@@ -1,4 +1,4 @@
-import React, { FC, useMemo, ChangeEvent } from "react";
+import React, { FC, useState, useMemo } from "react";
 import { CharacterData } from "../../types";
 import { PathfinderAttributesCard } from "../../components/PathfinderAttributesCard";
 import { PathfinderSavingThrowsCard } from "../../components/PathfinderSavingThrowsCard";
@@ -8,12 +8,11 @@ import {
   calculatePathfinderModifier,
   formatPathfinderModifier,
   getAttributeScore,
-  PATHFINDER_CORE_ATTRIBUTES
 } from "../../utils/pathfinder";
 
 interface StandardPFSkillDef {
   name: string;
-  attr: 'ST' | 'GE' | 'KO' | 'IN' | 'WE' | 'CH';
+  attr: "ST" | "GE" | "KO" | "IN" | "WE" | "CH";
   armorPenalty?: boolean;
   trainedOnly?: boolean;
 }
@@ -70,35 +69,33 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
   onUpdateData,
   onOpenDiceCalc,
   onSwitchToCombatTab,
-  isEditing
+  isEditing,
 }) => {
   const handleUpdateChar = onUpdateCharacter || ((c: CharacterData) => onUpdateData(c));
+  const [showAllSkills, setShowAllSkills] = useState(false);
 
-  // Attribute-Modifikatoren für Skill-Berechnung
   const attributeMap = useMemo(() => {
-    const keys = ['ST', 'GE', 'KO', 'IN', 'WE', 'CH'] as const;
+    const keys = ["ST", "GE", "KO", "IN", "WE", "CH"] as const;
     const map: Record<string, { score: number; mod: number }> = {};
-    for (const key of keys) {
-      const score = getAttributeScore(character, key);
-      map[key] = { score, mod: calculatePathfinderModifier(score) };
-    }
+    keys.forEach((k) => {
+      const score = getAttributeScore(character, k);
+      map[k] = { score, mod: calculatePathfinderModifier(score) };
+    });
     return map;
   }, [character]);
 
-  // Alle 33 offiziellen Fertigkeiten mit Charakter-Daten zusammenführen
   const mergedSkills = useMemo(() => {
     const userSkills = character.skills || [];
-    return OFFICIAL_PATHFINDER_SKILLS.map(def => {
-      const existing = userSkills.find(s => {
-        const sName = (s?.name || (s as any)?.label || "").toLowerCase();
+    return OFFICIAL_PATHFINDER_SKILLS.map((def) => {
+      const existing = userSkills.find((s) => {
+        const sName = (s?.name || "").toLowerCase();
         const defName = def.name.toLowerCase();
         return sName === defName || (sName.length >= 5 && sName.startsWith(defName.slice(0, 5)));
       });
       const attrMod = attributeMap[def.attr]?.mod || 0;
-      const rawVal = existing ? existing.value : 0;
-      const ranks = typeof rawVal === 'number' ? rawVal : (parseInt(String(rawVal).replace(/[^0-9-]/g, ''), 10) || 0);
+      const ranks = existing ? (typeof existing.value === "number" ? existing.value : parseInt(String(existing.value).replace(/[^0-9-]/g, ""), 10) || 0) : 0;
       const isClassSkill = existing?.trained ?? false;
-      const classBonus = (isClassSkill && ranks > 0) ? 3 : 0;
+      const classBonus = isClassSkill && ranks > 0 ? 3 : 0;
       const totalBonus = attrMod + ranks + classBonus;
       return { ...def, ranks, isClassSkill, classBonus, attrMod, totalBonus };
     });
@@ -106,7 +103,7 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
 
   const handleUpdateSkillRanks = (skillName: string, newRanks: number) => {
     const currentSkills = [...(character.skills || [])];
-    const idx = currentSkills.findIndex(s => (s?.name || '').toLowerCase() === skillName.toLowerCase());
+    const idx = currentSkills.findIndex((s) => (s?.name || "").toLowerCase() === skillName.toLowerCase());
     if (idx >= 0) {
       currentSkills[idx] = { ...currentSkills[idx], value: newRanks };
     } else {
@@ -117,7 +114,7 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
 
   const handleToggleClassSkill = (skillName: string) => {
     const currentSkills = [...(character.skills || [])];
-    const idx = currentSkills.findIndex(s => (s?.name || '').toLowerCase() === skillName.toLowerCase());
+    const idx = currentSkills.findIndex((s) => (s?.name || "").toLowerCase() === skillName.toLowerCase());
     if (idx >= 0) {
       currentSkills[idx] = { ...currentSkills[idx], trained: !currentSkills[idx].trained };
     } else {
@@ -126,11 +123,11 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
     onUpdateData({ skills: currentSkills });
   };
 
-  const totalRanks = useMemo(() => mergedSkills.reduce((acc, s) => acc + s.ranks, 0), [mergedSkills]);
+  const visibleSkills = showAllSkills ? mergedSkills : mergedSkills.filter((s) => s.ranks > 0);
+  const learnedCount = mergedSkills.filter((s) => s.ranks > 0).length;
 
   return (
     <div className="space-y-6">
-      {/* Attribute, Rettungswürfe, Kampfwerte */}
       <PathfinderAttributesCard
         character={character}
         onUpdateCharacteristics={(newChars) => {
@@ -146,7 +143,7 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
         onUpdateSavingThrows={(newSaves, updatedStats) => {
           onUpdateData({
             savingThrows: newSaves,
-            ...(updatedStats ? { stats: updatedStats } : {})
+            ...(updatedStats ? { stats: updatedStats } : {}),
           });
         }}
         onOpenDiceCalc={(saveType, mod) => onOpenDiceCalc(saveType, mod)}
@@ -161,119 +158,128 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
         isEditing={isEditing}
       />
 
-      {/* FERTIGKEITEN-TABELLE */}
-      <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6">
-        <div className="flex items-center justify-between mb-4">
+      {/* ── FERTIGKEITEN DASHBOARD-BLOCK ── */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
+        {/* Header + Toggle */}
+        <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-white uppercase tracking-tight">
-              Fertigkeiten (Skills)
-            </h2>
-            <p className="text-xs text-zinc-500 mt-0.5">
-              {totalRanks} Ränge vergeben • KF = Klassenfertigkeit (+3 bei ≥1 Rang)
+            <h3 className="text-sm font-bold text-white uppercase tracking-wide">Fertigkeiten</h3>
+            <p className="text-[10px] text-zinc-500 font-mono mt-0.5">
+              {learnedCount} von {mergedSkills.length} belegt
             </p>
           </div>
-          <span className="font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-xl text-xs">
-            {mergedSkills.filter(s => s.ranks > 0).length} / {mergedSkills.length} aktiv
-          </span>
+          <button
+            type="button"
+            onClick={() => setShowAllSkills((v) => !v)}
+            className={`text-[11px] font-semibold px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
+              showAllSkills
+                ? "bg-orange-500/20 border-orange-500/50 text-orange-300 hover:bg-orange-500/30"
+                : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700"
+            }`}
+          >
+            {showAllSkills ? "Nur belegte anzeigen" : "Alle anzeigen"}
+          </button>
         </div>
 
-        {/* Tabellen-Header */}
-        <div className="grid grid-cols-12 gap-1 text-[9px] uppercase font-bold text-zinc-500 border-b border-zinc-700 pb-1.5 px-1 mb-1">
-          <div className="col-span-1 text-center" title="Klassenfertigkeit">KF</div>
-          <div className="col-span-5">Fertigkeit</div>
-          <div className="col-span-1 text-center">Attr</div>
-          <div className="col-span-1 text-center text-amber-400">Ges</div>
-          <div className="col-span-1 text-center">Attr-M</div>
-          <div className="col-span-1 text-center">Rang</div>
-          <div className="col-span-1 text-center">KF+3</div>
-          <div className="col-span-1 text-center">Sonst</div>
-        </div>
-
-        {/* Skill-Zeilen – alle 33 immer sichtbar */}
-        <div className="space-y-0.5 text-[11px]">
-          {mergedSkills.map(skill => (
-            <div
-              key={skill.name}
-              className={`grid grid-cols-12 gap-1 items-center px-1 py-1 rounded-lg transition-colors ${
-                skill.ranks > 0
-                  ? 'bg-amber-500/10 border border-amber-500/20'
-                  : 'hover:bg-zinc-800/40'
-              }`}
-            >
-              {/* Klassenfertigkeit-Checkbox */}
-              <div className="col-span-1 text-center">
-                <input
-                  type="checkbox"
-                  checked={skill.isClassSkill}
-                  disabled={!isEditing}
-                  onChange={() => handleToggleClassSkill(skill.name)}
-                  className="cursor-pointer h-3 w-3 accent-amber-500"
-                  title="Als Klassenfertigkeit markieren"
-                />
-              </div>
-
-              {/* Fertigkeitsname */}
-              <div className="col-span-5 flex items-center gap-1 text-zinc-200 truncate">
-                <span className="truncate">{skill.name}</span>
-                {skill.armorPenalty && (
-                  <span className="text-[8px] text-zinc-500 font-mono shrink-0" title="Rüstungsmalus">*</span>
-                )}
-                {skill.trainedOnly && (
-                  <span className="text-[8px] text-amber-500 font-mono shrink-0" title="Nur geübt">†</span>
-                )}
-              </div>
-
-              {/* Attribut-Kürzel */}
-              <div className="col-span-1 text-center font-mono text-[10px] text-zinc-500">
-                {skill.attr}
-              </div>
-
-              {/* Gesamtbonus */}
-              <div className="col-span-1 text-center font-mono font-black text-amber-400 text-[11px]">
-                {formatPathfinderModifier(skill.totalBonus)}
-              </div>
-
-              {/* Attribut-Modifikator */}
-              <div className="col-span-1 text-center font-mono text-zinc-500 text-[10px]">
-                {formatPathfinderModifier(skill.attrMod)}
-              </div>
-
-              {/* Ränge (editierbar) */}
-              <div className="col-span-1 text-center">
-                {isEditing ? (
-                  <input
-                    type="number"
-                    min={0}
-                    max={20}
-                    value={skill.ranks}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                      const val = parseInt(e.target.value, 10) || 0;
-                      handleUpdateSkillRanks(skill.name, val);
-                    }}
-                    className="w-full text-center bg-zinc-800 border border-zinc-600 rounded font-mono font-bold text-[10px] text-white outline-none focus:border-amber-500"
-                  />
-                ) : (
-                  <span className="font-mono text-[10px] text-zinc-300">{skill.ranks}</span>
-                )}
-              </div>
-
-              {/* Klassenfertigkeitsbonus */}
-              <div className="col-span-1 text-center font-mono text-zinc-500 text-[10px]">
-                {skill.classBonus > 0 ? "+3" : "0"}
-              </div>
-
-              {/* Sonstiger Bonus */}
-              <div className="col-span-1 text-center font-mono text-zinc-500 text-[10px]">
-                {skill.name === "Heimlichkeit" ? "+4" : "0"}
-              </div>
+        {/* Skills-Tabelle */}
+        {visibleSkills.length === 0 ? (
+          <p className="text-xs text-zinc-600 font-mono italic">
+            Noch keine Fertigkeitsränge vergeben. Klicke auf „Alle anzeigen".
+          </p>
+        ) : (
+          <>
+            {/* Tabellen-Header */}
+            <div className="grid grid-cols-12 gap-1 text-[9px] uppercase font-bold text-zinc-500 border-b border-zinc-800 pb-1 px-1">
+              <div className="col-span-1 text-center" title="Klassenfertigkeit">KF</div>
+              <div className="col-span-5">Fertigkeit</div>
+              <div className="col-span-1 text-center">Attr</div>
+              <div className="col-span-1 text-center font-bold text-zinc-300">Ges</div>
+              <div className="col-span-1 text-center">AttrMod</div>
+              <div className="col-span-1 text-center">Ränge</div>
+              <div className="col-span-2 text-center text-[8px]">Flags</div>
             </div>
-          ))}
-        </div>
 
-        <div className="mt-3 pt-3 border-t border-zinc-800 text-[9px] text-zinc-600 flex justify-between">
-          <span>* = Rüstungsmalus gilt</span>
-          <span>† = Nur von geübten Charakteren einsetzbar</span>
-        </div>
+            <div className="space-y-0.5 max-h-[520px] overflow-y-auto pr-1">
+              {visibleSkills.map((skill) => (
+                <div
+                  key={skill.name}
+                  className={`grid grid-cols-12 gap-1 items-center px-1 py-1 rounded text-xs transition-colors ${
+                    skill.ranks > 0
+                      ? "bg-amber-500/10 border border-amber-500/20"
+                      : "hover:bg-zinc-800/60"
+                  }`}
+                >
+                  {/* KF Checkbox */}
+                  <div className="col-span-1 flex justify-center">
+                    <input
+                      type="checkbox"
+                      checked={skill.isClassSkill}
+                      disabled={!isEditing}
+                      onChange={() => handleToggleClassSkill(skill.name)}
+                      className="cursor-pointer h-3 w-3 accent-amber-500"
+                      title="Als Klassenfertigkeit markieren"
+                    />
+                  </div>
+
+                  {/* Name */}
+                  <div className="col-span-5 truncate text-zinc-200 font-mono text-[11px] flex items-center gap-1">
+                    <span className="truncate">{skill.name}</span>
+                    {skill.armorPenalty && (
+                      <span className="text-[8px] text-zinc-500" title="Rüstungsmalus">✦</span>
+                    )}
+                    {skill.trainedOnly && (
+                      <span className="text-[8px] text-amber-500" title="Nur geübt">†</span>
+                    )}
+                  </div>
+
+                  {/* Attribut-Kürzel */}
+                  <div className="col-span-1 text-center text-[9px] text-zinc-500 font-mono">
+                    {skill.attr}
+                  </div>
+
+                  {/* Gesamtbonus */}
+                  <div className="col-span-1 text-center font-black text-amber-400 font-mono text-[11px]">
+                    {formatPathfinderModifier(skill.totalBonus)}
+                  </div>
+
+                  {/* AttrMod */}
+                  <div className="col-span-1 text-center text-[9px] text-zinc-500 font-mono">
+                    {formatPathfinderModifier(skill.attrMod)}
+                  </div>
+
+                  {/* Ränge (editierbar) */}
+                  <div className="col-span-1 text-center">
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        min={0}
+                        max={20}
+                        value={skill.ranks}
+                        onChange={(e) =>
+                          handleUpdateSkillRanks(skill.name, parseInt(e.target.value, 10) || 0)
+                        }
+                        className="w-full text-center bg-zinc-950 border border-zinc-700 rounded font-mono font-bold text-[10px] text-white outline-none focus:border-amber-500 py-0.5"
+                      />
+                    ) : (
+                      <span className="font-mono text-zinc-300 text-[10px]">{skill.ranks}</span>
+                    )}
+                  </div>
+
+                  {/* Flags */}
+                  <div className="col-span-2 flex justify-center gap-1 text-[8px]">
+                    {skill.isClassSkill && skill.ranks > 0 && (
+                      <span className="px-1 py-0.5 bg-amber-500/20 text-amber-400 rounded font-mono">KF+3</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-[9px] text-zinc-600 font-mono">
+              ✦ = Rüstungsmalus &nbsp;|&nbsp; † = Nur geübt &nbsp;|&nbsp; KF+3 = Klassenfertigkeitsbonus
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
