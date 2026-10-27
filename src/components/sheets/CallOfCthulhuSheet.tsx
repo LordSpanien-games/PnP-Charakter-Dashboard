@@ -478,74 +478,14 @@ export const CallOfCthulhuSheet: FC<SheetProps> = ({
             </div>
           </div>
 
-          {/* FERTIGKEITENLISTE (CALL OF CTHULHU 7E FULL ROSTER) */}
-          <div className="border-2 border-[#2d3a27] rounded-lg p-3 bg-[#edf2e8]/60 shadow-xs mb-4">
-            <div className="flex items-center justify-between border-b-2 border-[#2d3a27] pb-1.5 mb-2">
-              <h2 className="text-xs font-black uppercase tracking-wider font-display text-[#1b2716]">
-                Investigator-Fertigkeiten (Skills)
-              </h2>
-              <div className="flex items-center gap-3 text-[9px] font-sans text-stone-600">
-                <span>[X] = Erfolgreich angewandt (Steigerung in Entwicklungsphase)</span>
-                <span className="font-mono text-stone-800 bg-white px-2 py-0.5 rounded border border-stone-300">
-                  Werte: Normal / Schwer (1/2) / Extrem (1/5)
-                </span>
-              </div>
-            </div>
-
-            {/* 3-COLUMN RESPONSIVE SKILL GRID */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1 max-h-[580px] overflow-y-auto pr-1 text-[10px]">
-              {skillsMerged.map(skill => (
-                <div 
-                  key={skill.name} 
-                  className={`flex items-center justify-between p-1 rounded border border-stone-200 transition-colors ${
-                    skill.val > skill.base ? 'bg-amber-50/70 font-medium' : 'bg-white'
-                  }`}
-                >
-                  {/* Steigerungs-Checkbox & Name */}
-                  <div className="flex items-center gap-1.5 truncate max-w-[150px]">
-                    <input
-                      type="checkbox"
-                      checked={skill.checked}
-                      disabled={!isEditable}
-                      onChange={() => handleToggleSkillCheck(skill.name)}
-                      className="cursor-pointer h-3 w-3 accent-[#2d3a27]"
-                      title="Erfolgreich eingesetzt für Steigerungswurf"
-                    />
-                    <span className="truncate text-stone-900" title={skill.name}>{skill.name}</span>
-                    <span className="text-[8px] text-stone-400 font-mono">({skill.base}%)</span>
-                  </div>
-
-                  {/* Triple Values: Regular (editable) / Half / Fifth */}
-                  <div className="flex items-center gap-1">
-                    {isEditable ? (
-                      <input
-                        type="number"
-                        min={0}
-                        max={99}
-                        value={skill.val}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                          const v = parseInt(e.target.value, 10);
-                          if (!isNaN(v)) handleUpdateSkill(skill.name, v);
-                        }}
-                        className="w-9 h-5 text-center font-bold font-mono text-[10px] bg-stone-50 border border-stone-300 rounded outline-none focus:border-[#2d3a27]"
-                      />
-                    ) : (
-                      <span className="w-8 inline-block text-center font-bold font-mono text-[10px] text-stone-900">{skill.val}</span>
-                    )}
-
-                    <span className="text-stone-400 font-mono text-[8px]">/</span>
-                    <span className="w-6 h-5 bg-stone-100 border border-stone-200 rounded flex items-center justify-center font-mono text-[9px] text-stone-700">
-                      {skill.half}
-                    </span>
-                    <span className="text-stone-400 font-mono text-[8px]">/</span>
-                    <span className="w-6 h-5 bg-[#dbe6d5] border border-[#a1b897] rounded flex items-center justify-center font-mono font-bold text-[9px] text-[#1c2a17]">
-                      {skill.fifth}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+         {/* FERTIGKEITENLISTE */}
+<CoCSkillsBlock
+  mergedSkills={skillsMerged}
+  isEditable={isEditable}
+  onUpdateSkill={handleUpdateSkill}
+  onToggleCheck={handleToggleSkillCheck}
+  printMode={false}
+/>
 
           {/* WAFFEN & KAMPF-ARSENAL */}
           <div className="border-2 border-[#2d3a27] rounded-lg p-3 bg-[#edf2e8]/60 shadow-xs">
