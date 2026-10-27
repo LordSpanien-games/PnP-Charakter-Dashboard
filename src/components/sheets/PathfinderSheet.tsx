@@ -33,6 +33,7 @@ import {
 import { PATHFINDER_ROGUE_TALENTS } from "../../data/pathfinderRogueTalents";
 import { extractDailyUsesFromText } from "../../utils/inventorySync";
 import { SheetProps } from "./types";
+import { PathfinderSkillsBlock } from "./PathfinderSkillsBlock";
 
 interface StandardPFSkillDef {
   name: string;
