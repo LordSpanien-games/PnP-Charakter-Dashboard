@@ -295,6 +295,7 @@ export const PathfinderSheet: FC<SheetProps> = ({
         classBonus,
         attrMod,
         totalBonus,
+        miscBonus: existing?.miscBonus ?? 0,
         note: existing?.note || ""
       };
     });
