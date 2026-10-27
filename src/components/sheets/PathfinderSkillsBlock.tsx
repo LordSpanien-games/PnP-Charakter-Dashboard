@@ -1,52 +1,8 @@
 import React, { FC, useState, ChangeEvent } from "react";
-import { Skill } from "../../types";
+import { PATHFINDER_SKILLS, PFSkillDef } from "../../data/skills/pathfinderSkills";
 import { formatPathfinderModifier } from "../../utils/pathfinder";
 
-interface StandardPFSkillDef {
-  name: string;
-  attr: "ST" | "GE" | "KO" | "IN" | "WE" | "CH";
-  armorPenalty?: boolean;
-  trainedOnly?: boolean;
-}
-
-export const OFFICIAL_PATHFINDER_SKILLS: StandardPFSkillDef[] = [
-  { name: "Akrobatik", attr: "GE", armorPenalty: true },
-  { name: "Auftreten (Gesang/Tanz)", attr: "CH" },
-  { name: "Beruf (Seemann/Kaufmann)", attr: "WE", trainedOnly: true },
-  { name: "Bluffen", attr: "CH" },
-  { name: "Diplomatie", attr: "CH" },
-  { name: "Einschüchtern", attr: "CH" },
-  { name: "Entfesslungskunst", attr: "GE", armorPenalty: true },
-  { name: "Fälschen", attr: "IN" },
-  { name: "Fingerfertigkeit", attr: "GE", armorPenalty: true, trainedOnly: true },
-  { name: "Fliegen", attr: "GE", armorPenalty: true },
-  { name: "Handwerk (Alchemie/Waffen)", attr: "IN" },
-  { name: "Heilkunde", attr: "WE" },
-  { name: "Heimlichkeit", attr: "GE", armorPenalty: true },
-  { name: "Klettern", attr: "ST", armorPenalty: true },
-  { name: "Magischen Gegenstand benutzen", attr: "CH", trainedOnly: true },
-  { name: "Mechanismus ausschalten", attr: "GE", armorPenalty: true, trainedOnly: true },
-  { name: "Mit Tieren umgehen", attr: "CH", trainedOnly: true },
-  { name: "Motiv erkennen", attr: "WE" },
-  { name: "Reiten", attr: "GE", armorPenalty: true },
-  { name: "Schätzen", attr: "IN" },
-  { name: "Schwimmen", attr: "ST", armorPenalty: true },
-  { name: "Sprachenkunde", attr: "IN", trainedOnly: true },
-  { name: "Überleben", attr: "WE" },
-  { name: "Verkleiden", attr: "CH" },
-  { name: "Wahrnehmung", attr: "WE" },
-  { name: "Wissen (Arkanes)", attr: "IN", trainedOnly: true },
-  { name: "Wissen (Dungeonkunde)", attr: "IN", trainedOnly: true },
-  { name: "Wissen (Geschichte)", attr: "IN", trainedOnly: true },
-  { name: "Wissen (Geografie)", attr: "IN", trainedOnly: true },
-  { name: "Wissen (Lokales)", attr: "IN", trainedOnly: true },
-  { name: "Wissen (Natur)", attr: "IN", trainedOnly: true },
-  { name: "Wissen (Religion)", attr: "IN", trainedOnly: true },
-  { name: "Wissen (Die Ebenen)", attr: "IN", trainedOnly: true },
-  { name: "Zauberkunde", attr: "IN", trainedOnly: true },
-];
-
-interface MergedSkill extends StandardPFSkillDef {
+interface MergedSkill extends PFSkillDef {
   ranks: number;
   isClassSkill: boolean;
   classBonus: number;
@@ -60,7 +16,6 @@ interface Props {
   isEditable: boolean;
   onUpdateSkillRanks: (name: string, ranks: number) => void;
   onToggleClassSkill: (name: string) => void;
-  /** Print-Modus: kein Toggle-Button, immer komplette Liste */
   printMode?: boolean;
 }
 
@@ -83,18 +38,17 @@ export const PathfinderSkillsBlock: FC<Props> = ({
   return (
     <div className="border-2 border-stone-800 rounded-lg p-3 bg-stone-100/50 shadow-xs">
       {/* Header */}
-      <div className="flex items-center justify-between border-b-2 border-stone-800 pb-1.5 mb-2">
+      <div className="flex items-center justify-between border-b-2 border-stone-800 pb-1.5 mb-2 flex-wrap gap-2">
         <h2 className="text-xs font-black uppercase tracking-wider font-display text-stone-900">
           Fertigkeiten (Skills)
         </h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-3 text-[9px] font-sans text-stone-600">
             <span>KF = Klassenfertigkeit (+3 bei ≥1 Rang)</span>
             <span className="font-mono font-bold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">
               Ränge: {totalRanks} | Belegt: {learnedCount}/{mergedSkills.length}
             </span>
           </div>
-          {/* Toggle nur außerhalb Print */}
           {!printMode && (
             <button
               type="button"
@@ -146,7 +100,7 @@ export const PathfinderSkillsBlock: FC<Props> = ({
 
             {/* Name */}
             <div className="col-span-5 truncate flex items-center gap-1 text-stone-800">
-              <span className={`truncate ${skill.ranks === 0 && !showAll ? "text-stone-400" : ""}`}>
+              <span className={`truncate ${skill.ranks === 0 ? "text-stone-400" : ""}`}>
                 {skill.name}
               </span>
               {skill.armorPenalty && (
@@ -186,7 +140,7 @@ export const PathfinderSkillsBlock: FC<Props> = ({
                   className="w-full text-center bg-white border border-stone-300 rounded font-mono font-bold text-[10px] outline-none focus:border-amber-600"
                 />
               ) : (
-                <span className={`font-mono text-[9px] ${skill.ranks === 0 ? "text-stone-300" : "text-stone-800"}`}>
+                <span className={`font-mono text-[9px] ${skill.ranks === 0 ? "text-stone-300" : ""}`}>
                   {skill.ranks === 0 ? "—" : skill.ranks}
                 </span>
               )}
