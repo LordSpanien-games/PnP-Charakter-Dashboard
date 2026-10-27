@@ -35,9 +35,6 @@ import { extractDailyUsesFromText } from "../../utils/inventorySync";
 import { SheetProps } from "./types";
 import { PATHFINDER_SKILLS } from "../../data/skills/pathfinderSkills";
 import { PathfinderSkillsBlock } from "./PathfinderSkillsBlock";
-
-import { PATHFINDER_SKILLS, PFSkillDef } from "../../data/skills/pathfinderSkills";
-
 export const PathfinderSheet: FC<SheetProps> = ({
   data,
   onUpdateData,
