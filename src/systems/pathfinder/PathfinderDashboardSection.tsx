@@ -52,10 +52,9 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
       });
       const attrMod = attributeMap[def.attr]?.mod || 0;
       const rawVal = existing ? existing.value : 0;
-      const ranks =
-        typeof rawVal === "number"
-          ? rawVal
-          : parseInt(String(rawVal).replace(/[^0-9-]/g, ""), 10) || 0;
+      const ranks = typeof rawVal === "number"
+        ? rawVal
+        : parseInt(String(rawVal).replace(/[^0-9-]/g, ""), 10) || 0;
       const isClassSkill = existing?.trained ?? false;
       const classBonus = isClassSkill && ranks > 0 ? 3 : 0;
       const totalBonus = attrMod + ranks + classBonus + (existing?.miscBonus ?? 0);
