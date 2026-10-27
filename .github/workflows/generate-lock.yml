@@ -1,22 +1,32 @@
 name: Generate Lock File
-
 on:
   push:
     branches: [main]
     paths:
       - 'package.json'
-
 jobs:
   generate:
     runs-on: ubuntu-latest
-    if: '!contains(github.event.head_commit.message, "skip-lock")'
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm install
+      - name: Check skip condition
+        id: check
+        run: |
+          if echo "${{ github.event.head_commit.message }}" | grep -q "skip-lock"; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Install and commit
+        if: steps.check.outputs.skip != 'true'
+        run: npm install
       - uses: EndBug/add-and-commit@v9
+        if: steps.check.outputs.skip != 'true'
         with:
           message: 'chore: update package-lock.json'
           add: 'package-lock.json'
