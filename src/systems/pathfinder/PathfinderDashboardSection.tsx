@@ -1,4 +1,4 @@
-import React, { FC, useState, useMemo } from "react";
+import React, { FC, useMemo } from "react";
 import { CharacterData } from "../../types";
 import { PathfinderAttributesCard } from "../../components/PathfinderAttributesCard";
 import { PathfinderSavingThrowsCard } from "../../components/PathfinderSavingThrowsCard";
@@ -6,7 +6,6 @@ import { PathfinderCombatCard } from "../../components/PathfinderCombatCard";
 import {
   recalculatePathfinderCharacter,
   calculatePathfinderModifier,
-  formatPathfinderModifier,
   getAttributeScore,
 } from "../../utils/pathfinder";
 import { PATHFINDER_SKILLS } from "../../data/skills/pathfinderSkills";
@@ -109,7 +108,6 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
         onOpenDiceCalc={() => onOpenDiceCalc()}
         isEditing={isEditing}
       />
-
       <PathfinderSavingThrowsCard
         character={character}
         onUpdateSavingThrows={(newSaves, updatedStats) => {
@@ -121,7 +119,6 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
         onOpenDiceCalc={(saveType, mod) => onOpenDiceCalc(saveType, mod)}
         isEditing={isEditing}
       />
-
       <PathfinderCombatCard
         character={character}
         onUpdateCharacter={(updated) => handleUpdateChar(updated)}
@@ -129,7 +126,6 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
         onSwitchToCombatTab={onSwitchToCombatTab}
         isEditing={isEditing}
       />
-
       <PathfinderSkillsBlock
         mergedSkills={mergedSkills}
         isEditable={isEditing}
