@@ -18,6 +18,7 @@ import {
   Stat
 } from "../../types";
 import { SheetProps } from "./types";
+import { CoCSkillsBlock } from "./CoCSkillsBlock";
 
 interface CoCSkillDef {
   name: string;
