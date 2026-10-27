@@ -1,3 +1,7 @@
+console.log("PATHFINDER_SKILLS:", PATHFINDER_SKILLS?.length);
+console.log("mergedSkills:", mergedSkills?.length);
+console.log("character.skills:", character.skills);
+
 import React, { FC, useMemo } from "react";
 import { CharacterData } from "../../types";
 import { PathfinderAttributesCard } from "../../components/PathfinderAttributesCard";
