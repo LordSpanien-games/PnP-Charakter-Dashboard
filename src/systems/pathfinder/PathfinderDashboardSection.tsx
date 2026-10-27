@@ -87,14 +87,11 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
   const mergedSkills = useMemo(() => {
     const userSkills = character.skills || [];
     return OFFICIAL_PATHFINDER_SKILLS.map((def) => {
-      const existing = userSkills.find((s) => {
-        const sName = (s?.name || "").toLowerCase();
-        const defName = def.name.toLowerCase();
-        return (
-          sName === defName ||
-          (sName.length >= 5 && sName.startsWith(defName.slice(0, 5)))
-        );
-      });
+      const existing = userSkills.find(s => {
+  const sName = (s?.name || (s as any)?.label || "").toLowerCase().trim();
+  const defName = def.name.toLowerCase().trim();
+  return sName === defName;
+});
       const attrMod = attributeMap[def.attr]?.mod || 0;
       const rawVal = existing ? existing.value : 0;
       const ranks =
