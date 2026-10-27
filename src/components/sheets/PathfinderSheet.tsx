@@ -33,14 +33,8 @@ import {
 import { PATHFINDER_ROGUE_TALENTS } from "../../data/pathfinderRogueTalents";
 import { extractDailyUsesFromText } from "../../utils/inventorySync";
 import { SheetProps } from "./types";
+import { PATHFINDER_SKILLS } from "../../data/skills/pathfinderSkills";
 import { PathfinderSkillsBlock } from "./PathfinderSkillsBlock";
-
-interface StandardPFSkillDef {
-  name: string;
-  attr: 'ST' | 'GE' | 'KO' | 'IN' | 'WE' | 'CH';
-  armorPenalty?: boolean;
-  trainedOnly?: boolean;
-}
 
 import { PATHFINDER_SKILLS, PFSkillDef } from "../../data/skills/pathfinderSkills";
 
