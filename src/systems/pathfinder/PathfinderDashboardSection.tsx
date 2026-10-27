@@ -170,7 +170,7 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
         isEditing={isEditing}
       />
 
-      <PathfinderCombatCard
+ <PathfinderCombatCard
         character={character}
         onUpdateCharacter={(updated) => handleUpdateChar(updated)}
         onOpenDiceCalc={(title, mod) => onOpenDiceCalc(title, mod)}
@@ -178,6 +178,17 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
         isEditing={isEditing}
       />
 
+      {/* FERTIGKEITEN */}
+      <PathfinderSkillsBlock
+        mergedSkills={mergedSkills}
+        isEditable={isEditing}
+        onUpdateSkillRanks={handleUpdateSkillRanks}
+        onToggleClassSkill={handleToggleClassSkill}
+        printMode={false}
+      />
+    </div>
+  );
+};
       {/* ── FERTIGKEITEN ── */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
         {/* Header + Toggle */}
