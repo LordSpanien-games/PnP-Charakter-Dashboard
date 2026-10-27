@@ -213,7 +213,7 @@ export const PathfinderSheet: FC<SheetProps> = ({
   // ── Skills aus JSON-Daten mergen ──────────────────────────
   const mergedSkills = useMemo(() => {
     const userSkills = data.skills || [];
-    return OFFICIAL_PATHFINDER_SKILLS.map(def => {
+    return PATHFINDER_SKILLS.map(def => {
       const existing = userSkills.find(s => {
   const sName = (s?.name || (s as any)?.label || "").toLowerCase().trim();
   const defName = def.name.toLowerCase().trim();
