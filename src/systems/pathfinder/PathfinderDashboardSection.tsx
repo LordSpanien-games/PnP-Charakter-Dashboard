@@ -90,7 +90,17 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
       const existing = userSkills.find(s => {
   const sName = (s?.name || (s as any)?.label || "").toLowerCase().trim();
   const defName = def.name.toLowerCase().trim();
-  return sName === defName;
+  // Exakter Match
+  if (sName === defName) return true;
+  // Kurzname-Match: "auftreten" matcht "auftreten (gesang/tanz)"
+  if (defName.startsWith(sName) && defName[sName.length] === ' ') return true;
+  // Umgekehrt: "auftreten (gesang/tanz)" matcht "auftreten"
+  if (sName.startsWith(defName) && sName[defName.length] === ' ') return true;
+  // Erster Wort-Match für Sammelskills wie "Beruf", "Wissen", "Handwerk"
+  const sFirst = sName.split(/[\s(]/)[0];
+  const dFirst = defName.split(/[\s(]/)[0];
+  if (sFirst === dFirst && ['beruf', 'wissen', 'handwerk', 'auftreten'].includes(sFirst)) return true;
+  return false;
 });
       const attrMod = attributeMap[def.attr]?.mod || 0;
       const rawVal = existing ? existing.value : 0;
