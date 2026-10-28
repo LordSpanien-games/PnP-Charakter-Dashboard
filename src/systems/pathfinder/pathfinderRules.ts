@@ -1,5 +1,5 @@
 import { CombatModifier, CombatModifierContext } from "../../core/types";
-import { PATHFINDER_CLASSES } from "../utils/levelUpRules";
+import { PATHFINDER_CLASSES } from "../../utils/levelUpRules";
 
 export type BabProgression = "full" | "threeFourths" | "half";
 
