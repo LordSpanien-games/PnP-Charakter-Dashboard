@@ -2,28 +2,6 @@ import { CombatModifier, CombatModifierContext } from "../../core/types";
 
 export type BabProgression = "full" | "threeFourths" | "half";
 
-export interface PathfinderClassPreset {
-  id: string;
-  name: string;
-  aliases: string[];
-  hitDie: number;
-  babProgression: BabProgression;
-  goodSaves: { fort: boolean; ref: boolean; will: boolean };
-}
-
-export const PATHFINDER_CLASSES: Record<string, PathfinderClassPreset> = {
-  rogue: { id: "rogue", name: "Schurke / Dieb (Rogue)", aliases: ["schurke", "dieb", "rogue"], hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: false, ref: true, will: false } },
-  fighter: { id: "fighter", name: "Kämpfer (Fighter)", aliases: ["kämpfer", "krieger", "fighter"], hitDie: 10, babProgression: "full", goodSaves: { fort: true, ref: false, will: false } },
-  barbarian: { id: "barbarian", name: "Barbar (Barbarian)", aliases: ["barbar", "barbarian"], hitDie: 12, babProgression: "full", goodSaves: { fort: true, ref: false, will: false } },
-  wizard: { id: "wizard", name: "Magier (Wizard)", aliases: ["magier", "wizard"], hitDie: 6, babProgression: "half", goodSaves: { fort: false, ref: false, will: true } },
-  cleric: { id: "cleric", name: "Kleriker (Cleric)", aliases: ["kleriker", "priester", "cleric"], hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: true, ref: false, will: true } },
-  ranger: { id: "ranger", name: "Waldläufer (Ranger)", aliases: ["waldläufer", "ranger"], hitDie: 10, babProgression: "full", goodSaves: { fort: true, ref: true, will: false } },
-  paladin: { id: "paladin", name: "Paladin", aliases: ["paladin"], hitDie: 10, babProgression: "full", goodSaves: { fort: true, ref: false, will: true } },
-  monk: { id: "monk", name: "Mönch (Monk)", aliases: ["mönch", "monk"], hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: true, ref: true, will: true } },
-  sorcerer: { id: "sorcerer", name: "Hexenmeister (Sorcerer)", aliases: ["hexenmeister", "sorcerer"], hitDie: 6, babProgression: "half", goodSaves: { fort: false, ref: false, will: true } },
-  bard: { id: "bard", name: "Barde (Bard)", aliases: ["barde", "bard"], hitDie: 8, babProgression: "threeFourths", goodSaves: { fort: false, ref: true, will: true } },
-};
-
 export interface PathfinderRacePreset {
   id: string;
   name: string;
