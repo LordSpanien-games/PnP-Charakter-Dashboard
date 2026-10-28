@@ -3,32 +3,26 @@ import { CharacterData, GameSystem } from '../types';
 export interface PathfinderClassPreset {
   id: string;
   name: string;
-  hitDie: number; // e.g. 8 for W8
+  aliases: string[];
+  hitDie: number;
   babProgression: 'full' | 'threeFourths' | 'half';
-  goodSaves: {
-    fort: boolean;
-    ref: boolean;
-    will: boolean;
-  };
-  skillPointsPerLevel: number; // e.g. 8 for Rogue
+  goodSaves: { fort: boolean; ref: boolean; will: boolean };
+  skillPointsPerLevel: number;
   classSkills: string[];
   keyFeaturesByLevel?: Record<number, string[]>;
 }
 
 export const PATHFINDER_CLASSES: Record<string, PathfinderClassPreset> = {
   rogue: {
-    id: 'rogue',
-    name: 'Schurke / Dieb (Rogue)',
-    hitDie: 8,
-    babProgression: 'threeFourths',
+    id: 'rogue', name: 'Schurke / Dieb (Rogue)',
+    aliases: ['schurke', 'dieb', 'rogue'],
+    hitDie: 8, babProgression: 'threeFourths',
     goodSaves: { fort: false, ref: true, will: false },
     skillPointsPerLevel: 8,
-    classSkills: [
-      'Akrobatik', 'Bluffen', 'Diplomatie', 'Entfesselungskunst', 'Einschüchtern',
-      'Entdecken / Wahrnehmung', 'Fahrzeug lenken', 'Fingerfertigkeit', 'Heimlichkeit',
-      'Klettern', 'Mechanismus ausschalten', 'Motiv erkennen', 'Schätzen', 'Schwimmen',
-      'Verkleiden', 'Wahrnehmung', 'Wissen (Lokales)', 'Wissen (Gewölbekunde)', 'Zauberkunde'
-    ],
+    classSkills: ['Akrobatik', 'Bluffen', 'Diplomatie', 'Einschüchtern', 'Entfesselungskunst',
+      'Fingerfertigkeit', 'Heimlichkeit', 'Klettern', 'Mechanismus ausschalten',
+      'Motiv erkennen', 'Schätzen', 'Schwimmen', 'Verkleiden', 'Wahrnehmung',
+      'Wissen (Lokales)', 'Zauberkunde'],
     keyFeaturesByLevel: {
       1: ['Hinterhältiger Angriff +1W6', 'Fallenfinder'],
       2: ['Entrinnen', 'Schurkentalent'],
@@ -53,157 +47,224 @@ export const PATHFINDER_CLASSES: Record<string, PathfinderClassPreset> = {
     }
   },
   fighter: {
-    id: 'fighter',
-    name: 'Kämpfer (Fighter)',
-    hitDie: 10,
-    babProgression: 'full',
+    id: 'fighter', name: 'Kämpfer (Fighter)',
+    aliases: ['kämpfer', 'krieger', 'fighter'],
+    hitDie: 10, babProgression: 'full',
     goodSaves: { fort: true, ref: false, will: false },
     skillPointsPerLevel: 2,
-    classSkills: ['Einschüchtern', 'Handwerk', 'Klettern', 'Reiten', 'Schwimmen', 'Überlebenskunst', 'Wissen (Baukunst)', 'Wissen (Kriegskunst)'],
+    classSkills: ['Einschüchtern', 'Handwerk', 'Klettern', 'Reiten', 'Schwimmen',
+      'Überleben', 'Wissen (Baukunst)', 'Wissen (Kriegskunst)'],
     keyFeaturesByLevel: {
       1: ['Kampf-Bonustalent'],
       2: ['Kampf-Bonustalent', 'Mut +1'],
       3: ['Rüstungstraining 1'],
-      4: ['Kampf-Bonustalent'],
+      4: ['Kampf-Bonustalent', 'Attributssteigerung +1'],
       5: ['Waffentraining 1'],
       6: ['Kampf-Bonustalent', 'Mut +2'],
       7: ['Rüstungstraining 2'],
-      8: ['Kampf-Bonustalent'],
+      8: ['Kampf-Bonustalent', 'Attributssteigerung +1'],
       9: ['Waffentraining 2'],
-      10: ['Kampf-Bonustalent', 'Mut +3']
+      10: ['Kampf-Bonustalent', 'Mut +3'],
+      11: ['Rüstungstraining 3'],
+      12: ['Kampf-Bonustalent', 'Attributssteigerung +1'],
+      13: ['Waffentraining 3'],
+      14: ['Kampf-Bonustalent', 'Mut +4'],
+      15: ['Rüstungstraining 4'],
+      16: ['Kampf-Bonustalent', 'Attributssteigerung +1'],
+      17: ['Waffentraining 4'],
+      18: ['Kampf-Bonustalent'],
+      19: ['Rüstungsbeherrschung'],
+      20: ['Waffenbeherrschung', 'Attributssteigerung +1']
     }
   },
   barbarian: {
-    id: 'barbarian',
-    name: 'Barbar (Barbarian)',
-    hitDie: 12,
-    babProgression: 'full',
+    id: 'barbarian', name: 'Barbar (Barbarian)',
+    aliases: ['barbar', 'barbarian'],
+    hitDie: 12, babProgression: 'full',
     goodSaves: { fort: true, ref: false, will: false },
     skillPointsPerLevel: 4,
-    classSkills: ['Akrobatik', 'Einschüchtern', 'Handwerk', 'Klettern', 'Mit Tieren umgehen', 'Reiten', 'Schwimmen', 'Überlebenskunst', 'Wahrnehmung'],
+    classSkills: ['Akrobatik', 'Einschüchtern', 'Handwerk', 'Klettern',
+      'Mit Tieren umgehen', 'Reiten', 'Schwimmen', 'Überleben', 'Wahrnehmung'],
     keyFeaturesByLevel: {
       1: ['Kampfrausch', 'Schnelle Bewegung (+3m)'],
       2: ['Kampfrauschkraft', 'Ungewohntes Ausweichen'],
       3: ['Fallengespür +1'],
-      4: ['Kampfrauschkraft'],
+      4: ['Kampfrauschkraft', 'Attributssteigerung +1'],
       5: ['Verbessertes ungewohntes Ausweichen'],
       6: ['Kampfrauschkraft', 'Fallengespür +2'],
-      7: ['Schadensreduzierung 1/-']
+      7: ['Schadensreduzierung 1/-'],
+      8: ['Kampfrauschkraft', 'Attributssteigerung +1'],
+      9: ['Fallengespür +3'],
+      10: ['Kampfrauschkraft', 'Schadensreduzierung 2/-'],
+      12: ['Attributssteigerung +1'],
+      16: ['Attributssteigerung +1'],
+      20: ['Mächtiger Kampfrausch', 'Attributssteigerung +1']
     }
   },
   wizard: {
-    id: 'wizard',
-    name: 'Magier (Wizard)',
-    hitDie: 6,
-    babProgression: 'half',
+    id: 'wizard', name: 'Magier (Wizard)',
+    aliases: ['magier', 'wizard'],
+    hitDie: 6, babProgression: 'half',
     goodSaves: { fort: false, ref: false, will: true },
     skillPointsPerLevel: 2,
     classSkills: ['Handwerk', 'Beruf', 'Fliegen', 'Sprachenkunde', 'Wissen (alle)', 'Zauberkunde'],
     keyFeaturesByLevel: {
       1: ['Zauberbuch', 'Arkane Bindung', 'Arkane Schule', 'Schreibtalent'],
+      4: ['Attributssteigerung +1'],
       5: ['Magier-Bonustalent'],
+      8: ['Attributssteigerung +1'],
       10: ['Magier-Bonustalent'],
+      12: ['Attributssteigerung +1'],
       15: ['Magier-Bonustalent'],
-      20: ['Magier-Bonustalent']
+      16: ['Attributssteigerung +1'],
+      20: ['Magier-Bonustalent', 'Attributssteigerung +1']
     }
   },
   cleric: {
-    id: 'cleric',
-    name: 'Kleriker (Cleric)',
-    hitDie: 8,
-    babProgression: 'threeFourths',
+    id: 'cleric', name: 'Kleriker (Cleric)',
+    aliases: ['kleriker', 'priester', 'cleric'],
+    hitDie: 8, babProgression: 'threeFourths',
     goodSaves: { fort: true, ref: false, will: true },
     skillPointsPerLevel: 2,
-    classSkills: ['Diplomatie', 'Heilkunde', 'Motiv erkennen', 'Wissen (Geschichte)', 'Wissen (Die Ebenen)', 'Wissen (Religion)', 'Zauberkunde'],
+    classSkills: ['Diplomatie', 'Heilkunde', 'Motiv erkennen', 'Wissen (Geschichte)',
+      'Wissen (Die Ebenen)', 'Wissen (Religion)', 'Zauberkunde'],
     keyFeaturesByLevel: {
       1: ['Aura', 'Domänen', 'Energie fokussieren (1W6)', 'Spontane Zauber'],
       3: ['Energie fokussieren 2W6'],
+      4: ['Attributssteigerung +1'],
       5: ['Energie fokussieren 3W6'],
       7: ['Energie fokussieren 4W6'],
-      9: ['Energie fokussieren 5W6']
+      8: ['Attributssteigerung +1'],
+      9: ['Energie fokussieren 5W6'],
+      12: ['Attributssteigerung +1'],
+      16: ['Attributssteigerung +1'],
+      20: ['Attributssteigerung +1']
     }
   },
   ranger: {
-    id: 'ranger',
-    name: 'Waldläufer (Ranger)',
-    hitDie: 10,
-    babProgression: 'full',
+    id: 'ranger', name: 'Waldläufer (Ranger)',
+    aliases: ['waldläufer', 'ranger'],
+    hitDie: 10, babProgression: 'full',
     goodSaves: { fort: true, ref: true, will: false },
     skillPointsPerLevel: 6,
-    classSkills: ['Heimlichkeit', 'Klettern', 'Mit Tieren umgehen', 'Reiten', 'Schwimmen', 'Spuren lesen', 'Überlebenskunst', 'Wahrnehmung', 'Wissen (Natur)'],
+    classSkills: ['Heimlichkeit', 'Klettern', 'Mit Tieren umgehen', 'Reiten',
+      'Schwimmen', 'Überleben', 'Wahrnehmung', 'Wissen (Natur)'],
     keyFeaturesByLevel: {
       1: ['Erzfeind 1', 'Spuren lesen', 'Wildes Gespür'],
       2: ['Kampfstil-Talent'],
       3: ['Bevorzugtes Gelände 1', 'Ausdauer'],
-      4: ['Bund des Jägers (Tiergefährte / Gefährten)'],
-      5: ['Erzfeind 2']
+      4: ['Bund des Jägers', 'Attributssteigerung +1'],
+      5: ['Erzfeind 2'],
+      6: ['Kampfstil-Talent'],
+      7: ['Bevorzugtes Gelände 2'],
+      8: ['Schnelle Spurensuche', 'Attributssteigerung +1'],
+      10: ['Erzfeind 3', 'Kampfstil-Talent'],
+      12: ['Attributssteigerung +1'],
+      15: ['Erzfeind 4'],
+      16: ['Attributssteigerung +1'],
+      20: ['Erzfeind 5', 'Meisterhafte Jagd', 'Attributssteigerung +1']
     }
   },
   paladin: {
-    id: 'paladin',
-    name: 'Paladin',
-    hitDie: 10,
-    babProgression: 'full',
+    id: 'paladin', name: 'Paladin',
+    aliases: ['paladin'],
+    hitDie: 10, babProgression: 'full',
     goodSaves: { fort: true, ref: false, will: true },
     skillPointsPerLevel: 2,
-    classSkills: ['Diplomatie', 'Heilkunde', 'Mit Tieren umgehen', 'Motiv erkennen', 'Reiten', 'Wissen (Religion)', 'Zauberkunde'],
+    classSkills: ['Diplomatie', 'Heilkunde', 'Mit Tieren umgehen',
+      'Motiv erkennen', 'Reiten', 'Wissen (Religion)', 'Zauberkunde'],
     keyFeaturesByLevel: {
       1: ['Aura des Guten', 'Böses erkennen', 'Böses niederstrecken 1/Tag'],
       2: ['Göttliche Anmut', 'Handauflegen'],
       3: ['Aura des Mutes', 'Göttliche Gesundheit', 'Gnade 1'],
-      4: ['Kanalisieren', 'Zauber vorbereiten']
+      4: ['Kanalisieren', 'Zauber vorbereiten', 'Attributssteigerung +1'],
+      5: ['Böses niederstrecken 2/Tag'],
+      8: ['Attributssteigerung +1'],
+      9: ['Böses niederstrecken 3/Tag'],
+      12: ['Attributssteigerung +1'],
+      16: ['Attributssteigerung +1'],
+      20: ['Heilige Entschlossenheit', 'Attributssteigerung +1']
     }
   },
   monk: {
-    id: 'monk',
-    name: 'Mönch (Monk)',
-    hitDie: 8,
-    babProgression: 'threeFourths',
+    id: 'monk', name: 'Mönch (Monk)',
+    aliases: ['mönch', 'monk'],
+    hitDie: 8, babProgression: 'threeFourths',
     goodSaves: { fort: true, ref: true, will: true },
     skillPointsPerLevel: 4,
-    classSkills: ['Akrobatik', 'Einschüchtern', 'Entfesselungskunst', 'Heimlichkeit', 'Klettern', 'Motiv erkennen', 'Schwimmen', 'Wahrnehmung'],
+    classSkills: ['Akrobatik', 'Einschüchtern', 'Entfesselungskunst',
+      'Heimlichkeit', 'Klettern', 'Motiv erkennen', 'Schwimmen', 'Wahrnehmung'],
     keyFeaturesByLevel: {
       1: ['Waffenloser Schlag', 'Bonustalent', 'Schlaghagel', 'Betäubender Schlag'],
       2: ['Ausweichen', 'Entrinnen', 'Bonustalent'],
       3: ['Schnelle Bewegung (+3m)', 'Ki-Vorrat'],
-      4: ['Verlangsamter Fall', 'Ki-Schlag (Magisch)']
+      4: ['Verlangsamter Fall', 'Ki-Schlag (Magisch)', 'Attributssteigerung +1'],
+      5: ['Bonustalent', 'Stilles Gemüt'],
+      6: ['Schlaghagel-Verbesserung', 'Ki-Schlag (Gesetzlich)'],
+      7: ['Windgang', 'Wholeness of Body'],
+      8: ['Attributssteigerung +1'],
+      9: ['Verbessertes ungewohntes Ausweichen'],
+      10: ['Bonustalent', 'Ki-Schlag (Silber/Kalt Eisen)'],
+      12: ['Attributssteigerung +1'],
+      16: ['Attributssteigerung +1'],
+      20: ['Vollkommene Seele', 'Attributssteigerung +1']
     }
   },
   sorcerer: {
-    id: 'sorcerer',
-    name: 'Hexenmeister (Sorcerer)',
-    hitDie: 6,
-    babProgression: 'half',
+    id: 'sorcerer', name: 'Hexenmeister (Sorcerer)',
+    aliases: ['hexenmeister', 'sorcerer'],
+    hitDie: 6, babProgression: 'half',
     goodSaves: { fort: false, ref: false, will: true },
     skillPointsPerLevel: 2,
-    classSkills: ['Bluffen', 'Einschüchtern', 'Fliegen', 'Handwerk', 'Beruf', 'Zauberkunde', 'Wissen (Arkanes)'],
+    classSkills: ['Bluffen', 'Einschüchtern', 'Fliegen', 'Handwerk',
+      'Beruf', 'Zauberkunde', 'Wissen (Arkanes)'],
     keyFeaturesByLevel: {
       1: ['Blutlinie', 'Blutlinienkraft', 'Einfache Waffen'],
       3: ['Blutlinien-Zauber 1'],
+      4: ['Attributssteigerung +1'],
       5: ['Blutlinien-Zauber 2'],
-      7: ['Blutlinien-Talent']
+      7: ['Blutlinien-Talent'],
+      8: ['Attributssteigerung +1'],
+      9: ['Blutlinien-Zauber 3'],
+      11: ['Blutlinien-Talent'],
+      12: ['Attributssteigerung +1'],
+      13: ['Blutlinien-Zauber 4'],
+      15: ['Blutlinien-Talent'],
+      16: ['Attributssteigerung +1'],
+      17: ['Blutlinien-Zauber 5'],
+      19: ['Blutlinien-Kraft (große)'],
+      20: ['Blutlinien-Meisterschaft', 'Attributssteigerung +1']
     }
   },
   bard: {
-    id: 'bard',
-    name: 'Barde (Bard)',
-    hitDie: 8,
-    babProgression: 'threeFourths',
+    id: 'bard', name: 'Barde (Bard)',
+    aliases: ['barde', 'bard'],
+    hitDie: 8, babProgression: 'threeFourths',
     goodSaves: { fort: false, ref: true, will: true },
     skillPointsPerLevel: 6,
-    classSkills: ['Akrobatik', 'Auftreten', 'Bluffen', 'Diplomatie', 'Einschüchtern', 'Entfesselungskunst', 'Heimlichkeit', 'Motiv erkennen', 'Schätzen', 'Taschendiebstahl', 'Wahrnehmung', 'Wissen (alle)', 'Zauberkunde'],
+    classSkills: ['Akrobatik', 'Auftreten', 'Bluffen', 'Diplomatie', 'Einschüchtern',
+      'Entfesselungskunst', 'Heimlichkeit', 'Motiv erkennen', 'Schätzen',
+      'Wahrnehmung', 'Wissen (alle)', 'Zauberkunde'],
     keyFeaturesByLevel: {
       1: ['Bardenauftritt', 'Bardenwissen', 'Faszinieren', 'Mut zusprechen +1'],
       2: ['Vielseitige Darbietung 1', 'Bewandert'],
       3: ['Inspirierende Kompetenz +2'],
-      5: ['Mut zusprechen +2']
+      4: ['Attributssteigerung +1'],
+      5: ['Mut zusprechen +2', 'Lore Master 1'],
+      6: ['Vielseitige Darbietung 2'],
+      7: ['Expertenwissen'],
+      8: ['Attributssteigerung +1'],
+      9: ['Inspirierende Kompetenz +4'],
+      10: ['Mut zusprechen +3', 'Lore Master 2'],
+      12: ['Attributssteigerung +1'],
+      16: ['Attributssteigerung +1'],
+      20: ['Meisterbarde', 'Attributssteigerung +1']
     }
   }
 };
 
-/**
- * Calculates Base Attack Bonus for a given level and progression
- */
+// ── Hilfsfunktionen ────────────────────────────────────────
+
 export const calculateBAB = (level: number, progression: 'full' | 'threeFourths' | 'half'): number => {
   if (level <= 0) return 0;
   if (progression === 'full') return level;
@@ -211,225 +272,92 @@ export const calculateBAB = (level: number, progression: 'full' | 'threeFourths'
   return Math.floor(level * 0.5);
 };
 
-/**
- * Formats multi-attack BAB string, e.g. level 9 full BAB = "+9/+4"
- */
 export const formatBABAttacks = (bab: number): string => {
   const attacks: string[] = [];
   let current = bab;
-  while (current > 0) {
-    attacks.push(`+${current}`);
-    current -= 5;
-  }
+  while (current > 0) { attacks.push(`+${current}`); current -= 5; }
   return attacks.length > 0 ? attacks.join(' / ') : '+0';
 };
 
-/**
- * Calculates base saving throw value (Good vs Poor)
- */
 export const calculateBaseSave = (level: number, isGood: boolean): number => {
   if (level <= 0) return 0;
-  if (isGood) {
-    return 2 + Math.floor(level / 2);
-  } else {
-    return Math.floor(level / 3);
-  }
+  return isGood ? 2 + Math.floor(level / 2) : Math.floor(level / 3);
 };
 
-/**
- * Checks if a specific level grants an Ability Score Increase (+1 to any stat)
- * In Pathfinder/D20: Levels 4, 8, 12, 16, 20
- */
-export const isAttributeIncreaseLevel = (level: number): boolean => {
-  return level > 0 && level % 4 === 0;
-};
+export const isAttributeIncreaseLevel = (level: number): boolean =>
+  level > 0 && level % 4 === 0;
 
-/**
- * Checks if a specific level grants a General Feat (All odd levels: 1, 3, 5, 7, 9, 11, etc.)
- */
-export const isGeneralFeatLevel = (level: number): boolean => {
-  return level > 0 && level % 2 === 1;
-};
+export const isGeneralFeatLevel = (level: number): boolean =>
+  level > 0 && level % 2 === 1;
 
-/**
- * Attempts to parse character level and class name from a subTitle string
- * e.g. "Level 9 Gnom Dieb" -> { level: 9, className: 'Dieb', matchedClassId: 'rogue' }
- */
 export const parseLevelAndClass = (subTitle: string = ''): {
-  level: number;
-  className: string;
-  matchedClassId?: string;
-  race?: string;
+  level: number; className: string; matchedClassId?: string; race?: string;
 } => {
   let level = 1;
   let className = 'Klasse';
-  let matchedClassId: string | undefined = undefined;
-  let race: string | undefined = undefined;
+  let matchedClassId: string | undefined;
+  let race: string | undefined;
 
   const s = subTitle.trim();
-
-  // Look for "Level X", "Stufe X", "Lvl X", or numbers
-  const levelMatch = s.match(/(?:level|stufe|lvl)\s*(\d+)/i) || s.match(/(\d+)\.\s*(?:stufe|level)/i) || s.match(/\b(\d+)\b/);
+  const levelMatch = s.match(/(?:level|stufe|lvl)\s*(\d+)/i) ||
+    s.match(/(\d+)\.\s*(?:stufe|level)/i) || s.match(/\b(\d+)\b/);
   if (levelMatch) {
     const parsed = parseInt(levelMatch[1], 10);
-    if (!isNaN(parsed) && parsed >= 1 && parsed <= 30) {
-      level = parsed;
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 30) level = parsed;
+  }
+
+  const lower = s.toLowerCase();
+  for (const [id, cls] of Object.entries(PATHFINDER_CLASSES)) {
+    if (cls.aliases.some((a) => lower.includes(a))) {
+      matchedClassId = id;
+      className = cls.name;
+      break;
     }
   }
 
-  // Detect class from text
-  const lower = s.toLowerCase();
-  if (lower.includes('dieb') || lower.includes('schurke') || lower.includes('rogue')) {
-    matchedClassId = 'rogue';
-    className = 'Schurke';
-  } else if (lower.includes('kämpfer') || lower.includes('fighter') || lower.includes('krieger')) {
-    matchedClassId = 'fighter';
-    className = 'Kämpfer';
-  } else if (lower.includes('barbar') || lower.includes('barbarian')) {
-    matchedClassId = 'barbarian';
-    className = 'Barbar';
-  } else if (lower.includes('magier') || lower.includes('wizard')) {
-    matchedClassId = 'wizard';
-    className = 'Magier';
-  } else if (lower.includes('kleriker') || lower.includes('cleric') || lower.includes('priester')) {
-    matchedClassId = 'cleric';
-    className = 'Kleriker';
-  } else if (lower.includes('waldläufer') || lower.includes('ranger')) {
-    matchedClassId = 'ranger';
-    className = 'Waldläufer';
-  } else if (lower.includes('paladin')) {
-    matchedClassId = 'paladin';
-    className = 'Paladin';
-  } else if (lower.includes('mönch') || lower.includes('monk')) {
-    matchedClassId = 'monk';
-    className = 'Mönch';
-  } else if (lower.includes('hexenmeister') || lower.includes('sorcerer')) {
-    matchedClassId = 'sorcerer';
-    className = 'Hexenmeister';
-  } else if (lower.includes('barde') || lower.includes('bard')) {
-    matchedClassId = 'bard';
-    className = 'Barde';
-  }
-
-  // Detect race
-  if (lower.includes('gnom') || lower.includes('gnome')) race = 'Gnom';
-  else if (lower.includes('mensch') || lower.includes('human')) race = 'Mensch';
-  else if (lower.includes('elf') || lower.includes('elfe')) race = 'Elf';
-  else if (lower.includes('zwerg') || lower.includes('dwarf')) race = 'Zwerg';
+  if (lower.includes('gnom')) race = 'Gnom';
+  else if (lower.includes('mensch')) race = 'Mensch';
   else if (lower.includes('halbelf')) race = 'Halbelf';
-  else if (lower.includes('halborc') || lower.includes('halbork')) race = 'Halbork';
-  else if (lower.includes('halbling') || lower.includes('halfling')) race = 'Halbling';
+  else if (lower.includes('elf')) race = 'Elf';
+  else if (lower.includes('zwerg')) race = 'Zwerg';
+  else if (lower.includes('halbork') || lower.includes('halborc')) race = 'Halbork';
+  else if (lower.includes('halbling')) race = 'Halbling';
 
   return { level, className, matchedClassId, race };
 };
 
+// ── Shadowrun Karma-Regeln ─────────────────────────────────
+
 export interface ShadowrunKarmaCostRule {
-  category: string;
-  formula: string;
-  example: string;
-  notes: string;
+  category: string; formula: string; example: string; notes: string;
 }
 
 export const SHADOWRUN_KARMA_RULES: ShadowrunKarmaCostRule[] = [
-  {
-    category: 'Attribut steigern',
-    formula: 'Neue Stufe × 5 Karma',
-    example: 'Stärke von 3 auf 4 = 4 × 5 = 20 Karma',
-    notes: 'Maximal bis zum Rassen-Attributsmaximum. Magie und Resonanz kosten ebenfalls Neue Stufe × 5.'
-  },
-  {
-    category: 'Aktionsfertigkeit steigern',
-    formula: 'Neue Stufe × 2 Karma (ab Stufe 1: 2 Karma)',
-    example: 'Pistolen von 4 auf 5 = 5 × 2 = 10 Karma',
-    notes: 'Neue Aktionsfertigkeit auf Stufe 1 lernen kostet 2 Karma.'
-  },
-  {
-    category: 'Fertigkeitsspezialisierung',
-    formula: '7 Karma pauschal',
-    example: 'Pistolen (Halbautomatik) = 7 Karma',
-    notes: 'Nur 1 Spezialisierung pro Fertigkeit, gewährt +2 Würfelpool.'
-  },
-  {
-    category: 'Fertigkeitsgruppe steigern',
-    formula: 'Neue Stufe × 5 Karma',
-    example: 'Feuerwaffen von 2 auf 3 = 3 × 5 = 15 Karma',
-    notes: 'Gilt nur, solange keine Einzelfertigkeit der Gruppe spezialisiert wurde.'
-  },
-  {
-    category: 'Wissens- / Sprachfertigkeit',
-    formula: 'Neue Stufe × 1 Karma',
-    example: 'Straßengerüchte von 3 auf 4 = 4 × 1 = 4 Karma',
-    notes: 'Neue Wissensfertigkeit auf Stufe 1 kostet 1 Karma.'
-  },
-  {
-    category: 'Neuer Zauber / Alchemie',
-    formula: '5 Karma pauschal',
-    example: 'Heilung oder Betäubungsblitz lernen = 5 Karma',
-    notes: 'Erfordert Zauberformel oder Lehrer.'
-  },
-  {
-    category: 'Komplexe Form (Technomancer)',
-    formula: '4 Karma pauschal',
-    example: 'Resonanzspitze lernen = 4 Karma',
-    notes: 'Für Technomancer.'
-  },
-  {
-    category: 'Initiation / Wandlung',
-    formula: '10 + (Neuer Grad × 3) Karma',
-    example: 'Initiationsgrad 1 = 10 + 3 = 13 Karma',
-    notes: 'Erhöht maximales Magie/Resonanz-Attribut um +1 und schaltet Metamagie frei. Mit Prüfung/Gruppe evtl. Rabatt.'
-  },
-  {
-    category: 'Vorteil nachträglich erwerben',
-    formula: 'Doppelte Karma-Kosten',
-    example: 'Vorteil Beidhändigkeit (4 Karma) nachträglich = 8 Karma',
-    notes: 'Erfordert Spielleiter-Zustimmung und Rollenspiel-Begründung.'
-  }
+  { category: 'Attribut steigern', formula: 'Neue Stufe × 5 Karma', example: 'Stärke 3→4 = 20 Karma', notes: 'Max Rassen-Attributsmaximum.' },
+  { category: 'Aktionsfertigkeit steigern', formula: 'Neue Stufe × 2 Karma', example: 'Pistolen 4→5 = 10 Karma', notes: 'Neu auf Stufe 1 = 2 Karma.' },
+  { category: 'Fertigkeitsspezialisierung', formula: '7 Karma pauschal', example: 'Pistolen (Halbautomatik) = 7 Karma', notes: '+2 Würfelpool.' },
+  { category: 'Fertigkeitsgruppe steigern', formula: 'Neue Stufe × 5 Karma', example: 'Feuerwaffen 2→3 = 15 Karma', notes: 'Nur ungeteilt.' },
+  { category: 'Wissens-/Sprachfertigkeit', formula: 'Neue Stufe × 1 Karma', example: 'Straßenwissen 3→4 = 4 Karma', notes: 'Neu = 1 Karma.' },
+  { category: 'Neuer Zauber', formula: '5 Karma pauschal', example: 'Heilung = 5 Karma', notes: 'Erfordert Formel oder Lehrer.' },
+  { category: 'Komplexe Form', formula: '4 Karma pauschal', example: 'Resonanzspitze = 4 Karma', notes: 'Für Technomancer.' },
+  { category: 'Initiation', formula: '10 + (Grad × 3) Karma', example: 'Grad 1 = 13 Karma', notes: 'Schaltet Metamagie frei.' },
+  { category: 'Vorteil nachträglich', formula: 'Doppelte Karma-Kosten', example: 'Beidhändigkeit (4) = 8 Karma', notes: 'SL-Zustimmung nötig.' },
 ];
 
-export const COC_DEVELOPMENT_GUIDE = {
-  title: 'Call of Cthulhu 7e: Die Ermittler-Entwicklungsphase',
-  steps: [
-    {
-      title: '1. Fertigkeits-Steigerungsproben (Erfahrung)',
-      description: 'Für jede Fertigkeit, die im Laufe des Szenarios erfolgreich angewendet wurde (gekennzeichnet durch ein Häkchen), würfelt der Ermittler 1W100.',
-      rules: 'Liegt das Wurfergebnis HÖHER als der aktuelle Wert der Fertigkeit (oder ist es 96–100), verbessert sich der Ermittler: Würfle 1W10 und addiere das Ergebnis direkt zum Fertigkeitswert!'
-    },
-    {
-      title: '2. Geistige Stabilität belohnen (Sanity Rewards)',
-      description: 'Nach erfolgreichem Abschluss eines Falles oder Meilensteins erhalten die Ermittler Stabilität zurück.',
-      rules: 'Typischerweise 1W4 bis 1W10 Punkte Stabilität. Maximaler Wert ist 99 minus aktueller Cthulhu-Mythos-Wert.'
-    },
-    {
-      title: '3. Mythos-Erkenntnisse & Wahnsinn',
-      description: 'Gelesene Mythos-Wälzer oder Begegnungen können den Cthulhu-Mythos-Wert dauerhaft steigern.',
-      rules: 'Jeder Punkt Cthulhu-Mythos verringert die maximale Geistige Stabilität unwiderruflich um 1 Punkt.'
-    },
-    {
-      title: '4. Finanzkraft & Lebensstil',
-      description: 'Prüfung von Einnahmen, Arztrechnungen für psychische Sanatorien und Reisekosten.',
-      rules: 'Ggf. Steigerung oder Senkung des Werts Finanzkraft je nach beruflichen Erfolgen oder Verlusten.'
-    }
-  ]
-};
+// ── CoC Entwicklungsphase ──────────────────────────────────
 
-export const TRAVELLER_TRAINING_GUIDE = {
-  title: 'Mongoose Traveller 2e: Trainings- & Weiterbildungssystem',
+export const COC_DEVELOPMENT_GUIDE = {
+  title: 'Call of Cthulhu 7e: Entwicklungsphase',
   steps: [
     {
-      title: '1. Fertigkeitstraining im Dienst',
-      description: 'Ein Charakter kann pro Trainingsabschnitt eine Fertigkeit oder ein Attribut steigern.',
-      rules: 'Benötigte Trainingszeit in Wochen = (Neue gewünschte Stufe × 5). Für Stufe 1 werden 5 Wochen intensives Training oder 10 Wochen Nebenbeistudium benötigt.'
+      title: '1. Fertigkeits-Steigerungsproben',
+      description: 'Für jede Fertigkeit mit Häkchen: W100 würfeln.',
+      rules: 'Ergebnis HÖHER als aktueller Wert → +1W10 auf die Fertigkeit.'
     },
     {
-      title: '2. Maximales Fertigkeitslimit',
-      description: 'Die Gesamtsumme aller Fertigkeitsstufen darf (Intelligenz + Bildung) mal 3 nicht überschreiten.',
-      rules: 'Wird das Limit erreicht, müssen ältere Fertigkeiten verrohen oder abgebaut werden, um neue zu meistern.'
+      title: '2. Geistige Stabilität',
+      description: 'Nach erfolgreichem Abschluss: Stabilität zurück.',
+      rules: '1W4 bis 1W10 Punkte. Max: 99 minus Cthulhu-Mythos-Wert.'
     },
-    {
-      title: '3. Physische Augmentationen & Bionik',
-      description: 'Kybernetische Upgrades (Subdermale Panzerung, künstliche Muskeln) steigern Attribute direkt gegen Credits.',
-      rules: 'Erfordert Krankenhausaufenthalt und medizinische Betreuung (Medical Check).'
-    }
   ]
 };
