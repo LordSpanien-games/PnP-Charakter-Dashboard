@@ -1,40 +1,33 @@
 import React, { FC, useMemo } from "react";
-import { CharacterData } from "../../types";
+import { GenericCharacter } from "../../core/types";
 import { PathfinderAttributesCard } from "../../components/PathfinderAttributesCard";
 import { PathfinderSavingThrowsCard } from "../../components/PathfinderSavingThrowsCard";
 import { PathfinderCombatCard } from "../../components/PathfinderCombatCard";
 import {
-  recalculatePathfinderCharacter,
   calculatePathfinderModifier,
   getAttributeScore,
+  recalculatePathfinderCharacter,
 } from "../../utils/pathfinder";
 import { PATHFINDER_SKILLS } from "../../data/skills/pathfinderSkills";
 import { PathfinderSkillsBlock } from "../../components/sheets/PathfinderSkillsBlock";
 
-export interface PathfinderDashboardSectionProps {
-  character: CharacterData;
-  onUpdateCharacter?: (character: CharacterData) => void;
-  onUpdateData: (partial: Partial<CharacterData>) => void;
-  onOpenDiceCalc: (title?: string, mod?: number) => void;
-  onSwitchToCombatTab?: () => void;
+// ── Props die das Plugin-System erwartet ──────────────────
+interface Props {
+  character: GenericCharacter;
   isEditing: boolean;
+  onUpdate: (updates: Partial<GenericCharacter>) => void;
 }
 
-export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = ({
+export const PathfinderDashboardSection: FC<Props> = ({
   character,
-  onUpdateCharacter,
-  onUpdateData,
-  onOpenDiceCalc,
-  onSwitchToCombatTab,
   isEditing,
+  onUpdate,
 }) => {
-  const handleUpdateChar = onUpdateCharacter || ((c: CharacterData) => onUpdateData(c));
-
   const attributeMap = useMemo(() => {
     const keys = ["ST", "GE", "KO", "IN", "WE", "CH"] as const;
     const map: Record<string, { score: number; mod: number }> = {};
     keys.forEach((k) => {
-      const score = getAttributeScore(character, k);
+      const score = getAttributeScore(character as any, k);
       map[k] = { score, mod: calculatePathfinderModifier(score) };
     });
     return map;
@@ -80,7 +73,7 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
     } else {
       currentSkills.push({ name: skillName, value: newRanks, trained: false });
     }
-    onUpdateData({ skills: currentSkills });
+    onUpdate({ skills: currentSkills });
   };
 
   const handleToggleClassSkill = (skillName: string) => {
@@ -93,36 +86,35 @@ export const PathfinderDashboardSection: FC<PathfinderDashboardSectionProps> = (
     } else {
       currentSkills.push({ name: skillName, value: 0, trained: true });
     }
-    onUpdateData({ skills: currentSkills });
+    onUpdate({ skills: currentSkills });
   };
 
   return (
     <div className="space-y-6">
       <PathfinderAttributesCard
-        character={character}
+        character={character as any}
         onUpdateCharacteristics={(newChars) => {
-          const recalculated = recalculatePathfinderCharacter(character, newChars);
-          handleUpdateChar(recalculated);
+          const recalculated = recalculatePathfinderCharacter(character as any, newChars);
+          onUpdate(recalculated as any);
         }}
-        onOpenDiceCalc={() => onOpenDiceCalc()}
+        onOpenDiceCalc={() => {}}
         isEditing={isEditing}
       />
       <PathfinderSavingThrowsCard
-        character={character}
+        character={character as any}
         onUpdateSavingThrows={(newSaves, updatedStats) => {
-          onUpdateData({
-            savingThrows: newSaves,
-            ...(updatedStats ? { stats: updatedStats } : {}),
-          });
+          onUpdate({
+            savingThrows: newSaves as any,
+            ...(updatedStats ? { stats: updatedStats as any } : {}),
+          } as any);
         }}
-        onOpenDiceCalc={(saveType, mod) => onOpenDiceCalc(saveType, mod)}
+        onOpenDiceCalc={() => {}}
         isEditing={isEditing}
       />
       <PathfinderCombatCard
-        character={character}
-        onUpdateCharacter={(updated) => handleUpdateChar(updated)}
-        onOpenDiceCalc={(title, mod) => onOpenDiceCalc(title, mod)}
-        onSwitchToCombatTab={onSwitchToCombatTab}
+        character={character as any}
+        onUpdateCharacter={(updated) => onUpdate(updated as any)}
+        onOpenDiceCalc={() => {}}
         isEditing={isEditing}
       />
       <PathfinderSkillsBlock
