@@ -1,6 +1,6 @@
 import { PATHFINDER_SKILLS } from "../../data/skills/pathfinderSkills";
 import { PathfinderSkillsBlock } from "../../components/sheets/PathfinderSkillsBlock";
-
+import { PathfinderLevelUpView } from "./PathfinderLevelUpView";
 import React, { useState } from "react";
 import { Info, Plus, Minus, ChevronDown, ChevronRight, X, Moon, BedDouble, Printer, Download } from "lucide-react";
 import { SystemPlugin, AttributePool, PluginViewProps } from "../../core/SystemPlugin";
@@ -1503,6 +1503,7 @@ export const PathfinderPlugin: SystemPlugin = {
   secondaryViews: [
   { id: "combat", label: "Kampf", Component: PathfinderCombatView },
   { id: "skills", label: "Fertigkeiten", Component: PathfinderSkillsView },
+  { id: "levelup", label: "⬆ Level-Up", Component: PathfinderLevelUpView },
   { id: "talents", label: "Talente & Fähigkeiten", Component: PathfinderTalentsView },
   { id: "sheet", label: "Charakterbogen", Component: PathfinderCharacterSheetView },
 ],
