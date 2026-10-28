@@ -265,25 +265,6 @@ export const PATHFINDER_CLASSES: Record<string, PathfinderClassPreset> = {
 
 // ── Hilfsfunktionen ────────────────────────────────────────
 
-export const calculateBAB = (level: number, progression: 'full' | 'threeFourths' | 'half'): number => {
-  if (level <= 0) return 0;
-  if (progression === 'full') return level;
-  if (progression === 'threeFourths') return Math.floor(level * 0.75);
-  return Math.floor(level * 0.5);
-};
-
-export const formatBABAttacks = (bab: number): string => {
-  const attacks: string[] = [];
-  let current = bab;
-  while (current > 0) { attacks.push(`+${current}`); current -= 5; }
-  return attacks.length > 0 ? attacks.join(' / ') : '+0';
-};
-
-export const calculateBaseSave = (level: number, isGood: boolean): number => {
-  if (level <= 0) return 0;
-  return isGood ? 2 + Math.floor(level / 2) : Math.floor(level / 3);
-};
-
 export const isAttributeIncreaseLevel = (level: number): boolean =>
   level > 0 && level % 4 === 0;
 
