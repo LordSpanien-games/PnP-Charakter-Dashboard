@@ -558,12 +558,12 @@ export const PathfinderSheet: FC<SheetProps> = ({
             {/* RIGHT COLUMN: SKILLS mit Toggle */}
             <div className="lg:col-span-7">
               <PathfinderSkillsBlock
-                mergedSkills={mergedSkills}
-                isEditable={isEditable}
-                onUpdateSkillRanks={handleUpdateSkillRanks}
-                onToggleClassSkill={handleToggleClassSkill}
-                printMode={false}
-              />
+  mergedSkills={mergedSkills}
+  isEditable={isEditable}
+  onUpdateSkillRanks={handleUpdateSkillRanks}
+  onToggleClassSkill={handleToggleClassSkill}
+  printMode={true}
+/>
             </div>
           </div>
 
