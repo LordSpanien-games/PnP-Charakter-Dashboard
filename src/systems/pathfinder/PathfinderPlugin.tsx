@@ -1,3 +1,6 @@
+import { PATHFINDER_SKILLS } from "../../data/skills/pathfinderSkills";
+import { PathfinderSkillsBlock } from "../../components/sheets/PathfinderSkillsBlock";
+
 import React, { useState } from "react";
 import { Info, Plus, Minus, ChevronDown, ChevronRight, X, Moon, BedDouble, Printer, Download } from "lucide-react";
 import { SystemPlugin, AttributePool, PluginViewProps } from "../../core/SystemPlugin";
