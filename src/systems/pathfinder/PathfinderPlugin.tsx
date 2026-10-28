@@ -1263,6 +1263,76 @@ const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, is
   );
 };
 
+const PathfinderSkillsView: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
+  const attrs = getAttrs(character);
+
+  const attrMods: Record<string, number> = {
+    ST: calculateModifier(attrs.ST),
+    GE: calculateModifier(attrs.GE),
+    KO: calculateModifier(attrs.KO),
+    IN: calculateModifier(attrs.IN),
+    WE: calculateModifier(attrs.WE),
+    CH: calculateModifier(attrs.CH),
+  };
+
+  const mergedSkills = React.useMemo(() => {
+    return PATHFINDER_SKILLS.map((def) => {
+      const existing = character.skills.find((s) => {
+        const sName = (s?.name || "").toLowerCase().trim();
+        const defName = def.name.toLowerCase().trim();
+        if (sName === defName) return true;
+        if (def.aliases?.some((a) => a.toLowerCase().trim() === sName)) return true;
+        return false;
+      });
+      const attrMod = attrMods[def.attr] ?? 0;
+      const rawVal = existing ? existing.value : 0;
+      const ranks = typeof rawVal === "number"
+        ? rawVal
+        : parseInt(String(rawVal).replace(/[^0-9-]/g, ""), 10) || 0;
+      const isClassSkill = existing?.trained ?? false;
+      const classBonus = isClassSkill && ranks > 0 ? 3 : 0;
+      const totalBonus = attrMod + ranks + classBonus + (existing?.miscBonus ?? 0);
+      return {
+        ...def,
+        ranks,
+        isClassSkill,
+        classBonus,
+        attrMod,
+        totalBonus,
+        miscBonus: existing?.miscBonus ?? 0,
+      };
+    });
+  }, [character.skills, attrMods]);
+
+  const handleUpdateSkillRanks = (skillName: string, newRanks: number) => {
+    const current = [...character.skills];
+    const idx = current.findIndex((s) => (s?.name || "").toLowerCase() === skillName.toLowerCase());
+    if (idx >= 0) current[idx] = { ...current[idx], value: newRanks };
+    else current.push({ name: skillName, value: newRanks, trained: false });
+    onUpdate({ skills: current });
+  };
+
+  const handleToggleClassSkill = (skillName: string) => {
+    const current = [...character.skills];
+    const idx = current.findIndex((s) => (s?.name || "").toLowerCase() === skillName.toLowerCase());
+    if (idx >= 0) current[idx] = { ...current[idx], trained: !current[idx].trained };
+    else current.push({ name: skillName, value: 0, trained: true });
+    onUpdate({ skills: current });
+  };
+
+  return (
+    <div className="space-y-4">
+      <PathfinderSkillsBlock
+        mergedSkills={mergedSkills}
+        isEditable={isEditing}
+        onUpdateSkillRanks={handleUpdateSkillRanks}
+        onToggleClassSkill={handleToggleClassSkill}
+        printMode={false}
+      />
+    </div>
+  );
+};
+
 export const PathfinderPlugin: SystemPlugin = {
   id: "pathfinder",
   name: "Pathfinder 1e",
