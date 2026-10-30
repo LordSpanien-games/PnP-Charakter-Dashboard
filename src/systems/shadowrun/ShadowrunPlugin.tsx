@@ -1,3 +1,6 @@
+import { ShadowrunKarmaView } from "./ShadowrunKarmaView";
+import { SHADOWRUN_SKILLS } from "../../data/skills/shadowrunSkills";
+
 import React, { useState } from "react";
 import { Info, Plus, Minus, ChevronDown, ChevronRight, HeartPulse, Stethoscope } from "lucide-react";
 import { SystemPlugin, AttributePool, PluginViewProps } from "../../core/SystemPlugin";
