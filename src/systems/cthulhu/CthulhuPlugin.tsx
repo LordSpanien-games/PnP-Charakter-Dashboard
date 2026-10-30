@@ -31,7 +31,7 @@ import {
   formatCocDamage,
   makeId,
 } from "./cthulhuRules";
-
+import { CoCDevelopmentView } from "./CoCDevelopmentView";
 const getAttrs = (character: GenericCharacter): CocAttributes => ({
   ST: Number(character.attributes.ST) || 50,
   KO: Number(character.attributes.KO) || 50,
@@ -977,7 +977,7 @@ const buildCocPlugin = (config: CocVariantConfig): SystemPlugin => ({
 
   secondaryViews: [
     { id: "combat", label: "Kampf", Component: CthulhuCombatView },
-    { id: "development", label: "Entwicklung", Component: CthulhuDevelopmentView },
+  { id: "development", label: "⬆ Entwicklung", Component: CoCDevelopmentView },
     { id: "background", label: "Hintergrund", Component: CthulhuBackgroundView },
   ],
 });
