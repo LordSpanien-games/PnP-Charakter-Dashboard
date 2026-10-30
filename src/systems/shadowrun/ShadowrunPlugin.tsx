@@ -951,7 +951,8 @@ export const ShadowrunPlugin: SystemPlugin = {
   DashboardComponent: ShadowrunOverview,
 
   secondaryViews: [
-    { id: "combat", label: "Kampf", Component: ShadowrunCombatView },
-    { id: "matrix", label: "Matrix", Component: ShadowrunMatrixView },
-  ],
+  { id: "combat", label: "Kampf",    Component: ShadowrunCombatView  },
+  { id: "matrix", label: "Matrix",   Component: ShadowrunMatrixView  },
+  { id: "karma",  label: "⬆ Karma",  Component: ShadowrunKarmaView   },
+],
 };
