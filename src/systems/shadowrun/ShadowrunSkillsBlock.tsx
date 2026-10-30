@@ -17,7 +17,7 @@ export const ShadowrunSkillsBlock: React.FC<Props> = ({
   const [showAll, setShowAll] = useState(false);
 
   // Masterliste mit Charakter-Skills mergen
-  const merged = SR_MASTER_SKILLS.map((def) => {
+  const merged = SHADOWRUN_SKILLS.map((def) => {
     const existing = character.skills.find(
       (s) => s.name.toLowerCase() === def.name.toLowerCase()
     );
@@ -32,7 +32,7 @@ export const ShadowrunSkillsBlock: React.FC<Props> = ({
   // Skills die der Charakter hat, aber NICHT in der Masterliste stehen
   const extraSkills = character.skills.filter(
     (s) =>
-      !SR_MASTER_SKILLS.some(
+      !SHADOWRUN_SKILLS.some(
         (m) => m.name.toLowerCase() === s.name.toLowerCase()
       )
   );
