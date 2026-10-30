@@ -1,49 +1,7 @@
 import React, { useState } from "react";
 import { GenericCharacter } from "../../core/types";
 
-const SR_MASTER_SKILLS: { name: string; category: "active" | "knowledge" }[] = [
-  // Aktionsfertigkeiten
-  { name: "Athletik", category: "active" },
-  { name: "Ausweichen", category: "active" },
-  { name: "Biotech", category: "active" },
-  { name: "Computersysteme", category: "active" },
-  { name: "Con", category: "active" },
-  { name: "Einschüchtern", category: "active" },
-  { name: "Elektronik", category: "active" },
-  { name: "Erste Hilfe", category: "active" },
-  { name: "Fahrzeuge", category: "active" },
-  { name: "Gewehre", category: "active" },
-  { name: "Hacking", category: "active" },
-  { name: "Heimlichkeit", category: "active" },
-  { name: "Kampfsport", category: "active" },
-  { name: "Klettern", category: "active" },
-  { name: "Klingenwaffen", category: "active" },
-  { name: "Knacken", category: "active" },
-  { name: "Knüppelwaffen", category: "active" },
-  { name: "Magie", category: "active" },
-  { name: "Mechaniker", category: "active" },
-  { name: "Medizin", category: "active" },
-  { name: "Nahkampf", category: "active" },
-  { name: "Navigation", category: "active" },
-  { name: "Pistolen", category: "active" },
-  { name: "Schlösser knacken", category: "active" },
-  { name: "Schrotflinten", category: "active" },
-  { name: "Schwere Waffen", category: "active" },
-  { name: "Schwimmen", category: "active" },
-  { name: "Sprengstoffe", category: "active" },
-  { name: "Sturmgewehre", category: "active" },
-  { name: "Überreden", category: "active" },
-  { name: "Verhandeln", category: "active" },
-  { name: "Wahrnehmung", category: "active" },
-  { name: "Waffenloser Kampf", category: "active" },
-  { name: "Werfen", category: "active" },
-  // Wissens-/Sprachfertigkeiten
-  { name: "Konzerne", category: "knowledge" },
-  { name: "Matrixsicherheit", category: "knowledge" },
-  { name: "Stadtgeographie", category: "knowledge" },
-  { name: "Straßenwissen", category: "knowledge" },
-  { name: "Unterwelt", category: "knowledge" },
-];
+import { SHADOWRUN_SKILLS } from "../../data/skills/shadowrunSkills";
 
 interface Props {
   character: GenericCharacter;
