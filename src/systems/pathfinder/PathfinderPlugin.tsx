@@ -217,7 +217,7 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
   const cls = classId ? PATHFINDER_CLASSES[classId] : undefined;
   const race = raceId ? PATHFINDER_RACES[raceId] : undefined;
   const sneakAttackActive = Boolean(character.systemData.sneakAttackActive);
-  const charModifiers = getCharModifiers(character);
+  const [charModifiers, setCharModifiers] = useState<CombatModifier[]>(getCharModifiers(character));
 
   const saves = calculateSavingThrows(attrs, level, classId);
   const armorBonus = getEquippedArmorBonus(character.inventory);
@@ -605,6 +605,9 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
   const totalKmb = maneuver.kmb + miscBonuses.kmbBonus;
   const totalKmv = maneuver.kmv + miscBonuses.kmvBonus;
   const updateSystemData = (key: string, value: unknown) => onUpdate({ systemData: { ...character.systemData, [key]: value } });
+  const [freeModName, setFreeModName] = useState("");
+  const [freeModValue, setFreeModValue] = useState("");
+  const [freeModTarget, setFreeModTarget] = useState<"attackBonus" | "damageBonus" | "acBonus" | "kmbBonus" | "kmvBonus" | "fortBonus" | "refBonus" | "willBonus">("attackBonus");
   const hp = character.resources.hp || { current: 0, max: 0 };
   const updateHp = (field: "current" | "max", value: number) => onUpdate({ resources: { ...character.resources, hp: { ...hp, [field]: value } } });
   const updateInventoryItem = (id: string, patch: Partial<InventoryItem>) => {
@@ -986,6 +989,105 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
           </p>
           <div className="mt-1">
             <ModifierListEditor modifiers={charModifiers} onChange={(next) => updateSystemData("combatModifiers", next)} showMiscFields />
+          </div>
+
+          {/* Freier Statuseffekt-Editor */}
+          <div className="mt-3 p-2 bg-black/30 border border-zinc-800 rounded-lg">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[9px] font-bold text-zinc-300">Freier Statuseffekt</span>
+              <span className="text-[8px] text-zinc-500 font-mono">Beliebiger Name + Wert + Ziel</span>
+            </div>
+            <div className="flex flex-wrap gap-1 items-end">
+              <div className="flex-1 min-w-[120px]">
+                <label className="text-[9px] text-zinc-500 font-mono block mb-0.5">Name</label>
+                <input
+                  type="text"
+                  value={freeModName}
+                  placeholder="z.B. Lied des Mutes"
+                  onChange={(e) => setFreeModName(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded text-[9px] text-white font-mono px-1 py-0.5"
+                />
+              </div>
+              <div className="min-w-[60px]">
+                <label className="text-[9px] text-zinc-500 font-mono block mb-0.5">Wert</label>
+                <input
+                  type="number"
+                  value={freeModValue === "" ? "" : freeModValue}
+                  placeholder="+2"
+                  onChange={(e) => setFreeModValue(e.target.value === "" ? "" : e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded text-[9px] text-white font-mono px-1 py-0.5 text-center"
+                />
+              </div>
+              <div className="min-w-[80px]">
+                <label className="text-[9px] text-zinc-500 font-mono block mb-0.5">Erhöht</label>
+                <select
+                  value={freeModTarget}
+                  onChange={(e) => setFreeModTarget(e.target.value as any)}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded text-[9px] text-white font-mono px-1 py-0.5"
+                >
+                  <option value="attackBonus">Angriff</option>
+                  <option value="damageBonus">Schaden</option>
+                  <option value="acBonus">RK</option>
+                  <option value="kmbBonus">KMB</option>
+                  <option value="kmvBonus">KMV</option>
+                  <option value="fortBonus">Zähigkeit</option>
+                  <option value="refBonus">Reflex</option>
+                  <option value="willBonus">Wille</option>
+                </select>
+              </div>
+              <button
+                onClick={() => {
+                  if (!freeModName.trim() || !freeModValue) return;
+                  const val = Number(freeModValue);
+                  const mod: CombatModifier = {
+                    id: makeId(),
+                    label: freeModName.trim(),
+                    sourceType: "custom",
+                    context: "always",
+                    ...(freeModTarget === "attackBonus" && { attackBonus: val }),
+                    ...(freeModTarget === "damageBonus" && { damageBonus: val }),
+                    ...(freeModTarget === "acBonus" && { acBonus: val }),
+                    ...(freeModTarget === "kmbBonus" && { kmbBonus: val }),
+                    ...(freeModTarget === "kmvBonus" && { kmvBonus: val }),
+                    ...(freeModTarget === "fortBonus" && { fortBonus: val }),
+                    ...(freeModTarget === "refBonus" && { refBonus: val }),
+                    ...(freeModTarget === "willBonus" && { willBonus: val }),
+                  };
+                  setCharModifiers([...charModifiers, mod]);
+                  updateSystemData("combatModifiers", [...charModifiers, mod]);
+                  setFreeModName("");
+                  setFreeModValue("");
+                }}
+                className="px-2 py-1 bg-amber-500 hover:bg-amber-400 text-black text-[9px] font-mono rounded"
+              >
+                + Hinzufügen
+              </button>
+            </div>
+            {charModifiers
+              .filter((m) => m.sourceType === "custom" && m.context === "always")
+              .map((m) => (
+                <div key={m.id} className="flex items-center justify-between px-2 py-1 mt-0.5 bg-zinc-950/50 border border-zinc-800/50 rounded">
+                  <span className="text-[9px] text-zinc-300 font-mono">{m.label}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9px] text-emerald-400 font-mono">
+                      {m.attackBonus !== 0 ? `Angriff {m.attackBonus > 0 ? "+" : ""}${m.attackBonus}` : ""}
+                      {m.damageBonus !== 0 ? `Schaden {m.damageBonus > 0 ? "+" : ""}${m.damageBonus}` : ""}
+                      {m.acBonus !== 0 ? `RK {m.acBonus > 0 ? "+" : ""}${m.acBonus}` : ""}
+                      {m.kmbBonus !== 0 ? `KMB {m.kmbBonus > 0 ? "+" : ""}${m.kmbBonus}` : ""}
+                      {m.kmvBonus !== 0 ? `KMV {m.kmvBonus > 0 ? "+" : ""}${m.kmvBonus}` : ""}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setCharModifiers(charModifiers.filter((x) => x.id !== m.id));
+                        updateSystemData("combatModifiers", charModifiers.filter((x) => x.id !== m.id));
+                      }}
+                      className="text-[9px] text-red-400 hover:text-red-300"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              ))}
           </div>
         </div>
       )}
