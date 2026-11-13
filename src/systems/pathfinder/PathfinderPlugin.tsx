@@ -372,12 +372,28 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
           )}
         </div>
         {isEditing && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mt-1">
             <label className="text-[10px] text-zinc-500 font-mono">Level</label>
             <input type="number" min={1} max={20} value={level} onChange={(e) => updateSystemData("level", Number(e.target.value))} className="w-16 bg-black border border-zinc-700 rounded px-1 py-0.5 text-xs text-white font-mono text-center" />
           </div>
         )}
       </div>
+
+      {/* Rast & Erholung */}
+      {isEditing && (
+        <div className="p-3 bg-indigo-950/20 border border-indigo-900/40 rounded-xl space-y-2">
+          <div className="text-xs font-mono font-bold text-indigo-300">Rast & Erholung</div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={handleNightRest} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold rounded-lg text-xs">
+              <Moon size={14} /> Nachtruhe (8h)
+            </button>
+            <button onClick={handleBedRest} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-800 hover:bg-indigo-700 text-white font-mono font-bold rounded-lg text-xs">
+              <BedDouble size={14} /> Bettruhe (24h, doppelte Heilung)
+            </button>
+          </div>
+          {restMessage && <p className="text-xs text-indigo-300 font-mono">{restMessage}</p>}
+        </div>
+      )}
 
       {/* Grundwerte kompakt */}
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
