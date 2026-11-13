@@ -729,7 +729,7 @@ const PathfinderInventory: React.FC<PluginViewProps> = ({ character, isEditing, 
         </div>
         {isEditing && (
           <div className="flex gap-1 flex-wrap">
-            {[ "weapon", "armor", "consumable", "jewelry", "gear" ] as const].map((cat) => (
+            {["weapon", "armor", "consumable", "jewelry", "gear"].map((cat) => (
               <button key={cat} onClick={() => addInventoryItem(cat as CategoryTabId)} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-[9px] font-mono rounded-lg text-zinc-300">
                 <Plus size={10} /> {cat === "weapon" ? "Waffe" : cat === "armor" ? "Rüstung" : cat === "consumable" ? "Trank" : cat === "jewelry" ? "Schmuck" : "Gegenstand"}
               </button>
