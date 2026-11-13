@@ -1105,8 +1105,6 @@ export const PathfinderPlugin: SystemPlugin = {
   DashboardComponent: PathfinderOverview,
   secondaryViews: [
     { id: "combat", label: "Kampf", Component: PathfinderCombatView },
-    { id: "skills", label: "Fertigkeiten", Component: PathfinderSkillsView },
-    { id: "levelup", label: "⬆ Level-Up", Component: PathfinderLevelUpView },
     { id: "talents", label: "Talente & Fähigkeiten", Component: PathfinderTalentsView },
     { id: "sheet", label: "Charakterbogen", Component: PathfinderCharacterSheetView },
   ],
