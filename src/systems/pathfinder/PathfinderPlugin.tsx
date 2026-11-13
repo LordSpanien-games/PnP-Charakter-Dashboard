@@ -705,6 +705,159 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
         )}
       </div>
 
+      {/* Würfel-Abfolge (Kampf) */}
+      <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-mono font-bold text-zinc-300">Würfel-Abfolge</span>
+          <Activity size={14} className="text-zinc-500" />
+        </div>
+        <p className="text-[9px] text-zinc-500 font-mono">
+          Für jeden Angriff: W20 auf Treffer, Kritisch?, Schadenswürfel der Waffe, Zusatzwürfel (Hinterhalt, Statuseffekte).
+          Felder für eingetretenen Schaden unten eintragen.
+        </p>
+        {!isTwoWeaponMode && singleResults.map(({ item, result }) => {
+          const iteratives = getBabIteratives(bab);
+          const hasSneak = !!result.grips[0]?.sneakAttack;
+          const sneakDamage = result.grips[0]?.sneakAttack?.damage || "–";
+          const hasExtraDamage = result.grips[0]?.extraDamageParts.length > 0;
+          return (
+            <div key={item.id} className="pb-2 border-b border-zinc-800 last:border-b-0 space-y-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-bold text-white">{item.name}</span>
+                {item.weaponData?.isFinesse && <span className="text-[9px] uppercase px-1 py-0.5 bg-amber-950/30 border border-amber-800/40 rounded text-amber-400">Finesse</span>}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[9px]">
+                  <thead>
+                    <tr>
+                      <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Schlag</th>
+                      <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Hand</th>
+                      <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">W20</th>
+                      <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Kritisch?</th>
+                      <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Schaden Waffe</th>
+                      {hasSneak && (
+                        <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Hinterhalt</th>
+                      )}
+                      {hasExtraDamage && (
+                        <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Magieschaden</th>
+                      )}
+                      <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Verursacht</th>
+                      <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Magie</th>
+                      <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Gesamt</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {iteratives.map((b, idx) => (
+                      <tr key={idx} className="border-b border-zinc-800">
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{idx + 1}.</td>
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-zinc-300">Haupthand</td>
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
+                          <input type="number" placeholder="W20" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                        </td>
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
+                          <input type="checkbox" className="accent-emerald-500" />
+                        </td>
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-zinc-400">
+                          {result.grips[0]?.damage || "–"}
+                        </td>
+                        {hasSneak && (
+                          <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-emerald-400">
+                            {sneakDamage}
+                          </td>
+                        )}
+                        {hasExtraDamage && (
+                          <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-sky-300">
+                            {result.grips[0]?.extraDamageParts.join(" ") || "–"}
+                          </td>
+                        )}
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
+                          <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                        </td>
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
+                          <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                        </td>
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">–</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        ))}
+        {isTwoWeaponMode && twfResult && (
+          <>
+            <p className="text-[9px] text-amber-400/80 font-mono mb-1">{twfResult.penaltyNote}</p>
+            {[
+              { res: twfResult.primary, label: "Haupthand", key: "primary" },
+              { res: twfResult.offHand, label: "Nebenhand", key: "offHand" },
+            ].map(({ res, label, key }) => {
+              const iteratives = res.attacks;
+              const hasSneak = !!iteratives[0]?.attack.includes("Hinterhalt") || sneakAttackActive;
+              return (
+                <div key={key} className="pb-2 border-b border-zinc-800 last:border-b-0 space-y-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-bold text-white">⚔ {res.weaponName}</span>
+                    <span className="text-[9px] uppercase px-1 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-300">{label}</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[9px]">
+                      <thead>
+                        <tr>
+                          <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Schlag</th>
+                          <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">W20</th>
+                          <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Kritisch?</th>
+                          <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Schaden Waffe</th>
+                          {hasSneak && (
+                            <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Hinterhalt</th>
+                          )}
+                          <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Verursacht</th>
+                          <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Magie</th>
+                          <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Gesamt</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {iteratives.map((att, aidx) => (
+                          <tr key={aidx} className="border-b border-zinc-800">
+                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{aidx + 1}.</td>
+                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
+                              <input type="number" placeholder="W20" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                            </td>
+                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
+                              <input type="checkbox" className="accent-emerald-500" />
+                            </td>
+                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-zinc-400">
+                              {att.attacks?.[0]?.damage || att.damage || "–"}
+                            </td>
+                            {hasSneak && (
+                              <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-emerald-400">
+                                {sneakDice > 0 ? `+${sneakDice}W6` : "–"}
+                              </td>
+                            )}
+                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
+                              <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                            </td>
+                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
+                              <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                            </td>
+                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">–</td>
+                          </tr>
+                        ))}
+                        <tr className="border-t border-zinc-800">
+                          <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold" colSpan={7}>
+                            Summe {label}: <span className="text-emerald-400">0</span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            }
+          )}
+        )}
+      </div>
+
       {/* Kampf-Modifikatoren (Echtzeit: Zauber, Flüche, Hast, Gift etc.) */}
       {isEditing && (
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
