@@ -379,25 +379,43 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
               <div key={key}>
                 <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">{TYPE_LABELS[key] || key}</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-                  {groups[key].map((ability) => (
-                    <div key={ability.id || ability.name} className="p-1.5 bg-black/40 border border-zinc-800 rounded">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-xs font-bold text-white truncate">{ability.name}</span>
-                        {ability.usage && <ValueBadge label="Nutzung" value={ability.usage} color="text-purple-300" />}
+                  {groups[key].map((ability) => {
+                    const max = ability.maxUses ?? parseDailyUses(ability.usage) ?? 0;
+                    const current = ability.currentUses ?? max;
+                    return (
+                      <div key={ability.id || ability.name} className="p-1.5 bg-black/40 border border-zinc-800 rounded">
+                        <div className="flex items-center justify-between gap-1 mb-0.5">
+                          <span className="text-xs font-bold text-white truncate">{ability.name}</span>
+                          {ability.usage && <ValueBadge label="Nutzung" value={ability.usage} color="text-purple-300" />}
+                        </div>
+                        {ability.effect && <p className="text-[10px] text-zinc-400 font-mono mt-0.5">{ability.effect}</p>}
+                        {max > 0 && (
+                          <ChargeTracker
+                            current={current}
+                            max={max}
+                            onToggle={(newCurrent) => {
+                              const idx = abilities.findIndex((a) => a.id === ability.id);
+                              if (idx >= 0) {
+                                const next = [...abilities];
+                                next[idx] = { ...next[idx], currentUses: newCurrent };
+                                onUpdate({ abilities: next });
+                              }
+                            }}
+                          />
+                        )}
+                        {isEditing && (
+                          <SourceReferenceEditor value={ability.sourceReference} onChange={(v) => {
+                            const idx = abilities.findIndex((a) => a.id === ability.id);
+                            if (idx >= 0) {
+                              const next = [...abilities];
+                              next[idx] = { ...next[idx], sourceReference: v };
+                              onUpdate({ abilities: next });
+                            }
+                          }} />
+                        )}
                       </div>
-                      {ability.effect && <p className="text-[10px] text-zinc-400 font-mono mt-0.5">{ability.effect}</p>}
-                      {isEditing && (
-                        <SourceReferenceEditor value={ability.sourceReference} onChange={(v) => {
-                          const idx = abilities.findIndex((a) => a.id === ability.id);
-                          if (idx >= 0) {
-                            const next = [...abilities];
-                            next[idx] = { ...next[idx], sourceReference: v };
-                            onUpdate({ abilities: next });
-                          }
-                        }} />
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -703,30 +721,85 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
         </div>
       )}
 
-      {/* Statuseffekte (Schnellübersicht) */}
-      <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-mono font-bold text-zinc-300">Aktive Statuseffekte</span>
-          <ShieldAlert size={14} className="text-zinc-500" />
+      {/* Statuseffekte (Dropdown zur Auswahl) */}
+      {isEditing && (
+        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono font-bold text-zinc-300">Statuseffekt hinzufügen</span>
+            <ShieldAlert size={14} className="text-zinc-500" />
+          </div>
+          <p className="text-[9px] text-zinc-500 font-mono">
+            Wähle einen Statuseffekt aus. Der entsprechende Kampf-Modifikator wird automatisch erstellt und wirkt auf Angriff, Schaden, KMB, KMV und RK.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <select
+              value=""
+              onChange={(e) => {
+                const type = e.target.value as any;
+                if (!type) return;
+                const now = Date.now();
+                let mod: CombatModifier;
+                switch (type) {
+                  case "haste":
+                    mod = { id: `mod_${now}_1`, label: "Haste", sourceType: "custom", context: "always", attackBonus: 1, acBonus: 1 };
+                    break;
+                  case "langsam":
+                    mod = { id: `mod_${now}_2`, label: "Langsam", sourceType: "custom", context: "always", attackBonus: -1, acBonus: -1 };
+                    break;
+                  case "vergiftet":
+                    mod = { id: `mod_${now}_3`, label: "Vergiftet", sourceType: "custom", context: "always", damageBonus: -1, extraDamageDice: "1W6 Gift" };
+                    break;
+                  case "blutend":
+                    mod = { id: `mod_${now}_4`, label: "Blutende Wunden", sourceType: "custom", context: "always", extraDamageDice: "1W6 Blutung" };
+                    break;
+                  case "segen":
+                    mod = { id: `mod_${now}_5`, label: "Segen", sourceType: "custom", context: "always", attackBonus: 1 };
+                    break;
+                  case "fluch":
+                    mod = { id: `mod_${now}_6`, label: "Fluch", sourceType: "custom", context: "always", attackBonus: -1 };
+                    break;
+                  case "gelegenheitsangriff":
+                    mod = { id: `mod_${now}_7`, label: "Gelegenheitsangriff", sourceType: "custom", context: "always", acBonus: -2 };
+                    break;
+                  default:
+                    return;
+                }
+                updateSystemData("combatModifiers", [...charModifiers, mod]);
+                e.target.value = "";
+              }}
+              className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-white font-mono px-1 py-0.5"
+            >
+              <option value="">-- Statuseffekt auswählen --</option>
+              <option value="haste">Haste (+1 Angriff, +1 RK)</option>
+              <option value="langsam">Langsam (-1 Angriff, -1 RK)</option>
+              <option value="vergiftet">Vergiftet (-1 Schaden, +1W6 Gift)</option>
+              <option value="blutend">Blutende Wunden (+1W6 Blutung)</option>
+              <option value="segen">Segen (+1 Angriff)</option>
+              <option value="fluch">Fluch (-1 Angriff)</option>
+              <option value="gelegenheitsangriff">Gelegenheitsangriff (-2 RK)</option>
+            </select>
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <div className="flex items-center gap-2 p-2 bg-black/30 rounded-lg border border-zinc-800/50">
-            <Sword size={12} className="text-rose-400" />
-            <span className="text-xs text-zinc-300 font-mono">Blutende Wunden (über Modifikator)</span>
+      )}
+      {!isEditing && charModifiers.length > 0 && (
+        <div className="p-3 bg-black/30 border border-zinc-800 rounded-xl space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono font-bold text-zinc-300">Aktive Statuseffekte</span>
+            <ShieldAlert size={14} className="text-zinc-500" />
           </div>
-          <div className="flex items-center gap-2 p-2 bg-black/30 rounded-lg border border-zinc-800/50">
-            <ShieldAlert size={12} className="text-amber-400" />
-            <span className="text-xs text-zinc-300 font-mono">Vergiftet (über Modifikator)</span>
-          </div>
-          <div className="flex items-center gap-2 p-2 bg-black/30 rounded-lg border border-zinc-800/50">
-            <Activity size={12} className="text-cyan-400" />
-            <span className="text-xs text-zinc-300 font-mono">Haste / Langsam</span>
-          </div>
+          {charModifiers.map((mod) => (
+            <div key={mod.id} className="flex items-center gap-2 p-1 bg-black/20 rounded">
+              <span className="text-[9px] text-zinc-400 font-mono">{mod.label}</span>
+              <span className="text-[9px] text-amber-400 font-mono">
+                {mod.attackBonus !== 0 ? `Angriff ${mod.attackBonus > 0 ? "+" : ""}${mod.attackBonus} · ` : ""}
+                {mod.damageBonus !== 0 ? `Schaden ${mod.damageBonus > 0 ? "+" : ""}${mod.damageBonus} · ` : ""}
+                {mod.acBonus !== 0 ? `RK ${mod.acBonus > 0 ? "+" : ""}${mod.acBonus}` : ""}
+                {mod.extraDamageDice ? `Zusatz: ${mod.extraDamageDice}` : ""}
+              </span>
+            </div>
+          ))}
         </div>
-        <p className="text-[9px] text-zinc-500 font-mono">
-          Statuseffekte werden über Kampf-Modifikatoren (oben) abgebildet: Typ „Sonstiges“, Kontext „Immer“, passende Werte für Angriff/Schaden/RK.
-        </p>
-      </div>
+      )}
     </div>
   );
 };
@@ -1106,6 +1179,7 @@ export const PathfinderPlugin: SystemPlugin = {
   DashboardComponent: PathfinderOverview,
   secondaryViews: [
     { id: "combat", label: "Kampf", Component: PathfinderCombatView },
+    { id: "inventory", label: "Inventar", Component: PathfinderInventory },
     { id: "sheet", label: "Charakterbogen", Component: PathfinderCharacterSheetView },
   ],
 };
