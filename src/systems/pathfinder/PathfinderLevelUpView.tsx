@@ -234,6 +234,36 @@ export const PathfinderLevelUpView: React.FC<PluginViewProps> = ({
         <p className="text-[10px] text-zinc-600 font-mono italic">
           Trage die erhaltenen Erfahrungspunkte ein. Sie werden zum aktuellen Wert addiert.
         </p>
+        {typeof xpToAdd === "number" && xpToAdd > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              const currentXp = Number(character.systemData?.experiencePoints) || 0;
+              const newTotalXp = currentXp + xpToAdd;
+              const updatedXpHistory = [
+                ...(character.systemData?.experienceHistory || []),
+                {
+                  id: makeId(),
+                  amount: xpToAdd,
+                  totalAfter: newTotalXp,
+                  date: new Date().toISOString(),
+                  reason: "Erfahrungspunkte",
+                },
+              ];
+              onUpdate({
+                systemData: {
+                  ...character.systemData,
+                  experiencePoints: newTotalXp,
+                  experienceHistory: updatedXpHistory,
+                },
+              });
+              setXpToAdd("");
+            }}
+            className="w-full px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-black font-mono rounded-lg"
+          >
+            XP speichern
+          </button>
+        )}
       </div>
 
       {/* SCHRITT 1: HP */}

@@ -296,6 +296,8 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
 
   const currencyBalance = character.systemData.currencyBalance as number | undefined;
   const currencyUnit = (character.systemData.currencyUnit as string) || "GM";
+  const currentXpOverview = Number(character.systemData.experiencePoints) || 0;
+  const [xpToAddOverview, setXpToAddOverview] = useState<number | "">("");
 
   return (
     <div className="space-y-4">
@@ -308,6 +310,55 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
               {race?.name || "–"} · {cls?.name || "–"} · Stufe {level}
               {character.subTitle ? ` · ${character.subTitle}` : ""}
             </p>
+            {isEditing && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[9px] text-zinc-500 font-mono">Erfahrungspunkte:</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={xpToAddOverview === "" ? "" : xpToAddOverview}
+                  onChange={(e) => setXpToAddOverview(e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="+500"
+                  className="w-14 bg-black border border-zinc-700 rounded px-0.5 py-0 text-xs text-white text-center"
+                />
+                <button
+                  onClick={() => {
+                    const currentXp = Number(character.systemData.experiencePoints) || 0;
+                    const xpAdd = typeof xpToAddOverview === "number" ? xpToAddOverview : 0;
+                    if (xpAdd > 0) {
+                      const newTotalXp = currentXp + xpAdd;
+                      const updatedXpHistory = [
+                        ...(character.systemData.experienceHistory || []),
+                        {
+                          id: makeId(),
+                          amount: xpAdd,
+                          totalAfter: newTotalXp,
+                          date: new Date().toISOString(),
+                          reason: "Erfahrungspunkte",
+                        },
+                      ];
+                      onUpdate({
+                        systemData: {
+                          ...character.systemData,
+                          experiencePoints: newTotalXp,
+                          experienceHistory: updatedXpHistory,
+                        },
+                      });
+                      setXpToAddOverview("");
+                    }
+                  }}
+                  className="px-2 py-0.5 bg-amber-500 hover:bg-amber-400 text-black text-[9px] font-mono rounded"
+                >
+                  Speichern
+                </button>
+              </div>
+            )}
+            {!isEditing && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[9px] text-zinc-500 font-mono">XP:</span>
+                <span className="text-[9px] text-yellow-400 font-mono font-bold">{currentXpOverview}</span>
+              </div>
+            )}
           </div>
           {isEditing && (
             <div className="flex gap-2">
