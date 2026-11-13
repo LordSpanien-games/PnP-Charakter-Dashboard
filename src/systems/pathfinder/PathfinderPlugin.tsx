@@ -712,150 +712,99 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
           <Activity size={14} className="text-zinc-500" />
         </div>
         <p className="text-[9px] text-zinc-500 font-mono">
-          Für jeden Angriff: W20 auf Treffer, Kritisch?, Schadenswürfel der Waffe, Zusatzwürfel (Hinterhalt, Statuseffekte).
-          Felder für eingetretenen Schaden unten eintragen.
+          Eine Zeile pro Schlag. Bei Zweiwaffenkampf reihum: Haupt, Neben, Haupt, Neben…
+          W20 und Kritisch entfallen – entscheidend ist der gewürfelte Schaden.
         </p>
-        {!isTwoWeaponMode && singleResults.map(({ item, result }) => {
-          const iteratives = getBabIteratives(bab);
-          const hasSneak = !!result.grips[0]?.sneakAttack;
-          const sneakDamage = result.grips[0]?.sneakAttack?.damage || "\u2013";
-          const hasExtraDamage = result.grips[0]?.extraDamageParts.length > 0;
-          return (
-            <div key={item.id} className="pb-2 border-b border-zinc-800 last:border-b-0 space-y-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-bold text-white">{item.name}</span>
-                {item.weaponData?.isFinesse && <span className="text-[9px] uppercase px-1 py-0.5 bg-amber-950/30 border border-amber-800/40 rounded text-amber-400">Finesse</span>}
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-[9px]">
-                  <thead>
-                    <tr>
-                      <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Schlag</th>
-                      <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Hand</th>
-                      <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">W20</th>
-                      <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Kritisch?</th>
-                      <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Schaden Waffe</th>
-                      {hasSneak && (
-                        <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Hinterhalt</th>
-                      )}
-                      {hasExtraDamage && (
-                        <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Magieschaden</th>
-                      )}
-                      <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Verursacht</th>
-                      <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Magie</th>
-                      <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Gesamt</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[9px]">
+            <thead>
+              <tr>
+                <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">#</th>
+                <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Waffe / Hand</th>
+                <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Würfel (aus Waffe)</th>
+                <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Kritisch-Schaden</th>
+                <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Gewürfelt</th>
+                <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Status</th>
+                <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Schaden</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!isTwoWeaponMode ? (
+                singleResults.map(({ item, result }) => {
+                  const iteratives = getBabIteratives(bab);
+                  const dmgLine = result.grips[0]?.damage || "\u2013";
+                  return iteratives.map((_b, idx) => (
+                    <tr key={idx} className="border-b border-zinc-800">
+                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{idx + 1}.</td>
+                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{item.name}</td>
+                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-zinc-400">
+                        {dmgLine}{item.weaponData?.magicBonus ? ` +${item.weaponData.magicBonus}` : ""}
+                      </td>
+                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
+                        <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                      </td>
+                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
+                        <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                      </td>
+                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
+                        <select className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-white px-0.5 py-0">
+                          <option value="">–</option>
+                          <option value="blutend">Blutend</option>
+                          <option value="schwächen">Schwächen</option>
+                          <option value="vergiftet">Vergiftet</option>
+                        </select>
+                      </td>
+                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">0</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {iteratives.map((b, idx) => (
-                      <tr key={idx} className="border-b border-zinc-800">
-                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{idx + 1}.</td>
-                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-zinc-300">Haupthand</td>
-                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
-                          <input type="number" placeholder="W20" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
-                        </td>
-                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
-                          <input type="checkbox" className="accent-emerald-500" />
-                        </td>
-                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-zinc-400">
-                          {result.grips[0]?.damage || "\u2013"}
-                        </td>
-                        {hasSneak && (
-                          <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-emerald-400">
-                            {sneakDamage}
-                          </td>
-                        )}
-                        {hasExtraDamage && (
-                          <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-sky-300">
-                            {result.grips[0]?.extraDamageParts.join(" ") || "\u2013"}
-                          </td>
-                        )}
-                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
-                          <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
-                        </td>
-                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
-                          <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
-                        </td>
-                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">\u2013</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          );
-        })}
-        {isTwoWeaponMode && twfResult && (
-          <>
-            <p className="text-[9px] text-amber-400/80 font-mono mb-1">{twfResult.penaltyNote}</p>
-            {[
-              { res: twfResult.primary, label: "Haupthand", key: "primary" },
-              { res: twfResult.offHand, label: "Nebenhand", key: "offHand" },
-            ].map(({ res, label, key }) => {
-              const iteratives = res.attacks;
-              const hasSneak = sneakAttackActive;
-              return (
-                <div key={key} className="pb-2 border-b border-zinc-800 last:border-b-0 space-y-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-bold text-white">\u2694 {res.weaponName}</span>
-                    <span className="text-[9px] uppercase px-1 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-300">{label}</span>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-[9px]">
-                      <thead>
-                        <tr>
-                          <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Schlag</th>
-                          <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">W20</th>
-                          <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Kritisch?</th>
-                          <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Schaden Waffe</th>
-                          {hasSneak && (
-                            <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Hinterhalt</th>
-                          )}
-                          <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Verursacht</th>
-                          <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Magie</th>
-                          <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Gesamt</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {iteratives.map((att, aidx) => (
-                          <tr key={aidx} className="border-b border-zinc-800">
-                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{aidx + 1}.</td>
-                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
-                              <input type="number" placeholder="W20" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
-                            </td>
-                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
-                              <input type="checkbox" className="accent-emerald-500" />
-                            </td>
+                  ));
+                })
+              ) : (
+                isTwoWeaponMode && twfResult && (
+                  <>
+                    <p className="text-[9px] text-amber-400/80 font-mono mb-1">{twfResult.penaltyNote}</p>
+                    {[twfResult.primary, twfResult.offHand].flatMap((res, wIdx) => {
+                      const iteratives = res.attacks;
+                      return iteratives.map((att, aidx) => {
+                        const globalIdx = wIdx * iteratives.length + aidx;
+                        const hand = wIdx === 0 ? "Haupthand" : "Nebenhand";
+                        const weaponName = res.weaponName;
+                        const dmgLine = att.damage || "\u2013";
+                        return (
+                          <tr key={globalIdx} className="border-b border-zinc-800">
+                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{globalIdx + 1}.</td>
+                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{weaponName} ({hand})</td>
                             <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-zinc-400">
-                              {att.damage || "–"}
+                              {dmgLine}
                             </td>
-                            {hasSneak && (
-                              <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-emerald-400">
-                                {sneakDice > 0 ? `+${sneakDice}W6` : "\u2013"}
-                              </td>
-                            )}
                             <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
                               <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
                             </td>
                             <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
                               <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
                             </td>
-                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">\u2013</td>
+                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
+                              <select className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-white px-0.5 py-0">
+                                <option value="">–</option>
+                                <option value="blutend">Blutend</option>
+                                <option value="schwächen">Schwächen</option>
+                                <option value="vergiftet">Vergiftet</option>
+                              </select>
+                            </td>
+                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">0</td>
                           </tr>
-                        ))}
-                        <tr className="border-t border-zinc-800">
-                          <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold" colSpan={7}>
-                            Summe {label}: <span className="text-emerald-400">0</span>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              );
-            })}
-          </>
-        )}
+                        );
+                      });
+                    })}
+                  </>
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex justify-end mt-1">
+          <span className="text-xs font-bold text-white font-mono">Gesamtschaden aller Schläge: </span>
+          <span className="text-emerald-400 font-bold text-lg">0</span>
+        </div>
       </div>
 
       {/* Kampf-Modifikatoren (Echtzeit: Zauber, Flüche, Hast, Gift etc.) */}
