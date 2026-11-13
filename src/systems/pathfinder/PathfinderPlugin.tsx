@@ -713,7 +713,7 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
         </div>
         <p className="text-[9px] text-zinc-500 font-mono">
           Eine Zeile pro Schlag. Bei Zweiwaffenkampf reihum: Haupt, Neben, Haupt, Neben…
-          W20 und Kritisch entfallen – entscheidend ist der gewürfelte Schaden.
+          W20 entfällt – entscheidend ist der gewürfelte Schaden. Kritisch als eigener Wurf.
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-[9px]">
@@ -722,7 +722,9 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                 <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">#</th>
                 <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Waffe / Hand</th>
                 <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Würfel (aus Waffe)</th>
-                <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Kritisch-Schaden</th>
+                <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Sneak Attack</th>
+                <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Angriffswert</th>
+                <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Kritisch</th>
                 <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Gewürfelt</th>
                 <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Status</th>
                 <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Schaden</th>
@@ -733,30 +735,48 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                 singleResults.map(({ item, result }) => {
                   const iteratives = getBabIteratives(bab);
                   const dmgLine = result.grips[0]?.damage || "\u2013";
-                  return iteratives.map((_b, idx) => (
-                    <tr key={idx} className="border-b border-zinc-800">
-                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{idx + 1}.</td>
-                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{item.name}</td>
-                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-zinc-400">
-                        {dmgLine}{item.weaponData?.magicBonus ? ` +${item.weaponData.magicBonus}` : ""}
-                      </td>
-                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
-                        <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
-                      </td>
-                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
-                        <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
-                      </td>
-                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
-                        <select className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-white px-0.5 py-0">
-                          <option value="">–</option>
-                          <option value="blutend">Blutend</option>
-                          <option value="schwächen">Schwächen</option>
-                          <option value="vergiftet">Vergiftet</option>
-                        </select>
-                      </td>
-                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">0</td>
-                    </tr>
-                  ));
+                  return iteratives.map((_b, idx) => {
+                    const weaponName = item.name;
+                    const hand = "Haupthand";
+                    const magicBonus = item.weaponData?.magicBonus ?? 0;
+                    const stMod = calculateModifier(attrs.ST);
+                    const geMod = calculateModifier(attrs.GE);
+                    const dmgAttr = item.weaponData?.damageAttribute ?? "ST";
+                    const dmgMod = dmgAttr === "GE" ? geMod : stMod;
+                    const totalAttack = bab + dmgMod + magicBonus;
+                    const sneakActive = sneakAttackActive;
+                    const sneakDiceCount = sneakActive ? getSneakAttackDice(classId, level) : 0;
+                    return (
+                      <tr key={idx} className="border-b border-zinc-800">
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{idx + 1}.</td>
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{weaponName} ({hand})</td>
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-zinc-400">
+                          {dmgLine}{magicBonus > 0 ? ` +${magicBonus}` : ""}
+                        </td>
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-emerald-400">
+                          {sneakDiceCount > 0 ? `+${sneakDiceCount}W6` : "\u2013"}
+                        </td>
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">
+                          {totalAttack >= 0 ? "+" : ""}{totalAttack}
+                        </td>
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
+                          <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                        </td>
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
+                          <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                        </td>
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
+                          <select className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-white px-0.5 py-0">
+                            <option value="">–</option>
+                            <option value="blutend">Blutend</option>
+                            <option value="schwächen">Schwächen</option>
+                            <option value="vergiftet">Vergiftet</option>
+                          </select>
+                        </td>
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">0</td>
+                      </tr>
+                    );
+                  });
                 })
               ) : (
                 isTwoWeaponMode && twfResult && (
@@ -764,17 +784,29 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                     <p className="text-[9px] text-amber-400/80 font-mono mb-1">{twfResult.penaltyNote}</p>
                     {[twfResult.primary, twfResult.offHand].flatMap((res, wIdx) => {
                       const iteratives = res.attacks;
+                      const hand = wIdx === 0 ? "Haupthand" : "Nebenhand";
+                      const weaponName = res.weaponName;
+                      const isOffHand = wIdx === 1;
+                      const magicBonus = isOffHand ? (offHandWeapon?.weaponData?.magicBonus ?? 0) : (primaryWeapon?.weaponData?.magicBonus ?? 0);
+                      const stMod = calculateModifier(attrs.ST);
+                      const geMod = calculateModifier(attrs.GE);
+                      const dmgMod = stMod;
+                      const baseAttack = bab + dmgMod + magicBonus + (isOffHand && sneakAttackActive ? 5 : 0);
+                      const sneakDiceCount = sneakAttackActive ? getSneakAttackDice(classId, level) : 0;
                       return iteratives.map((att, aidx) => {
                         const globalIdx = wIdx * iteratives.length + aidx;
-                        const hand = wIdx === 0 ? "Haupthand" : "Nebenhand";
-                        const weaponName = res.weaponName;
-                        const dmgLine = att.damage || "\u2013";
                         return (
                           <tr key={globalIdx} className="border-b border-zinc-800">
                             <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{globalIdx + 1}.</td>
                             <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{weaponName} ({hand})</td>
                             <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-zinc-400">
-                              {dmgLine}
+                              {att.damage || "\u2013"}
+                            </td>
+                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-emerald-400">
+                              {sneakDiceCount > 0 ? `+${sneakDiceCount}W6` : "\u2013"}
+                            </td>
+                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">
+                              {baseAttack >= 0 ? "+" : ""}{baseAttack}
                             </td>
                             <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
                               <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
@@ -795,15 +827,16 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                         );
                       });
                     })}
+                    <tr className="border-t border-zinc-800">
+                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold" colSpan={9}>
+                        Gesamtschaden aller Schläge: <span className="text-emerald-400 font-bold">0</span>
+                      </td>
+                    </tr>
                   </>
                 )
               )}
             </tbody>
           </table>
-        </div>
-        <div className="flex justify-end mt-1">
-          <span className="text-xs font-bold text-white font-mono">Gesamtschaden aller Schläge: </span>
-          <span className="text-emerald-400 font-bold text-lg">0</span>
         </div>
       </div>
 
