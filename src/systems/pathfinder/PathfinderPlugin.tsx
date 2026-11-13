@@ -718,7 +718,7 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
         {!isTwoWeaponMode && singleResults.map(({ item, result }) => {
           const iteratives = getBabIteratives(bab);
           const hasSneak = !!result.grips[0]?.sneakAttack;
-          const sneakDamage = result.grips[0]?.sneakAttack?.damage || "–";
+          const sneakDamage = result.grips[0]?.sneakAttack?.damage || "\u2013";
           const hasExtraDamage = result.grips[0]?.extraDamageParts.length > 0;
           return (
             <div key={item.id} className="pb-2 border-b border-zinc-800 last:border-b-0 space-y-1">
@@ -758,7 +758,7 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                           <input type="checkbox" className="accent-emerald-500" />
                         </td>
                         <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-zinc-400">
-                          {result.grips[0]?.damage || "–"}
+                          {result.grips[0]?.damage || "\u2013"}
                         </td>
                         {hasSneak && (
                           <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-emerald-400">
@@ -767,7 +767,7 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                         )}
                         {hasExtraDamage && (
                           <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-sky-300">
-                            {result.grips[0]?.extraDamageParts.join(" ") || "–"}
+                            {result.grips[0]?.extraDamageParts.join(" ") || "\u2013"}
                           </td>
                         )}
                         <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
@@ -776,7 +776,7 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                         <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
                           <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
                         </td>
-                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">–</td>
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">\u2013</td>
                       </tr>
                     ))}
                   </tbody>
@@ -784,7 +784,7 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
               </div>
             </div>
           );
-        ))}
+        })}
         {isTwoWeaponMode && twfResult && (
           <>
             <p className="text-[9px] text-amber-400/80 font-mono mb-1">{twfResult.penaltyNote}</p>
@@ -797,7 +797,7 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
               return (
                 <div key={key} className="pb-2 border-b border-zinc-800 last:border-b-0 space-y-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-bold text-white">⚔ {res.weaponName}</span>
+                    <span className="text-sm font-bold text-white">\u2694 {res.weaponName}</span>
                     <span className="text-[9px] uppercase px-1 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-300">{label}</span>
                   </div>
                   <div className="overflow-x-auto">
@@ -827,11 +827,11 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                               <input type="checkbox" className="accent-emerald-500" />
                             </td>
                             <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-zinc-400">
-                              {att.attacks?.[0]?.damage || att.damage || "–"}
+                              {att.attacks?.[0]?.damage || att.damage || "\u2013"}
                             </td>
                             {hasSneak && (
                               <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-emerald-400">
-                                {sneakDice > 0 ? `+${sneakDice}W6` : "–"}
+                                {sneakDice > 0 ? `+${sneakDice}W6` : "\u2013"}
                               </td>
                             )}
                             <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
@@ -840,7 +840,7 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                             <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
                               <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
                             </td>
-                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">–</td>
+                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">\u2013</td>
                           </tr>
                         ))}
                         <tr className="border-t border-zinc-800">
@@ -853,8 +853,8 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                   </div>
                 </div>
               );
-            }
-          )}
+            })}
+          </>
         )}
       </div>
 
