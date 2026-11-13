@@ -812,6 +812,8 @@ const PathfinderInventory: React.FC<PluginViewProps> = ({ character, isEditing, 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<CategoryTabId>("all");
 
+  const currencyUnit = (character.systemData.currencyUnit as string) || "GM";
+
   const toggleExpand = (id: string) => setExpandedIds((prev) => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
