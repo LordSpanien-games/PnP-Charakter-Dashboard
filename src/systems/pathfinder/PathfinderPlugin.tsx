@@ -50,9 +50,9 @@ import {
   parseMagicBonusFromName,
   makeModifierId,
   makeId,
-  PATHFINDER_CLASSES,
   PATHFINDER_RACES,
 } from "./pathfinderRules";
+import { PATHFINDER_CLASSES } from "../../utils/levelUpRules";
 
 const ATTR_KEYS = ["ST", "GE", "KO", "IN", "WE", "CH"] as const;
 const ATTR_LABELS: Record<string, string> = {
