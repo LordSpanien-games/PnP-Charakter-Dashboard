@@ -20,7 +20,6 @@ import {
   SourceReferenceEditor,
   PartyCard,
   CurrencyHistoryCard,
-  ModifierListEditor,
   ValueStepper,
 } from "../../core/uiKit";
 import {
@@ -135,6 +134,69 @@ const parseDailyUses = (usage?: string): number | undefined => {
   if (!usage) return undefined;
   const match = usage.match(/(\d+)\s*x/i);
   return match ? parseInt(match[1], 10) : undefined;
+};
+
+const ModifierListEditor: React.FC<{
+  modifiers: CombatModifier[];
+  onChange: (next: CombatModifier[]) => void;
+  showMiscFields?: boolean;
+}> = ({ modifiers, onChange, showMiscFields }) => {
+  const addModifier = () => {
+    onChange([...modifiers, { id: makeId(), label: "Neuer Modifikator", sourceType: "custom", context: "always" }]);
+  };
+  const updateModifier = (id: string, patch: Partial<CombatModifier>) => {
+    onChange(modifiers.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+  };
+  const removeModifier = (id: string) => {
+    onChange(modifiers.filter((m) => m.id !== id));
+  };
+
+  return (
+    <div className="space-y-2">
+      {modifiers.map((mod) => (
+        <div key={mod.id} className="p-2 bg-zinc-950/60 border border-zinc-800 rounded-lg space-y-1.5">
+          <div className="flex items-center gap-2">
+            <input
+              value={mod.label}
+              onChange={(e) => updateModifier(mod.id, { label: e.target.value })}
+              className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-white font-mono"
+              placeholder="Bezeichnung, z.B. Ausweichen"
+            />
+            <button onClick={() => removeModifier(mod.id)} className="text-red-400 hover:text-red-300 shrink-0"><X size={14} /></button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+            <select value={mod.sourceType} onChange={(e) => updateModifier(mod.id, { sourceType: e.target.value as CombatModifierSourceType })}
+              className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono">
+              {Object.entries(SOURCE_LABELS).map(([key, label]) => (<option key={key} value={key}>{label}</option>))}
+            </select>
+            <select value={mod.context} onChange={(e) => updateModifier(mod.id, { context: e.target.value as CombatModifierContext })}
+              className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono">
+              {Object.entries(CONTEXT_LABELS).map(([key, label]) => (<option key={key} value={key}>{label}</option>))}
+            </select>
+            <input type="number" value={mod.attackBonus ?? 0} onChange={(e) => updateModifier(mod.id, { attackBonus: Number(e.target.value) })}
+              placeholder="Angriff +X" title="Angriffsbonus" className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono" />
+            <input type="number" value={mod.damageBonus ?? 0} onChange={(e) => updateModifier(mod.id, { damageBonus: Number(e.target.value) })}
+              placeholder="Schaden +X" title="Schadensbonus (flach)" className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono" />
+          </div>
+          <input value={mod.extraDamageDice || ""} onChange={(e) => updateModifier(mod.id, { extraDamageDice: e.target.value || undefined })}
+            placeholder="Zusatzschaden, z.B. +1W6 Feuer oder +5 Blutung" className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono" />
+          {showMiscFields && (
+            <div className="grid grid-cols-3 gap-1.5">
+              <input type="number" value={mod.kmbBonus ?? 0} onChange={(e) => updateModifier(mod.id, { kmbBonus: Number(e.target.value) })}
+                placeholder="KMB +X" title="Bonus auf KMB" className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono" />
+              <input type="number" value={mod.kmvBonus ?? 0} onChange={(e) => updateModifier(mod.id, { kmvBonus: Number(e.target.value) })}
+                placeholder="KMV +X" title="Bonus auf KMV" className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono" />
+              <input type="number" value={mod.acBonus ?? 0} onChange={(e) => updateModifier(mod.id, { acBonus: Number(e.target.value) })}
+                placeholder="RK +X" title="Bonus auf Rüstungsklasse" className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono" />
+            </div>
+          )}
+        </div>
+      ))}
+      <button onClick={addModifier} className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-[11px] font-mono font-bold rounded-lg text-zinc-300">
+        <Plus size={12} /> Modifikator hinzufügen
+      </button>
+    </div>
+  );
 };
 
 // ═══════════════════════════════════════════════════════════
