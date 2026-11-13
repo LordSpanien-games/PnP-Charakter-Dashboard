@@ -743,7 +743,10 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                     const geMod = calculateModifier(attrs.GE);
                     const dmgAttr = item.weaponData?.damageAttribute ?? "ST";
                     const dmgMod = dmgAttr === "GE" ? geMod : stMod;
-                    const totalAttack = bab + dmgMod + magicBonus;
+                    const weaponAttackBonus = item.weaponData?.modifiers?.reduce(
+                      (sum, m) => sum + (m.context === "always" || (sneakAttackActive && m.context === "sneakAttackOnly") ? m.attackBonus ?? 0 : 0), 0
+                    ) ?? 0;
+                    const totalAttack = bab + dmgMod + magicBonus + weaponAttackBonus;
                     const sneakActive = sneakAttackActive;
                     const sneakDiceCount = sneakActive ? getSneakAttackDice(classId, level) : 0;
                     return (
@@ -787,11 +790,15 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                       const hand = wIdx === 0 ? "Haupthand" : "Nebenhand";
                       const weaponName = res.weaponName;
                       const isOffHand = wIdx === 1;
-                      const magicBonus = isOffHand ? (offHandWeapon?.weaponData?.magicBonus ?? 0) : (primaryWeapon?.weaponData?.magicBonus ?? 0);
+                      const weapon = isOffHand ? offHandWeapon : primaryWeapon;
+                      const magicBonus = weapon?.weaponData?.magicBonus ?? 0;
                       const stMod = calculateModifier(attrs.ST);
                       const geMod = calculateModifier(attrs.GE);
                       const dmgMod = stMod;
-                      const baseAttack = bab + dmgMod + magicBonus + (isOffHand && sneakAttackActive ? 5 : 0);
+                      const weaponAttackBonus = weapon?.weaponData?.modifiers?.reduce(
+                        (sum, m) => sum + (m.context === "always" || (sneakAttackActive && m.context === "sneakAttackOnly") ? m.attackBonus ?? 0 : 0), 0
+                      ) ?? 0;
+                      const baseAttack = bab + dmgMod + magicBonus + weaponAttackBonus;
                       const sneakDiceCount = sneakAttackActive ? getSneakAttackDice(classId, level) : 0;
                       return iteratives.map((att, aidx) => {
                         const globalIdx = wIdx * iteratives.length + aidx;
