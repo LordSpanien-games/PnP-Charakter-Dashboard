@@ -1,8 +1,5 @@
-import { PATHFINDER_SKILLS } from "../../data/skills/pathfinderSkills";
-import { PathfinderSkillsBlock } from "../../components/sheets/PathfinderSkillsBlock";
-import { PathfinderLevelUpView } from "./PathfinderLevelUpView";
 import React, { useState } from "react";
-import { Info, Plus, Minus, ChevronDown, ChevronRight, X, Moon, BedDouble, Printer, Download } from "lucide-react";
+import { Info, Plus, Minus, ChevronDown, ChevronRight, X, Moon, BedDouble, Printer, Download, Shield, Activity, Sword, ShieldAlert, Target } from "lucide-react";
 import { SystemPlugin, AttributePool, PluginViewProps } from "../../core/SystemPlugin";
 import {
   GenericCharacter,
@@ -15,16 +12,17 @@ import {
 } from "../../core/types";
 import { rollPool, roll4d6DropLowest } from "../../core/dice";
 import { applyRest } from "../../core/rest";
+import { downloadCharacterAsMarkdown } from "../../core/markdownExport";
 import {
   ValueBadge,
   ChargeTracker,
-  ValueStepper,
   SourceReferenceBadges,
   SourceReferenceEditor,
   PartyCard,
   CurrencyHistoryCard,
+  ModifierListEditor,
+  ValueStepper,
 } from "../../core/uiKit";
-import { downloadCharacterAsMarkdown } from "../../core/markdownExport";
 import {
   PathfinderAttributes,
   calculateModifier,
@@ -51,15 +49,17 @@ import {
   parseLegacyWeaponDamage,
   parseMagicBonusFromName,
   makeModifierId,
+  makeId,
+  PATHFINDER_CLASSES,
   PATHFINDER_RACES,
 } from "./pathfinderRules";
-import { PATHFINDER_CLASSES } from "../../utils/levelUpRules";
 
 const ATTR_KEYS = ["ST", "GE", "KO", "IN", "WE", "CH"] as const;
 const ATTR_LABELS: Record<string, string> = {
   ST: "Stärke (ST)", GE: "Geschicklichkeit (GE)", KO: "Konstitution (KO)",
   IN: "Intelligenz (IN)", WE: "Weisheit (WE)", CH: "Charisma (CH)",
 };
+
 const CONTEXT_LABELS: Record<CombatModifierContext, string> = {
   always: "Immer",
   oneHandedOnly: "Nur einhändig",
@@ -68,9 +68,11 @@ const CONTEXT_LABELS: Record<CombatModifierContext, string> = {
   sneakAttackOnly: "Nur Hinterhalt",
   twoWeaponFightingOnly: "Nur bei Zweiwaffenkampf",
 };
+
 const SOURCE_LABELS: Record<CombatModifierSourceType, string> = {
   weapon: "Waffe", talent: "Talent", class: "Klasse", race: "Rasse", skill: "Fertigkeit", custom: "Sonstiges",
 };
+
 const GRIP_LABELS: Record<string, string> = { oneHanded: "Einhändig", twoHanded: "Zweihändig" };
 const TYPE_LABELS: Record<string, string> = {
   class: "Klassenmerkmale",
@@ -89,11 +91,11 @@ const getAttrs = (character: GenericCharacter): PathfinderAttributes => ({
   WE: Number(character.attributes.WE) || 10,
   CH: Number(character.attributes.CH) || 10,
 });
+
 const getLevel = (c: GenericCharacter) => Number(c.systemData.level) || 1;
 const getClassId = (c: GenericCharacter) => c.systemData.classId as string | undefined;
 const getRaceId = (c: GenericCharacter) => c.systemData.raceId as string | undefined;
 const getCharModifiers = (c: GenericCharacter): CombatModifier[] => (c.systemData.combatModifiers as CombatModifier[]) || [];
-const makeId = () => `item_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
 const createBase = (name: string, subTitle: string | undefined, attrs: Record<string, number>): GenericCharacter => {
   const base = createEmptyGenericCharacter("pathfinder", name, subTitle);
@@ -110,68 +112,6 @@ const createBase = (name: string, subTitle: string | undefined, attrs: Record<st
   };
 };
 
-const ModifierListEditor: React.FC<{
-  modifiers: CombatModifier[];
-  onChange: (next: CombatModifier[]) => void;
-  showMiscFields?: boolean;
-}> = ({ modifiers, onChange, showMiscFields }) => {
-  const addModifier = () => {
-    onChange([...modifiers, { id: makeModifierId(), label: "Neuer Modifikator", sourceType: "custom", context: "always" }]);
-  };
-  const updateModifier = (id: string, patch: Partial<CombatModifier>) => {
-    onChange(modifiers.map((m) => (m.id === id ? { ...m, ...patch } : m)));
-  };
-  const removeModifier = (id: string) => {
-    onChange(modifiers.filter((m) => m.id !== id));
-  };
-  return (
-    <div className="space-y-2">
-      {modifiers.map((mod) => (
-        <div key={mod.id} className="p-2 bg-zinc-950/60 border border-zinc-800 rounded-lg space-y-1.5">
-          <div className="flex items-center gap-2">
-            <input
-              value={mod.label}
-              onChange={(e) => updateModifier(mod.id, { label: e.target.value })}
-              className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-white font-mono"
-              placeholder="Bezeichnung, z.B. Ausweichen"
-            />
-            <button onClick={() => removeModifier(mod.id)} className="text-red-400 hover:text-red-300 shrink-0"><X size={14} /></button>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-            <select value={mod.sourceType} onChange={(e) => updateModifier(mod.id, { sourceType: e.target.value as CombatModifierSourceType })}
-              className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono">
-              {Object.entries(SOURCE_LABELS).map(([key, label]) => (<option key={key} value={key}>{label}</option>))}
-            </select>
-            <select value={mod.context} onChange={(e) => updateModifier(mod.id, { context: e.target.value as CombatModifierContext })}
-              className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono">
-              {Object.entries(CONTEXT_LABELS).map(([key, label]) => (<option key={key} value={key}>{label}</option>))}
-            </select>
-            <input type="number" value={mod.attackBonus ?? 0} onChange={(e) => updateModifier(mod.id, { attackBonus: Number(e.target.value) })}
-              placeholder="Angriff +X" title="Angriffsbonus" className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono" />
-            <input type="number" value={mod.damageBonus ?? 0} onChange={(e) => updateModifier(mod.id, { damageBonus: Number(e.target.value) })}
-              placeholder="Schaden +X" title="Schadensbonus (flach)" className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono" />
-          </div>
-          <input value={mod.extraDamageDice || ""} onChange={(e) => updateModifier(mod.id, { extraDamageDice: e.target.value || undefined })}
-            placeholder="Zusatzschaden, z.B. +1W6 Feuer oder +5 Blutung" className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono" />
-          {showMiscFields && (
-            <div className="grid grid-cols-3 gap-1.5">
-              <input type="number" value={mod.kmbBonus ?? 0} onChange={(e) => updateModifier(mod.id, { kmbBonus: Number(e.target.value) })}
-                placeholder="KMB +X" title="Bonus auf KMB" className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono" />
-              <input type="number" value={mod.kmvBonus ?? 0} onChange={(e) => updateModifier(mod.id, { kmvBonus: Number(e.target.value) })}
-                placeholder="KMV +X" title="Bonus auf KMV" className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono" />
-              <input type="number" value={mod.acBonus ?? 0} onChange={(e) => updateModifier(mod.id, { acBonus: Number(e.target.value) })}
-                placeholder="RK +X" title="Bonus auf Rüstungsklasse" className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white font-mono" />
-            </div>
-          )}
-        </div>
-      ))}
-      <button onClick={addModifier} className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-[11px] font-mono font-bold rounded-lg text-zinc-300">
-        <Plus size={12} /> Modifikator hinzufügen
-      </button>
-    </div>
-  );
-};
-
 type CategoryTabId = "all" | "weapon" | "armor" | "consumable" | "jewelry" | "gear";
 const CATEGORY_TABS: { id: CategoryTabId; label: string }[] = [
   { id: "all", label: "Alle" },
@@ -181,6 +121,7 @@ const CATEGORY_TABS: { id: CategoryTabId; label: string }[] = [
   { id: "jewelry", label: "Schmuck" },
   { id: "gear", label: "Sonstiges" },
 ];
+
 const getTabForItem = (item: InventoryItem): CategoryTabId => {
   const cat = (item.category || "gear").toLowerCase();
   if (cat === "weapon") return "weapon";
@@ -190,35 +131,6 @@ const getTabForItem = (item: InventoryItem): CategoryTabId => {
   return "gear";
 };
 
-const getSimpleWeaponLine = (
-  item: InventoryItem,
-  attrs: PathfinderAttributes,
-  level: number,
-  classId: string | undefined,
-  raceId: string | undefined
-) => {
-  const result = calculateWeaponGripVariants(
-    {
-      name: item.name,
-      isMelee: item.weaponData?.isMelee ?? true,
-      isFinesse: item.weaponData?.isFinesse,
-      magicBonus: item.weaponData?.magicBonus,
-      baseDice: item.weaponData?.baseDice,
-      damageAttribute: item.weaponData?.damageAttribute,
-      extraDamage: item.weaponData?.extraDamage,
-      supportsOneHanded: item.weaponData?.supportsOneHanded,
-      supportsTwoHanded: item.weaponData?.supportsTwoHanded,
-      modifiers: item.weaponData?.modifiers,
-      sneakAttackBonusAttack: item.weaponData?.sneakAttackBonusAttack,
-      sneakAttackBonusDamage: item.weaponData?.sneakAttackBonusDamage,
-    },
-    attrs, level, classId, raceId, undefined, false
-  );
-  const primaryGrip = result.grips[0];
-  const extra = primaryGrip.extraDamageParts.join(" ");
-  return { attack: primaryGrip.attack, damage: `${primaryGrip.damage}${extra ? ` ${extra}` : ""}` };
-};
-
 const parseDailyUses = (usage?: string): number | undefined => {
   if (!usage) return undefined;
   const match = usage.match(/(\d+)\s*x/i);
@@ -226,20 +138,11 @@ const parseDailyUses = (usage?: string): number | undefined => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// HAUPTSEITE
+// ÜBERSICHT (kompakt, wie Papierbogen)
 // ═══════════════════════════════════════════════════════════
-const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<CategoryTabId>("all");
-  const [restMessage, setRestMessage] = useState<string | null>(null);
 
-  const toggleExpand = (id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
+const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
+  const [restMessage, setRestMessage] = useState<string | null>(null);
 
   const attrs = getAttrs(character);
   const level = getLevel(character);
@@ -249,11 +152,13 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
   const race = raceId ? PATHFINDER_RACES[raceId] : undefined;
   const sneakAttackActive = Boolean(character.systemData.sneakAttackActive);
   const charModifiers = getCharModifiers(character);
+
   const saves = calculateSavingThrows(attrs, level, classId);
   const armorBonus = getEquippedArmorBonus(character.inventory);
   const jewelryArmorBonus = getJewelryArmorBonus(character.inventory);
   const ac = calculateArmorClass(attrs, armorBonus, jewelryArmorBonus, raceId);
   const hp = character.resources.hp || { current: 0, max: 0 };
+
   const activeWeapons = character.inventory.filter(
     (i) => i.category === "weapon" && i.location === "equipped" && i.isActiveWeapon
   );
@@ -265,6 +170,7 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
   const hasDodge = Boolean(character.systemData.hasDodge);
   const talentAcBonus = getTalentAcBonus(hasDefensiveTwoWeaponFighting, hasDodge, isTwoWeaponMode);
   const totalArmorClass = ac.armorClass + miscBonuses.acBonus + talentAcBonus;
+
   const chaMod = calculateModifier(attrs.CH);
   const sneakDice = getSneakAttackDice(classId, level);
   const rageRounds = classId === "barbarian" ? getRageRounds(classId, calculateModifier(attrs.KO)) : 0;
@@ -274,37 +180,21 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
   const stunningFistUses = classId === "monk" ? getStunningFistUses(classId, level) : 0;
   const hasClassFeatureDisplay = ["barbarian", "ranger", "cleric", "bard", "monk"].includes(classId || "");
 
+  const abilities: Ability[] = character.abilities || [];
+  const groups: Record<string, Ability[]> = {};
+  abilities.forEach((a) => {
+    const key = a.type || "other";
+    (groups[key] = groups[key] || []).push(a);
+  });
+  const orderedKeys = ["class", "talent", "race", "gnome", "item", "other"].filter((k) => groups[k]?.length);
+  Object.keys(groups).forEach((k) => {
+    if (!orderedKeys.includes(k)) orderedKeys.push(k);
+  });
+
   const updateAttr = (key: string, value: number) => onUpdate({ attributes: { ...character.attributes, [key]: value } });
   const updateSystemData = (key: string, value: unknown) => onUpdate({ systemData: { ...character.systemData, [key]: value } });
   const updateHp = (field: "current" | "max", value: number) => onUpdate({ resources: { ...character.resources, hp: { ...hp, [field]: value } } });
-  const updateInventoryItem = (id: string, patch: Partial<InventoryItem>) => {
-    onUpdate({ inventory: character.inventory.map((it) => (it.id === id ? { ...it, ...patch } : it)) });
-  };
-  const removeInventoryItem = (id: string) => {
-    onUpdate({ inventory: character.inventory.filter((it) => it.id !== id) });
-  };
-  const addInventoryItem = (category: "weapon" | "armor" | "consumable" | "jewelry" | "gear") => {
-    const base: InventoryItem = {
-      id: makeId(),
-      name: category === "weapon" ? "Neue Waffe" : category === "armor" ? "Neue Rüstung" : category === "consumable" ? "Neuer Trank" : category === "jewelry" ? "Neuer Schmuck" : "Neuer Gegenstand",
-      category, quantity: 1, location: "equipped",
-      isActiveWeapon: category === "weapon" ? false : undefined,
-      weaponData: category === "weapon" ? { isMelee: true, baseDice: "1W6", damageAttribute: "ST", weaponSlot: "primary", supportsOneHanded: true, supportsTwoHanded: false, modifiers: [] } : undefined,
-      armorData: category === "armor" ? { armorBonus: 0 } : undefined,
-    };
-    onUpdate({ inventory: [...character.inventory, base] });
-    setExpandedIds((prev) => new Set(prev).add(base.id));
-  };
-  const adjustQuantity = (id: string, delta: number) => {
-    onUpdate({ inventory: character.inventory.map((it) => it.id === id ? { ...it, quantity: Math.max(0, (it.quantity ?? 0) + delta) } : it) });
-  };
-  const setCharge = (id: string, newCurrent: number) => {
-    onUpdate({ inventory: character.inventory.map((it) => {
-      if (it.id !== id || !it.charges) return it;
-      const clamped = Math.min(it.charges.max, Math.max(0, newCurrent));
-      return { ...it, charges: { ...it.charges, current: clamped } };
-    }) });
-  };
+  const updateParty = (party: typeof character.party) => onUpdate({ party });
 
   // ── FIXED: handleNightRest ──
   const handleNightRest = () => {
@@ -338,458 +228,195 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
     setRestMessage(`Bettruhe (24h): ${parts.join(" · ")}`);
   };
 
-  const filteredInventory = character.inventory.filter((item) => activeTab === "all" || getTabForItem(item) === activeTab);
   const currencyBalance = character.systemData.currencyBalance as number | undefined;
   const currencyUnit = (character.systemData.currencyUnit as string) || "GM";
-  const updateParty = (party: typeof character.party) => onUpdate({ party });
 
   return (
-    <div className="space-y-6">
-      <div className="p-3 bg-indigo-950/20 border border-indigo-900/40 rounded-xl space-y-2">
-        <div className="text-xs font-mono font-bold text-indigo-300">Rast & Erholung</div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={handleNightRest} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-bold rounded-lg text-xs">
-            <Moon size={14} /> Nachtruhe (8h)
-          </button>
-          <button onClick={handleBedRest} className="flex items-center gap-2 px-3 py-1.5 bg-indigo-800 hover:bg-indigo-700 text-white font-mono font-bold rounded-lg text-xs">
-            <BedDouble size={14} /> Bettruhe (24h, doppelte Heilung)
-          </button>
+    <div className="space-y-4">
+      {/* Kopfzeile */}
+      <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <h1 className="text-lg font-bold text-white">{character.name || "Unbenannter Charakter"}</h1>
+            <p className="text-xs text-zinc-400 font-mono">
+              {race?.name || "–"} · {cls?.name || "–"} · Stufe {level}
+              {character.subTitle ? ` · ${character.subTitle}` : ""}
+            </p>
+          </div>
+          {isEditing && (
+            <div className="flex gap-2">
+              <select value={classId || ""} onChange={(e) => updateSystemData("classId", e.target.value)} className="bg-black border border-zinc-700 rounded px-2 py-1 text-xs text-white font-mono">
+                {Object.values(PATHFINDER_CLASSES).map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+              </select>
+              <select value={raceId || ""} onChange={(e) => updateSystemData("raceId", e.target.value)} className="bg-black border border-zinc-700 rounded px-2 py-1 text-xs text-white font-mono">
+                {Object.values(PATHFINDER_RACES).map((r) => (<option key={r.id} value={r.id}>{r.name}</option>))}
+              </select>
+            </div>
+          )}
         </div>
-        {restMessage && <p className="text-xs text-indigo-300 font-mono">{restMessage}</p>}
+        {isEditing && (
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] text-zinc-500 font-mono">Level</label>
+            <input type="number" min={1} max={20} value={level} onChange={(e) => updateSystemData("level", Number(e.target.value))} className="w-16 bg-black border border-zinc-700 rounded px-1 py-0.5 text-xs text-white font-mono text-center" />
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-3 gap-3 p-4 bg-zinc-900 border border-zinc-800 rounded-xl">
-        <div>
-          <label className="text-[10px] text-zinc-500 uppercase font-mono">Klasse</label>
-          {isEditing ? (
-            <select value={classId || ""} onChange={(e) => updateSystemData("classId", e.target.value)}
-              className="w-full bg-black border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white font-mono mt-1">
-              {Object.values(PATHFINDER_CLASSES).map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-            </select>
-          ) : <div className="text-sm font-bold text-white mt-1">{cls?.name || "–"}</div>}
-        </div>
-        <div>
-          <label className="text-[10px] text-zinc-500 uppercase font-mono">Rasse</label>
-          {isEditing ? (
-            <select value={raceId || ""} onChange={(e) => updateSystemData("raceId", e.target.value)}
-              className="w-full bg-black border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white font-mono mt-1">
-              {Object.values(PATHFINDER_RACES).map((r) => (<option key={r.id} value={r.id}>{r.name}</option>))}
-            </select>
-          ) : <div className="text-sm font-bold text-white mt-1">{race?.name || "–"}</div>}
-        </div>
-        <div>
-          <label className="text-[10px] text-zinc-500 uppercase font-mono">Level</label>
-          {isEditing ? (
-            <input type="number" min={1} max={20} value={level} onChange={(e) => updateSystemData("level", Number(e.target.value))}
-              className="w-full bg-black border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white font-mono mt-1 text-center" />
-          ) : <div className="text-sm font-bold text-white mt-1 text-center">{level}</div>}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+      {/* Grundwerte kompakt */}
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
         {ATTR_KEYS.map((key) => (
-          <div key={key} className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-            <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">{key}</div>
+          <div key={key} className="p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-center">
+            <div className="text-[8px] uppercase text-zinc-500 font-mono mb-0.5">{key}</div>
             {isEditing ? (
-              <input type="number" value={attrs[key]} onChange={(e) => updateAttr(key, Number(e.target.value))}
-                className="w-full bg-black border border-zinc-700 rounded-lg text-center text-lg font-bold text-white py-1" />
-            ) : <div className="text-xl font-bold text-white">{attrs[key]}</div>}
-            <div className="text-[10px] text-amber-400 font-mono mt-0.5">{formatModifier(calculateModifier(attrs[key]))}</div>
+              <input type="number" value={attrs[key]} onChange={(e) => updateAttr(key, Number(e.target.value))} className="w-full bg-black border border-zinc-700 rounded text-center text-base font-bold text-white py-0.5" />
+            ) : (
+              <div className="text-base font-bold text-white">{attrs[key]}</div>
+            )}
+            <div className="text-[9px] text-amber-400 font-mono">{formatModifier(calculateModifier(attrs[key]))}</div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1.5">
-          <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Trefferpunkte</div>
-          <ValueStepper current={hp.current} max={hp.max} onChange={(v) => updateHp("current", v)} />
+      {/* TP, RK, Rettungswürfe kompakt */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-center space-y-0.5">
+          <div className="text-[8px] uppercase text-zinc-500 font-mono mb-0.5">Trefferpunkte</div>
+          <div className="text-base font-bold text-white">{hp.current} / {hp.max ?? "–"}</div>
           {isEditing && (
-            <div className="flex items-center justify-center gap-2 text-[10px] text-zinc-500 font-mono">
+            <div className="flex items-center justify-center gap-1 text-[9px] text-zinc-500 font-mono">
               <span>Max</span>
-              <input type="number" value={hp.max ?? 0} onChange={(e) => updateHp("max", Number(e.target.value))}
-                className="w-14 bg-black border border-zinc-700 rounded px-1 py-0.5 text-white text-center" />
+              <input type="number" value={hp.max ?? 0} onChange={(e) => updateHp("max", Number(e.target.value))} className="w-12 bg-black border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
             </div>
           )}
         </div>
-        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-          <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Rüstungsklasse</div>
-          <div className="text-xl font-bold text-white">{totalArmorClass}</div>
-          {miscBonuses.acBonus !== 0 && (
-            <div className="text-[9px] text-emerald-400 font-mono">(Basis {ac.armorClass} {miscBonuses.acBonus >= 0 ? "+" : ""}{miscBonuses.acBonus})</div>
-          )}
+        <div className="p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-center">
+          <div className="text-[8px] uppercase text-zinc-500 font-mono mb-0.5">Rüstungsklasse</div>
+          <div className="text-base font-bold text-white">{totalArmorClass}</div>
+          <div className="grid grid-cols-2 gap-0.5 text-[9px] text-zinc-500 font-mono">
+            <div>Berührung {ac.touchAc}</div>
+            <div>Flat-Footed {ac.flatFootedAc}</div>
+          </div>
         </div>
         {(["fortitude", "reflex", "will"] as const).map((key) => (
-          <div key={key} className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-            <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">{key === "fortitude" ? "Zähigkeit" : key === "reflex" ? "Reflex" : "Wille"}</div>
-            <div className="text-lg font-bold text-white">{formatModifier(saves[key].total)}</div>
+          <div key={key} className="p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-center">
+            <div className="text-[8px] uppercase text-zinc-500 font-mono mb-0.5">{key === "fortitude" ? "Zähigkeit" : key === "reflex" ? "Reflex" : "Wille"}</div>
+            <div className="text-base font-bold text-white">{formatModifier(saves[key].total)}</div>
           </div>
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-          <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Hinterhalt aktiv?</div>
-          <label className="flex items-center justify-center gap-1.5 mt-1 cursor-pointer">
-            <input type="checkbox" checked={sneakAttackActive} onChange={(e) => updateSystemData("sneakAttackActive", e.target.checked)} />
-            <span className="text-sm font-bold text-white">{sneakDice > 0 ? `+${sneakDice}W6` : "ja/nein"}</span>
-          </label>
-        </div>
-        {hasClassFeatureDisplay && (
-          <>
-            {classId === "barbarian" && <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center"><div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Wut (Runden/Tag)</div><div className="text-lg font-bold text-white">{rageRounds}</div></div>}
-            {classId === "ranger" && <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center"><div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Lieblingsfeind-Bonus</div><div className="text-lg font-bold text-white">+{favoredEnemy}</div></div>}
-            {classId === "cleric" && channelEnergy && <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center"><div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Energie fokussieren</div><div className="text-lg font-bold text-white">{channelEnergy.dice}W6 · {channelEnergy.usesPerDay}x/Tag</div></div>}
-            {classId === "bard" && <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center"><div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Bardenauftritt (Runden/Tag)</div><div className="text-lg font-bold text-white">{bardicRounds}</div></div>}
-            {classId === "monk" && <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center"><div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Betäubender Schlag (x/Tag)</div><div className="text-lg font-bold text-white">{stunningFistUses}</div></div>}
-          </>
-        )}
-      </div>
-
-      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
-        <div className="text-xs font-mono font-bold text-zinc-300 mb-1">Aktive Waffen</div>
-        {activeWeapons.length === 0 && (
-          <p className="text-xs text-zinc-600 font-mono">Keine aktive Waffe markiert – im Inventar unten eine Waffe als "aktiv" setzen.</p>
-        )}
-        {!isTwoWeaponMode && activeWeapons.map((item) => {
-          const line = getSimpleWeaponLine(item, attrs, level, classId, raceId);
-          return (
-            <div key={item.id} className="flex items-center justify-between text-sm font-mono text-zinc-300">
-              <span className="font-bold text-white">{item.name}</span>
-              <span className="text-zinc-500">Angriff {line.attack} · Schaden {line.damage}</span>
-            </div>
-          );
-        })}
-        {isTwoWeaponMode && (
-          <>
-            <div className="flex items-center justify-between text-sm font-mono text-zinc-300">
-              <span className="font-bold text-white">⚔ {primaryWeapon!.name} (Haupthand)</span>
-            </div>
-            <div className="flex items-center justify-between text-sm font-mono text-zinc-300">
-              <span className="font-bold text-white">⚔ {offHandWeapon!.name} (Nebenhand)</span>
-            </div>
-            <p className="text-[10px] text-zinc-500 font-mono italic">Details zum Zweiwaffenkampf siehe Reiter "Kampf"</p>
-          </>
-        )}
-      </div>
-
-      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <span className="text-xs font-mono font-bold text-zinc-300">Inventar</span>
-          {isEditing && (
-            <div className="flex gap-1.5 flex-wrap">
-              <button onClick={() => addInventoryItem("weapon")} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono rounded-lg text-zinc-300">+ Waffe</button>
-              <button onClick={() => addInventoryItem("armor")} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono rounded-lg text-zinc-300">+ Rüstung</button>
-              <button onClick={() => addInventoryItem("consumable")} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono rounded-lg text-zinc-300">+ Trank/Verbrauch</button>
-              <button onClick={() => addInventoryItem("jewelry")} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono rounded-lg text-zinc-300">+ Schmuck</button>
-              <button onClick={() => addInventoryItem("gear")} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-[10px] font-mono rounded-lg text-zinc-300">+ Gegenstand</button>
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-1 p-1 bg-black/40 rounded-xl border border-zinc-800 text-xs font-mono overflow-x-auto">
-          {CATEGORY_TABS.map((tab) => {
-            const count = tab.id === "all" ? character.inventory.length : character.inventory.filter((it) => getTabForItem(it) === tab.id).length;
-            return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-1.5 rounded-lg font-bold whitespace-nowrap transition-all ${activeTab === tab.id ? "bg-orange-500 text-black" : "text-zinc-400 hover:text-white"}`}>
-                {tab.label} <span className="opacity-60">({count})</span>
-              </button>
-            );
-          })}
-        </div>
-        {filteredInventory.length === 0 && <p className="text-xs text-zinc-600 font-mono">Keine Gegenstände in dieser Kategorie.</p>}
-        <div className="space-y-2">
-          {filteredInventory.map((item) => {
-            const isExpanded = expandedIds.has(item.id);
-            return (
-              <div key={item.id} className="bg-black/40 border border-zinc-800 rounded-lg overflow-hidden">
-                <div className="p-3 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <button onClick={() => toggleExpand(item.id)} className="flex items-center gap-1.5 text-left flex-1 min-w-0">
-                      {isExpanded ? <ChevronDown size={14} className="text-zinc-500 shrink-0" /> : <ChevronRight size={14} className="text-zinc-500 shrink-0" />}
-                      {isEditing ? (
-                        <input value={item.name} onClick={(e) => e.stopPropagation()} onChange={(e) => updateInventoryItem(item.id, { name: e.target.value })}
-                          className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-white font-mono" />
-                      ) : <span className="text-sm font-bold text-white truncate">{item.name}</span>}
-                      {!isExpanded && item.notes && <span title={item.notes} className="text-zinc-500 hover:text-amber-400 cursor-help shrink-0"><Info size={13} /></span>}
-                    </button>
-                    {isEditing && <button onClick={() => removeInventoryItem(item.id)} className="text-xs text-red-400 font-mono shrink-0">Entfernen</button>}
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <ValueBadge label="Ort" value={item.location === "equipped" ? "Am Mann" : "Eingelagert"} color={item.location === "equipped" ? "text-emerald-400" : "text-amber-400"} />
-                    {item.category === "weapon" && item.weaponData?.baseDice && (
-                      <ValueBadge label="Schaden" value={item.weaponData.baseDice} color="text-rose-400" />
-                    )}
-                    {item.category === "weapon" && item.weaponData?.extraDamage && (
-                      <ValueBadge label="Magieschaden" value={item.weaponData.extraDamage} color="text-sky-300" />
-                    )}
-                    {item.category === "weapon" && !!item.weaponData?.magicBonus && (
-                      <ValueBadge label="Verstärkung" value={`+${item.weaponData.magicBonus}`} color="text-indigo-300" />
-                    )}
-                    {item.category === "weapon" && item.weaponData?.supportsTwoHanded && <ValueBadge label="Griff" value="1H/2H" color="text-zinc-200" />}
-                    {item.category === "weapon" && item.isActiveWeapon && (
-                      <ValueBadge label="Aktiv" value={item.weaponData?.weaponSlot === "offHand" ? "Nebenhand" : item.weaponData?.weaponSlot === "twoHanded" ? "beidhändig" : "Haupthand"} color="text-orange-400" />
-                    )}
-                    {item.category === "armor" && <ValueBadge label="Rüstung" value={`+${item.armorData?.armorBonus ?? 0}`} color="text-cyan-300" />}
-                    {item.charges && <ValueBadge label="Ladungen" value={`${item.charges.current}/${item.charges.max}`} color="text-purple-300" />}
-                    {item.quantity !== undefined && item.category !== "weapon" && item.category !== "armor" && <ValueBadge label="Anzahl" value={`${item.quantity}x`} color="text-zinc-200" />}
-                    <SourceReferenceBadges value={item.sourceReference} />
-                  </div>
+      {/* Talente & Fähigkeiten (auf Übersicht) */}
+      <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+        <div className="text-xs font-mono font-bold text-zinc-300">Talente & Fähigkeiten</div>
+        {abilities.length === 0 ? (
+          <p className="text-xs text-zinc-600 font-mono">Keine Talente oder Fähigkeiten hinterlegt.</p>
+        ) : (
+          <div className="space-y-1">
+            {orderedKeys.map((key) => (
+              <div key={key}>
+                <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">{TYPE_LABELS[key] || key}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                  {groups[key].map((ability) => (
+                    <div key={ability.id || ability.name} className="p-1.5 bg-black/40 border border-zinc-800 rounded">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-white truncate">{ability.name}</span>
+                        {ability.usage && <ValueBadge label="Nutzung" value={ability.usage} color="text-purple-300" />}
+                      </div>
+                      {ability.effect && <p className="text-[10px] text-zinc-400 font-mono mt-0.5">{ability.effect}</p>}
+                      {isEditing && (
+                        <SourceReferenceEditor value={ability.sourceReference} onChange={(v) => {
+                          const idx = abilities.findIndex((a) => a.id === ability.id);
+                          if (idx >= 0) {
+                            const next = [...abilities];
+                            next[idx] = { ...next[idx], sourceReference: v };
+                            onUpdate({ abilities: next });
+                          }
+                        }} />
+                      )}
+                    </div>
+                  ))}
                 </div>
-                {isExpanded && (
-                  <div className="px-3 pb-3 pt-1 border-t border-zinc-800 space-y-3">
-                    {item.charges && (
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-zinc-500 font-mono uppercase">Ladungen verwalten</span>
-                        <ChargeTracker current={item.charges.current} max={item.charges.max} onToggle={(newCurrent) => setCharge(item.id, newCurrent)} />
-                      </div>
-                    )}
-                    {item.quantity !== undefined && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-zinc-500 font-mono uppercase">Anzahl</span>
-                        <button onClick={() => adjustQuantity(item.id, -1)} className="p-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300"><Minus size={12} /></button>
-                        <span className="text-sm font-mono text-white w-10 text-center">{item.quantity}</span>
-                        <button onClick={() => adjustQuantity(item.id, 1)} className="p-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300"><Plus size={12} /></button>
-                      </div>
-                    )}
-                    {item.notes && (
-                      <div>
-                        <span className="text-[10px] text-zinc-500 font-mono uppercase">Beschreibung</span>
-                        <p className="text-xs text-zinc-300 font-mono mt-1 whitespace-pre-wrap bg-zinc-950/60 border border-zinc-800 rounded-lg p-2">{item.notes}</p>
-                      </div>
-                    )}
-                    {isEditing && (
-                      <div className="space-y-3 pt-2 border-t border-zinc-800">
-                        <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-zinc-400">
-                          <label className="flex items-center gap-1.5"><input type="checkbox" checked={item.location === "equipped"} onChange={(e) => updateInventoryItem(item.id, { location: e.target.checked ? "equipped" : "stored" })} />Am Körper getragen</label>
-                          {item.category === "weapon" && (
-                            <>
-                              <label className="flex items-center gap-1.5"><input type="checkbox" checked={!!item.isActiveWeapon} onChange={(e) => updateInventoryItem(item.id, { isActiveWeapon: e.target.checked })} />Aktive Kampfwaffe</label>
-                              {item.isActiveWeapon && (
-                                <label className="flex items-center gap-1.5">
-                                  <span>Hand:</span>
-                                  <select value={item.weaponData?.weaponSlot || "primary"} onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, weaponSlot: e.target.value as any } })} className="bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-white">
-                                    <option value="primary">Haupthand</option>
-                                    <option value="offHand">Nebenhand</option>
-                                    <option value="twoHanded">Beidhändig</option>
-                                  </select>
-                                </label>
-                              )}
-                            </>
-                          )}
-                        </div>
-                        {item.category === "weapon" && (
-                          <>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                              <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400"><input type="checkbox" checked={item.weaponData?.isMelee ?? true} onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData, isMelee: e.target.checked } })} />Nahkampf</label>
-                              <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400"><input type="checkbox" checked={!!item.weaponData?.isFinesse} onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, isFinesse: e.target.checked } })} />Finesse</label>
-                              <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400"><input type="checkbox" checked={!!item.weaponData?.isLight} onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, isLight: e.target.checked } })} />Leicht (TWF)</label>
-                            </div>
-                            <div className="flex gap-3">
-                              <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400"><input type="checkbox" checked={item.weaponData?.supportsOneHanded !== false} onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, supportsOneHanded: e.target.checked } })} />Einhändig nutzbar</label>
-                              <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400"><input type="checkbox" checked={!!item.weaponData?.supportsTwoHanded} onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, supportsTwoHanded: e.target.checked } })} />Zweihändig nutzbar</label>
-                            </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                              <div><label className="block text-[9px] text-zinc-500">Schaden (W-Formel)</label><input value={item.weaponData?.baseDice || ""} placeholder="1W6" onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, baseDice: e.target.value } })} className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" /></div>
-                              <div><label className="block text-[9px] text-zinc-500">Verstärkung (+X)</label><input type="number" value={item.weaponData?.magicBonus ?? 0} onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, magicBonus: Number(e.target.value) } })} className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" /></div>
-                              <div><label className="block text-[9px] text-zinc-500">Magieschaden (z.B. +1W6 Eis)</label><input value={item.weaponData?.extraDamage || ""} placeholder="+1W6 Feuer" onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, extraDamage: e.target.value || undefined } })} className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" /></div>
-                            </div>
-                            <div>
-                              <span className="text-[10px] uppercase text-zinc-500 font-mono">Waffeneigene Kampf-Modifikatoren</span>
-                              <div className="mt-1.5">
-                                <ModifierListEditor modifiers={item.weaponData?.modifiers || []} onChange={(next) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, modifiers: next } })} />
-                              </div>
-                            </div>
-                          </>
-                        )}
-                        {item.category === "armor" && (
-                          <div><label className="block text-[9px] text-zinc-500">Rüstungsbonus</label><input type="number" value={item.armorData?.armorBonus ?? 0} onChange={(e) => updateInventoryItem(item.id, { armorData: { armorBonus: Number(e.target.value) } })} className="w-24 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" /></div>
-                        )}
-                        {item.category === "jewelry" && (
-                          <>
-                            <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-zinc-400 mb-1">
-                              <label className="flex items-center gap-1.5">
-                                <span>Schmuck-Bonus:</span>
-                                <select
-                                  value=""
-                                  onChange={(e) => {
-                                    const type = e.target.value as any;
-                                    if (!type) return;
-                                    updateInventoryItem(item.id, {
-                                      jewelryBonus: [
-                                        ...(item.jewelryBonus || []),
-                                        { id: makeId(), type, value: 0, label: "Neuer Bonus" }
-                                      ]
-                                    });
-                                  }}
-                                  className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-zinc-400 px-1 py-0.5"
-                                >
-                                  <option value="">-- Bonus hinzufügen --</option>
-                                  <option value="armor">Rüstung</option>
-                                  <option value="attack">Angriff</option>
-                                  <option value="damage">Schaden</option>
-                                  <option value="save">Rettungswurf</option>
-                                  <option value="ac">RK (allgemein)</option>
-                                  <option value="kmb">KMB</option>
-                                  <option value="kmv">KMV</option>
-                                  <option value="custom">Benutzerdefiniert</option>
-                                </select>
-                              </label>
-                            </div>
-                            {item.jewelryBonus?.map((bonus, idx) => (
-                              <div key={bonus.id} className="flex items-center gap-2 mt-1">
-                                <select
-                                  value={bonus.type}
-                                  onChange={(e) => {
-                                    updateInventoryItem(item.id, {
-                                      jewelryBonus: item.jewelryBonus!.map((b, i) =>
-                                        i === idx ? { ...b, type: e.target.value as any } : b
-                                      )
-                                    });
-                                  }}
-                                  className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-zinc-400 px-1 py-0.5"
-                                >
-                                  <option value="armor">Rüstung</option>
-                                  <option value="attack">Angriff</option>
-                                  <option value="damage">Schaden</option>
-                                  <option value="save">Rettungswurf</option>
-                                  <option value="ac">RK (allgemein)</option>
-                                  <option value="kmb">KMB</option>
-                                  <option value="kmv">KMV</option>
-                                  <option value="custom">Benutzerdefiniert</option>
-                                </select>
-                                <input
-                                  type="number"
-                                  value={bonus.value}
-                                  onChange={(e) => {
-                                    updateInventoryItem(item.id, {
-                                      jewelryBonus: item.jewelryBonus!.map((b, i) =>
-                                        i === idx ? { ...b, value: Number(e.target.value) } : b
-                                      )
-                                    });
-                                  }}
-                                  className="w-16 bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-xs text-white font-mono"
-                                />
-                                <button
-                                  onClick={() => {
-                                    updateInventoryItem(item.id, {
-                                      jewelryBonus: item.jewelryBonus!.filter((_, i) => i !== idx)
-                                    });
-                                  }}
-                                  className="text-red-400 hover:text-red-300 text-xs"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
-                          </>
-                        )}
-                        <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400"><input type="checkbox" checked={!!item.charges} onChange={(e) => updateInventoryItem(item.id, { charges: e.target.checked ? { max: 1, current: 1, rechargeType: "rest" } : undefined })} />Hat Ladungen</label>
-                        {item.charges && (
-                          <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
-                            <span>Max</span>
-                            <input type="number" value={item.charges.max} onChange={(e) => updateInventoryItem(item.id, { charges: { ...item.charges!, max: Number(e.target.value) } })} className="w-14 bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-white text-center" />
-                            <select value={item.charges.rechargeType} onChange={(e) => updateInventoryItem(item.id, { charges: { ...item.charges!, rechargeType: e.target.value as any } })} className="bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-white">
-                              <option value="rest">Erneuert sich bei Rast</option>
-                              <option value="manual">Muss aufgeladen werden</option>
-                              <option value="none">Verbraucht sich dauerhaft</option>
-                            </select>
-                          </div>
-                        )}
-                        <div>
-                          <label className="block text-[9px] text-zinc-500">Kategorie</label>
-                          <select value={item.category || "gear"} onChange={(e) => updateInventoryItem(item.id, { category: e.target.value })} className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono">
-                            <option value="weapon">Waffe</option>
-                            <option value="armor">Rüstung</option>
-                            <option value="consumable">Trank / Verbrauch</option>
-                            <option value="jewelry">Schmuck</option>
-                            <option value="gear">Sonstiges</option>
-                          </select>
-                        </div>
-                        <div>
-                          <span className="text-[10px] uppercase text-zinc-500 font-mono">Regelwerk-Referenz</span>
-                          <div className="mt-1">
-                            <SourceReferenceEditor value={item.sourceReference} onChange={(v) => updateInventoryItem(item.id, { sourceReference: v })} />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] text-zinc-400 font-mono mb-1">Beschreibung / Effekt bearbeiten</label>
-                          <textarea value={item.notes || ""} onChange={(e) => updateInventoryItem(item.id, { notes: e.target.value || undefined })} placeholder="z.B. Fängt 2x/Tag ein Geschoss ab." className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-white font-mono min-h-[50px]" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      <CurrencyHistoryCard
-        title="Vermögen"
-        balanceDisplay={currencyBalance !== undefined ? `${currencyBalance} ${currencyUnit}` : undefined}
-        entries={(character.systemData.currencyHistory as any[]) || []}
-      />
+      {/* Fertigkeiten (ohne Scrollbar, kompakt) */}
+      <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-mono font-bold text-zinc-300">Fertigkeiten</span>
+        </div>
+        {character.skills.length === 0 ? (
+          <p className="text-xs text-zinc-600 font-mono">Keine Fertigkeiten hinterlegt.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[10px] text-left">
+              <thead>
+                <tr>
+                  <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono">Fertigkeit</th>
+                  <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Wert</th>
+                  <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono text-center">Geübt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {character.skills.map((s, idx) => (
+                  <tr key={idx} className="border-b border-zinc-800">
+                    <td className="border border-zinc-800 px-1 py-0.5 text-xs text-white">{s.name}</td>
+                    <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{isEditing ? (
+                      <input type="number" value={s.value} onChange={(e) => {
+                        const next = [...character.skills];
+                        next[idx] = { ...next[idx], value: Number(e.target.value) };
+                        onUpdate({ skills: next });
+                      }} className="w-10 bg-black border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                    ) : s.value}</td>
+                    <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-zinc-400">{ (s as any).trained ? "✓" : "" }</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-      {/* ── FERTIGKEITEN ── */}
-      {(() => {
-        const attributeMap: Record<string, number> = {
-          ST: calculateModifier(attrs.ST),
-          GE: calculateModifier(attrs.GE),
-          KO: calculateModifier(attrs.KO),
-          IN: calculateModifier(attrs.IN),
-          WE: calculateModifier(attrs.WE),
-          CH: calculateModifier(attrs.CH),
-        };
-        const mergedSkills = PATHFINDER_SKILLS.map((def) => {
-          const existing = character.skills.find((s) => {
-            const sName = (s?.name || "").toLowerCase().trim();
-            const defName = def.name.toLowerCase().trim();
-            if (sName === defName) return true;
-            if (def.aliases?.some((a) => a.toLowerCase().trim() === sName)) return true;
-            return false;
-          });
-          const attrMod = attributeMap[def.attr] ?? 0;
-          const rawVal = existing ? existing.value : 0;
-          const ranks = typeof rawVal === "number" ? rawVal : parseInt(String(rawVal).replace(/[^0-9-]/g, ""), 10) || 0;
-          const isClassSkill = existing?.trained ?? false;
-          const classBonus = isClassSkill && ranks > 0 ? 3 : 0;
-          const totalBonus = attrMod + ranks + classBonus + (existing?.miscBonus ?? 0);
-          return { ...def, ranks, isClassSkill, classBonus, attrMod, totalBonus, miscBonus: existing?.miscBonus ?? 0 };
-        });
-        const handleUpdateSkillRanks = (skillName: string, newRanks: number) => {
-          const current = [...character.skills];
-          const idx = current.findIndex((s) => (s?.name || "").toLowerCase() === skillName.toLowerCase());
-          if (idx >= 0) current[idx] = { ...current[idx], value: newRanks };
-          else current.push({ name: skillName, value: newRanks, trained: false });
-          onUpdate({ skills: current });
-        };
-        const handleToggleClassSkill = (skillName: string) => {
-          const current = [...character.skills];
-          const idx = current.findIndex((s) => (s?.name || "").toLowerCase() === skillName.toLowerCase());
-          if (idx >= 0) current[idx] = { ...current[idx], trained: !current[idx].trained };
-          else current.push({ name: skillName, value: 0, trained: true });
-          onUpdate({ skills: current });
-        };
-        return (
-          <PathfinderSkillsBlock
-            mergedSkills={mergedSkills}
-            isEditable={isEditing}
-            onUpdateSkillRanks={handleUpdateSkillRanks}
-            onToggleClassSkill={handleToggleClassSkill}
-            printMode={false}
-          />
-        );
-      })()}
-
-      <PartyCard party={character.party} isEditing={isEditing} onUpdate={updateParty} />
+      {/* Gruppe & Finanzen kompakt */}
+      <div className="grid grid-cols-2 gap-3">
+        {character.party.length > 0 && (
+          <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-1">
+            <div className="text-xs font-mono font-bold text-zinc-300">Gruppe</div>
+            <table className="w-full text-[10px]">
+              <thead>
+                <tr>
+                  <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono">Name</th>
+                  <th className="border border-zinc-800 px-1 py-0.5 text-zinc-500 font-mono">Spieler</th>
+                </tr>
+              </thead>
+              <tbody>
+                {character.party.map((p, idx) => (
+                  <tr key={idx} className="border-b border-zinc-800">
+                    <td className="border border-zinc-800 px-1 py-0.5 text-xs text-white">{p.name}</td>
+                    <td className="border border-zinc-800 px-1 py-0.5 text-xs text-zinc-400">{p.playerName || ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {isEditing && <PartyCard party={character.party} isEditing={true} onUpdate={updateParty} />}
+          </div>
+        )}
+        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-1">
+          <div className="text-xs font-mono font-bold text-zinc-300">Finanzen</div>
+          <div className="text-sm text-white">Guthaben: {character.systemData.currencyBalance !== undefined ? `${character.systemData.currencyBalance} ${currencyUnit}` : "–"}</div>
+          {isEditing && <CurrencyHistoryCard title="Transaktionen" balanceDisplay={currencyBalance !== undefined ? currencyBalance : undefined} entries={(character.systemData.currencyHistory as any[]) || []} />}
+        </div>
+      </div>
     </div>
   );
 };
 
 // ═══════════════════════════════════════════════════════════
-// KAMPF-REITER
+// KAMPF-REITER (alle kampfrelevanten Werte)
 // ═══════════════════════════════════════════════════════════
+
 const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
   const attrs = getAttrs(character);
   const level = getLevel(character);
@@ -798,6 +425,7 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
   const cls = classId ? PATHFINDER_CLASSES[classId] : undefined;
   const sneakAttackActive = Boolean(character.systemData.sneakAttackActive);
   const charModifiers = getCharModifiers(character);
+
   const hasTwoWeaponFighting = Boolean(character.systemData.hasTwoWeaponFighting);
   const hasImprovedTwoWeaponFighting = Boolean(character.systemData.hasImprovedTwoWeaponFighting);
   const hasGreaterTwoWeaponFighting = Boolean(character.systemData.hasGreaterTwoWeaponFighting);
@@ -816,6 +444,20 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
   const totalKmb = maneuver.kmb + miscBonuses.kmbBonus;
   const totalKmv = maneuver.kmv + miscBonuses.kmvBonus;
   const updateSystemData = (key: string, value: unknown) => onUpdate({ systemData: { ...character.systemData, [key]: value } });
+  const hp = character.resources.hp || { current: 0, max: 0 };
+  const updateHp = (field: "current" | "max", value: number) => onUpdate({ resources: { ...character.resources, hp: { ...hp, [field]: value } } });
+  const updateInventoryItem = (id: string, patch: Partial<InventoryItem>) => {
+    onUpdate({ inventory: character.inventory.map((it) => (it.id === id ? { ...it, ...patch } : it)) });
+  };
+
+  const armorBonus = getEquippedArmorBonus(character.inventory);
+  const jewelryArmorBonus = getJewelryArmorBonus(character.inventory);
+  const ac = calculateArmorClass(attrs, armorBonus, jewelryArmorBonus, raceId);
+  const talentAcBonus = getTalentAcBonus(hasDefensiveTwoWeaponFighting, hasDodge, isTwoWeaponMode);
+  const totalArmorClass = ac.armorClass + miscBonuses.acBonus + talentAcBonus;
+
+  const sneakDice = getSneakAttackDice(classId, level);
+
   const singleResults = !isTwoWeaponMode
     ? activeWeapons.map((item) => ({
         item,
@@ -847,70 +489,109 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
         charModifiers, sneakAttackActive
       )
     : null;
+
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-          <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">Basis-Angriffsbonus</div>
-          <div className="text-lg font-bold text-white">{bab}</div>
+    <div className="space-y-4">
+      {/* Kampfwerte oben */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-center">
+          <div className="text-[8px] uppercase text-zinc-500 font-mono mb-0.5">Basis-Angriffsbonus</div>
+          <div className="text-base font-bold text-white">{bab}</div>
+          <div className="text-[9px] text-zinc-500 font-mono">{formatIteratives(iteratives)}</div>
         </div>
-        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-          <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">GAB (Iterativ)</div>
-          <div className="text-sm font-bold text-white">{formatIteratives(iteratives)}</div>
-        </div>
-        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-          <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">KMB</div>
-          <div className="text-lg font-bold text-white">{formatModifier(totalKmb)}</div>
+        <div className="p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-center">
+          <div className="text-[8px] uppercase text-zinc-500 font-mono mb-0.5">KMB</div>
+          <div className="text-base font-bold text-white">{formatModifier(totalKmb)}</div>
           {miscBonuses.kmbBonus !== 0 && <div className="text-[9px] text-emerald-400 font-mono">(Basis {formatModifier(maneuver.kmb)})</div>}
         </div>
-        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center">
-          <div className="text-[9px] uppercase text-zinc-500 font-mono mb-1">KMV</div>
-          <div className="text-lg font-bold text-white">{totalKmv}</div>
-          {miscBonuses.kmvBonus !== 0 && <div className="text-[9px] text-emerald-400 font-mono">(Basis {maneuver.kmv})</div>}
+        <div className="p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-center">
+          <div className="text-[8px] uppercase text-zinc-500 font-mono mb-0.5">KMV</div>
+          <div className="text-base font-bold text-white">{formatModifier(totalKmv)}</div>
+          {miscBonuses.kmvBonus !== 0 && <div className="text-[9px] text-emerald-400 font-mono">(Basis {formatModifier(maneuver.kmv)})</div>}
+        </div>
+        <div className="p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-center">
+          <div className="text-[8px] uppercase text-zinc-500 font-mono mb-0.5">RK</div>
+          <div className="text-base font-bold text-white">{totalArmorClass}</div>
+          <div className="grid grid-cols-2 gap-0.5 text-[9px] text-zinc-500 font-mono">
+            <div>Berührung {ac.touchAc}</div>
+            <div>Flat-Footed {ac.flatFootedAc}</div>
+          </div>
         </div>
       </div>
-      {isEditing && (
-        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
-          <div className="flex flex-wrap gap-4 text-[11px] font-mono text-zinc-400">
-            <label className="flex items-center gap-1.5"><input type="checkbox" checked={hasTwoWeaponFighting} onChange={(e) => updateSystemData("hasTwoWeaponFighting", e.target.checked)} />Zweiwaffenkampf (Talent)</label>
-            <label className="flex items-center gap-1.5"><input type="checkbox" checked={hasImprovedTwoWeaponFighting} onChange={(e) => updateSystemData("hasImprovedTwoWeaponFighting", e.target.checked)} />Verbesserter Zweiwaffenkampf</label>
-            <label className="flex items-center gap-1.5"><input type="checkbox" checked={hasGreaterTwoWeaponFighting} onChange={(e) => updateSystemData("hasGreaterTwoWeaponFighting", e.target.checked)} />Meisterlicher Zweiwaffenkampf</label>
-            <label className="flex items-center gap-1.5"><input type="checkbox" checked={hasDefensiveTwoWeaponFighting} onChange={(e) => updateSystemData("hasDefensiveTwoWeaponFighting", e.target.checked)} />Verteidigung mit zwei Waffen (+1 RK)</label>
-            <label className="flex items-center gap-1.5"><input type="checkbox" checked={hasDodge} onChange={(e) => updateSystemData("hasDodge", e.target.checked)} />Ausweichen (+1 RK)</label>
-          </div>
-          <div>
-            <span className="text-[10px] uppercase text-zinc-500 font-mono">
-              Charakter-Kampfmodifikatoren (Talente, Rasse, Klasse, Skills – nicht an eine Waffe gebunden, kann auch KMB/KMV/RK beeinflussen)
-            </span>
-            <div className="mt-1.5">
-              <ModifierListEditor modifiers={charModifiers} onChange={(next) => updateSystemData("combatModifiers", next)} showMiscFields />
-            </div>
-          </div>
+
+      {/* TP im Kampf mit +/- */}
+      <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-mono font-bold text-zinc-300">Trefferpunkte (Kampf)</span>
+          <Shield size={14} className="text-zinc-500" />
         </div>
-      )}
-      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
-        <div className="text-xs font-mono font-bold text-zinc-300">Vollständige Angriffsberechnung</div>
-        {activeWeapons.length === 0 && (
-          <p className="text-xs text-zinc-600 font-mono">Keine aktive Waffe markiert – auf der Übersichtsseite im Inventar eine Waffe als "aktiv" setzen.</p>
+        <div className="flex items-center gap-3">
+          <button onClick={() => updateHp("current", Math.max(0, hp.current - 1))} className="p-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-400"><Minus size={14} /></button>
+          <span className="text-base font-mono font-bold text-white">{hp.current} / {hp.max ?? "–"}</span>
+          <button onClick={() => updateHp("current", hp.current + 1)} className="p-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-400"><Plus size={14} /></button>
+        </div>
+        {isEditing && (
+          <div className="flex items-center gap-1">
+            <label className="text-[9px] text-zinc-500 font-mono">Max</label>
+            <input type="number" value={hp.max ?? 0} onChange={(e) => updateHp("max", Number(e.target.value))} className="w-14 bg-black border border-zinc-700 rounded px-1 py-0.5 text-white text-center" />
+          </div>
         )}
+      </div>
+
+      {/* Kampf-Modi: Einhändig/Beidhändig, Hinterhalt, Gelegenheitsangriff */}
+      <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+        <div className="text-xs font-mono font-bold text-zinc-300">Kampf-Modi</div>
+        <div className="flex flex-wrap gap-2">
+          {isEditing && (
+            <>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input type="checkbox" checked={sneakAttackActive} onChange={(e) => updateSystemData("sneakAttackActive", e.target.checked)} className="accent-amber-500" />
+                <span className="text-xs text-white">{sneakDice > 0 ? `Hinterhalt aktiv (+${sneakDice}W6)` : "Hinterhalt aktiv"}</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input type="checkbox" checked={hasDefensiveTwoWeaponFighting} onChange={(e) => updateSystemData("hasDefensiveTwoWeaponFighting", e.target.checked)} className="accent-emerald-500" />
+                <span className="text-xs text-white">Verteidigung mit zwei Waffen (+1 RK)</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input type="checkbox" checked={hasDodge} onChange={(e) => updateSystemData("hasDodge", e.target.checked)} className="accent-emerald-500" />
+                <span className="text-xs text-white">Ausweichen (+1 RK)</span>
+              </label>
+            </>
+          )}
+          {!isEditing && (
+            <div className="flex items-center gap-2 text-xs font-mono text-zinc-300">
+              <span>{sneakAttackActive ? "🎯 Hinterhalt aktiv" : "–"}</span>
+              <span>{hasDefensiveTwoWeaponFighting ? "⚔ Verteidigung mit zwei Waffen" : "–"}</span>
+              <span>{hasDodge ? "🛡 Ausweichen" : "–"}</span>
+            </div>
+          )}
+        </div>
+        <p className="text-[9px] text-zinc-500 font-mono">
+          Waffenschachtel im Reiter „Gegenstände“: legen Sie fest, welche Waffe in welcher Hand (Haupthand / Nebenhand / Beidhändig) geführt wird.
+        </p>
+      </div>
+
+      {/* Waffen-Angriffstabellen */}
+      <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+        <div className="text-xs font-mono font-bold text-zinc-300">Angriffstabellen</div>
         {!isTwoWeaponMode && singleResults.map(({ item, result }) => (
-          <div key={item.id} className="pb-2 border-b border-zinc-800 last:border-b-0 last:pb-0 space-y-1.5">
+          <div key={item.id} className="pb-2 border-b border-zinc-800 last:border-b-0 space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-white">{item.name}</span>
-              {item.weaponData?.isFinesse && <span className="text-[9px] uppercase px-1.5 py-0.5 bg-amber-950/30 border border-amber-800/40 rounded text-amber-400">Finesse</span>}
+              {item.weaponData?.isFinesse && <span className="text-[9px] uppercase px-1 py-0.5 bg-amber-950/30 border border-amber-800/40 rounded text-amber-400">Finesse</span>}
             </div>
             {result.grips.map((grip) => (
-              <div key={grip.grip} className="pl-2 border-l-2 border-zinc-800 space-y-1">
-                <span className="text-[10px] uppercase text-zinc-500 font-mono">{GRIP_LABELS[grip.grip]}</span>
-                <div className="flex flex-wrap gap-1.5">
+              <div key={grip.grip} className="pl-2 border-l-2 border-zinc-800 space-y-0.5">
+                <span className="text-[9px] uppercase text-zinc-500 font-mono">{GRIP_LABELS[grip.grip]}</span>
+                <div className="flex flex-wrap gap-1">
                   <ValueBadge label="Angriff" value={grip.attack} color="text-cyan-300" />
                   <ValueBadge label="Schaden" value={grip.damage} color="text-rose-400" />
-                  {grip.extraDamageParts.map((part, i) => (<ValueBadge key={i} label="Magieschaden" value={part} color="text-sky-300" />))}
+                  {grip.extraDamageParts.map((part, i) => (<ValueBadge key={i} label="Magie" value={part} color="text-sky-300" />))}
                   {!!item.weaponData?.magicBonus && <ValueBadge label="Verstärkung" value={`+${item.weaponData.magicBonus}`} color="text-indigo-300" />}
                 </div>
                 {grip.sneakAttack && (
-                  <div className="pl-2 border-l-2 border-emerald-900/50 flex flex-wrap gap-1.5">
-                    <span className="text-[10px] uppercase text-emerald-500 font-mono w-full">Hinterhalt</span>
+                  <div className="pl-2 border-l-2 border-emerald-900/50 flex flex-wrap gap-1 mt-0.5">
+                    <span className="text-[9px] uppercase text-emerald-500 font-mono w-full">Hinterhalt</span>
                     <ValueBadge label="Angriff" value={grip.sneakAttack.attack} color="text-emerald-400" />
                     <ValueBadge label="Schaden" value={grip.sneakAttack.damage} color="text-emerald-400" />
                     {grip.sneakAttack.extraDamageParts.map((part, i) => (<ValueBadge key={i} label="Zusatz" value={part} color="text-emerald-300" />))}
@@ -922,22 +603,289 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
         ))}
         {isTwoWeaponMode && twfResult && (
           <>
-            <p className="text-[10px] text-amber-400/80 font-mono">{twfResult.penaltyNote}</p>
-            {[{ res: twfResult.primary, label: "Haupthand" }, { res: twfResult.offHand, label: "Nebenhand" }].map(({ res, label }) => (
-              <div key={label} className="pb-2 border-b border-zinc-800 last:border-b-0 last:pb-0">
-                <div className="flex items-center gap-2 mb-1.5">
+            <p className="text-[9px] text-amber-400/80 font-mono mb-1">{twfResult.penaltyNote}</p>
+            {[
+              { res: twfResult.primary, label: "Haupthand" },
+              { res: twfResult.offHand, label: "Nebenhand" },
+            ].map(({ res, label }) => (
+              <div key={label} className="pb-2 border-b border-zinc-800 last:border-b-0">
+                <div className="flex items-center gap-2 mb-1">
                   <span className="text-sm font-bold text-white">⚔ {res.weaponName}</span>
-                  <span className="text-[9px] uppercase px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-300">{label}</span>
+                  <span className="text-[9px] uppercase px-1 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-300">{label}</span>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1">
                   <ValueBadge label="Angriff" value={res.formattedAttack} color="text-cyan-300" />
                   <ValueBadge label="Schaden" value={res.attacks[0].damage} color="text-rose-400" />
-                  {res.attacks[0].extraDamageParts.map((part, i) => (<ValueBadge key={i} label="Magieschaden" value={part} color="text-sky-300" />))}
+                  {res.attacks[0].extraDamageParts.map((part, i) => (<ValueBadge key={i} label="Magie" value={part} color="text-sky-300" />))}
                 </div>
               </div>
             ))}
           </>
         )}
+      </div>
+
+      {/* Kampf-Modifikatoren (Echtzeit: Zauber, Flüche, Hast, Gift etc.) */}
+      {isEditing && (
+        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono font-bold text-zinc-300">Kampf-Modifikatoren (Echtzeit)</span>
+            <Target size={14} className="text-zinc-500" />
+          </div>
+          <p className="text-[9px] text-zinc-500 font-mono">
+            Boni/Mali die im Kampf aktiv sind (z.B. Haste, Vergiftung, Segen, Fluch, Gelegenheitsangriff). Wirken auf Angriff, Schaden, KMB, KMV und RK.
+          </p>
+          <div className="mt-1">
+            <ModifierListEditor modifiers={charModifiers} onChange={(next) => updateSystemData("combatModifiers", next)} showMiscFields />
+          </div>
+        </div>
+      )}
+
+      {/* Statuseffekte (Schnellübersicht) */}
+      <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-mono font-bold text-zinc-300">Aktive Statuseffekte</span>
+          <ShieldAlert size={14} className="text-zinc-500" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="flex items-center gap-2 p-2 bg-black/30 rounded-lg border border-zinc-800/50">
+            <Sword size={12} className="text-rose-400" />
+            <span className="text-xs text-zinc-300 font-mono">Blutende Wunden (über Modifikator)</span>
+          </div>
+          <div className="flex items-center gap-2 p-2 bg-black/30 rounded-lg border border-zinc-800/50">
+            <ShieldAlert size={12} className="text-amber-400" />
+            <span className="text-xs text-zinc-300 font-mono">Vergiftet (über Modifikator)</span>
+          </div>
+          <div className="flex items-center gap-2 p-2 bg-black/30 rounded-lg border border-zinc-800/50">
+            <Activity size={12} className="text-cyan-400" />
+            <span className="text-xs text-zinc-300 font-mono">Haste / Langsam</span>
+          </div>
+        </div>
+        <p className="text-[9px] text-zinc-500 font-mono">
+          Statuseffekte werden über Kampf-Modifikatoren (oben) abgebildet: Typ „Sonstiges“, Kontext „Immer“, passende Werte für Angriff/Schaden/RK.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════
+// INVENTAR-REITER (eigene Ansicht)
+// ═══════════════════════════════════════════════════════════
+
+const PathfinderInventory: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<CategoryTabId>("all");
+
+  const toggleExpand = (id: string) => setExpandedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
+  const updateInventoryItem = (id: string, patch: Partial<InventoryItem>) =>
+    onUpdate({ inventory: character.inventory.map((it) => it.id === id ? { ...it, ...patch } : it) });
+
+  const removeInventoryItem = (id: string) =>
+    onUpdate({ inventory: character.inventory.filter((it) => it.id !== id) });
+
+  const addInventoryItem = (category: CategoryTabId) => {
+    const base: InventoryItem = {
+      id: makeId(),
+      name: category === "weapon" ? "Neue Waffe" : category === "armor" ? "Neue Rüstung" : category === "consumable" ? "Neuer Trank" : category === "jewelry" ? "Neuer Schmuck" : "Neuer Gegenstand",
+      category, quantity: 1, location: "equipped",
+      isActiveWeapon: category === "weapon" ? false : undefined,
+      weaponData: category === "weapon" ? { isMelee: true, baseDice: "1W6", damageAttribute: "ST", weaponSlot: "primary", supportsOneHanded: true, supportsTwoHanded: false, modifiers: [] } : undefined,
+      armorData: category === "armor" ? { armorBonus: 0 } : undefined,
+    };
+    onUpdate({ inventory: [...character.inventory, base] });
+    setExpandedIds((prev) => new Set(prev).add(base.id));
+  };
+
+  const adjustQuantity = (id: string, delta: number) =>
+    onUpdate({ inventory: character.inventory.map((it) => it.id === id ? { ...it, quantity: Math.max(0, (it.quantity ?? 0) + delta) } : it) });
+
+  const setCharge = (id: string, newCurrent: number) =>
+    onUpdate({ inventory: character.inventory.map((it) => {
+      if (it.id !== id || !it.charges) return it;
+      const clamped = Math.min(it.charges.max, Math.max(0, newCurrent));
+      return { ...it, charges: { ...it.charges, current: clamped } };
+    }) });
+
+  const filteredInventory = character.inventory.filter((item) => activeTab === "all" || getTabForItem(item) === activeTab);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-1 p-1 bg-black/40 rounded-xl border border-zinc-800 text-[9px] font-mono overflow-x-auto">
+          {CATEGORY_TABS.map((tab) => {
+            const count = tab.id === "all" ? character.inventory.length : character.inventory.filter((it) => getTabForItem(it) === tab.id).length;
+            return (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                className={`px-2 py-1 rounded text-[9px] font-mono transition-colors ${activeTab === tab.id ? "bg-orange-500 text-black" : "text-zinc-400 hover:text-white"}`}>
+                {tab.label} <span className="opacity-60">({count})</span>
+              </button>
+            );
+          })}
+        </div>
+        {isEditing && (
+          <div className="flex gap-1 flex-wrap">
+            {[ "weapon", "armor", "consumable", "jewelry", "gear" ] as const].map((cat) => (
+              <button key={cat} onClick={() => addInventoryItem(cat as CategoryTabId)} className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-[9px] font-mono rounded-lg text-zinc-300">
+                <Plus size={10} /> {cat === "weapon" ? "Waffe" : cat === "armor" ? "Rüstung" : cat === "consumable" ? "Trank" : cat === "jewelry" ? "Schmuck" : "Gegenstand"}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {filteredInventory.length === 0 && (
+        <p className="text-xs text-zinc-600 font-mono">Keine Gegenstände in dieser Kategorie.</p>
+      )}
+
+      <div className="space-y-1">
+        {filteredInventory.map((item) => {
+          const isExpanded = expandedIds.has(item.id);
+          return (
+            <div key={item.id} className="bg-black/40 border border-zinc-800 rounded-lg overflow-hidden">
+              <div className="p-2 space-y-1">
+                <div className="flex items-center justify-between gap-1">
+                  <button onClick={() => toggleExpand(item.id)} className="flex items-center gap-1 text-left flex-1 min-w-0">
+                    {isExpanded ? <ChevronDown size={12} className="text-zinc-500 shrink-0" /> : <ChevronRight size={12} className="text-zinc-500 shrink-0" />}
+                    {isEditing ? (
+                      <input value={item.name} onClick={(e) => e.stopPropagation()} onChange={(e) => updateInventoryItem(item.id, { name: e.target.value })} className="flex-1 bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-xs text-white font-mono" />
+                    ) : <span className="text-xs font-bold text-white truncate">{item.name}</span>}
+                    {!isExpanded && item.notes && <span title={item.notes} className="text-zinc-500 hover:text-amber-400 cursor-help shrink-0"><Info size={11} /></span>}
+                  </button>
+                  {isEditing && <button onClick={() => removeInventoryItem(item.id)} className="text-[9px] text-red-400 font-mono shrink-0">Entfernen</button>}
+                </div>
+                <div className="flex flex-wrap gap-0.5">
+                  <ValueBadge label="Ort" value={item.location === "equipped" ? "Am Mann" : "Eingelagert"} color={item.location === "equipped" ? "text-emerald-400" : "text-amber-400"} />
+                  {item.category === "weapon" && item.weaponData?.baseDice && <ValueBadge label="Schaden" value={item.weaponData.baseDice} color="text-rose-400" />}
+                  {item.category === "weapon" && item.weaponData?.extraDamage && <ValueBadge label="Magie" value={item.weaponData.extraDamage} color="text-sky-300" />}
+                  {item.category === "weapon" && !!item.weaponData?.magicBonus && <ValueBadge label="+X" value={item.weaponData.magicBonus} color="text-indigo-300" />}
+                  {item.category === "weapon" && item.isActiveWeapon && <ValueBadge label="Aktiv" value={item.weaponData?.weaponSlot === "offHand" ? "Nebenhand" : item.weaponData?.weaponSlot === "twoHanded" ? "Beidhändig" : "Haupthand"} color="text-orange-400" />}
+                  {item.category === "armor" && <ValueBadge label="Rüstung" value={`+${item.armorData?.armorBonus ?? 0}`} color="text-cyan-300" />}
+                  {item.charges && <ValueBadge label="Ladungen" value={`${item.charges.current}/${item.charges.max}`} color="text-purple-300" />}
+                  {item.quantity !== undefined && item.category !== "weapon" && item.category !== "armor" && <ValueBadge label="Anzahl" value={`${item.quantity}x`} color="text-zinc-200" />}
+                  <SourceReferenceBadges value={item.sourceReference} />
+                </div>
+              </div>
+
+              {isExpanded && (
+                <div className="px-2 pb-2 pt-0.5 border-t border-zinc-800 space-y-1">
+                  {item.charges && (
+                    <div className="space-y-0.5">
+                      <span className="text-[9px] text-zinc-500 font-mono uppercase">Ladungen</span>
+                      <ChargeTracker current={item.charges.current} max={item.charges.max} onToggle={(newCurrent) => setCharge(item.id, newCurrent)} />
+                    </div>
+                  )}
+                  {item.quantity !== undefined && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[9px] text-zinc-500 font-mono uppercase">Anzahl</span>
+                      <button onClick={() => adjustQuantity(item.id, -1)} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300"><Minus size={10} /></button>
+                      <span className="text-xs font-mono text-white w-8 text-center">{item.quantity}</span>
+                      <button onClick={() => adjustQuantity(item.id, 1)} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-300"><Plus size={10} /></button>
+                    </div>
+                  )}
+                  {item.notes && (
+                    <div>
+                      <span className="text-[9px] text-zinc-500 font-mono uppercase">Beschreibung</span>
+                      <p className="text-[9px] text-zinc-300 font-mono mt-0.5 whitespace-pre-wrap bg-zinc-950/60 border border-zinc-800 rounded p-1">{item.notes}</p>
+                    </div>
+                  )}
+                  {isEditing && (
+                    <div className="space-y-1 pt-1 border-t border-zinc-800">
+                      <div className="flex flex-wrap items-center gap-1 text-[9px] font-mono text-zinc-400">
+                        <label className="flex items-center gap-1"><input type="checkbox" checked={item.location === "equipped"} onChange={(e) => updateInventoryItem(item.id, { location: e.target.checked ? "equipped" : "stored" })} /> Am Körper</label>
+                        {item.category === "weapon" && (
+                          <>
+                            <label className="flex items-center gap-1"><input type="checkbox" checked={!!item.isActiveWeapon} onChange={(e) => updateInventoryItem(item.id, { isActiveWeapon: e.target.checked })} /> Aktiv</label>
+                            {item.isActiveWeapon && (
+                              <label className="flex items-center gap-1"><span className="mr-0.5">Hand:</span>
+                                <select value={item.weaponData?.weaponSlot || "primary"} onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, weaponSlot: e.target.value as any } })} className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-white font-mono px-0.5 py-0">
+                                  <option value="primary">Haupthand</option>
+                                  <option value="offHand">Nebenhand</option>
+                                  <option value="twoHanded">Beidhändig</option>
+                                </select>
+                              </label>
+                            )}
+                          </>
+                        )}
+                      </div>
+                      {item.category === "weapon" && (
+                        <>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
+                            <label className="flex items-center gap-1 text-[9px] font-mono text-zinc-400"><input type="checkbox" checked={item.weaponData?.isMelee ?? true} onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData, isMelee: e.target.checked } })} /> Nahkampf</label>
+                            <label className="flex items-center gap-1 text-[9px] font-mono text-zinc-400"><input type="checkbox" checked={!!item.weaponData?.isFinesse} onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, isFinesse: e.target.checked } })} /> Finesse</label>
+                            <label className="flex items-center gap-1 text-[9px] font-mono text-zinc-400"><input type="checkbox" checked={!!item.weaponData?.isLight} onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, isLight: e.target.checked } })} /> Leicht</label>
+                          </div>
+                          <div className="flex gap-1">
+                            <label className="flex items-center gap-1 text-[9px] font-mono text-zinc-400"><input type="checkbox" checked={item.weaponData?.supportsOneHanded !== false} onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, supportsOneHanded: e.target.checked } })} /> 1H</label>
+                            <label className="flex items-center gap-1 text-[9px] font-mono text-zinc-400"><input type="checkbox" checked={!!item.weaponData?.supportsTwoHanded} onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, supportsTwoHanded: e.target.checked } })} /> 2H</label>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
+                            <div><label className="block text-[9px] text-zinc-500">Schaden</label><input value={item.weaponData?.baseDice || ""} placeholder="1W6" onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, baseDice: e.target.value } })} className="w-full bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0.5 text-[9px] text-white font-mono" /></div>
+                            <div><label className="block text-[9px] text-zinc-500">+X</label><input type="number" value={item.weaponData?.magicBonus ?? 0} onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, magicBonus: Number(e.target.value) } })} className="w-full bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0.5 text-[9px] text-white font-mono" /></div>
+                            <div><label className="block text-[9px] text-zinc-500">Magieschaden</label><input value={item.weaponData?.extraDamage || ""} placeholder="+1W6" onChange={(e) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, extraDamage: e.target.value || undefined } })} className="w-full bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0.5 text-[9px] text-white font-mono" /></div>
+                          </div>
+                          <div><span className="text-[9px] uppercase text-zinc-500 font-mono">Waffen-Modifikatoren</span><div className="mt-0.5"><ModifierListEditor modifiers={item.weaponData?.modifiers || []} onChange={(next) => updateInventoryItem(item.id, { weaponData: { ...item.weaponData!, modifiers: next } })} /></div></div>
+                        </>
+                      )}
+                      {item.category === "armor" && (
+                        <div><label className="block text-[9px] text-zinc-500">Rüstungsbonus</label><input type="number" value={item.armorData?.armorBonus ?? 0} onChange={(e) => updateInventoryItem(item.id, { armorData: { armorBonus: Number(e.target.value) } })} className="w-16 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0.5 text-[9px] text-white font-mono" /></div>
+                      )}
+                      {item.category === "jewelry" && (
+                        <>
+                          <div className="flex flex-wrap items-center gap-1 text-[9px] font-mono text-zinc-400 mb-0.5">
+                            <label className="flex items-center gap-1"><span>Bonus:</span>
+                              <select value="" onChange={(e) => {
+                                const type = e.target.value as any;
+                                if (!type) return;
+                                updateInventoryItem(item.id, { jewelryBonus: [ ...(item.jewelryBonus || []), { id: makeId(), type, value: 0, label: "Neu" } ] });
+                              }} className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-zinc-400 px-0.5 py-0">
+                                <option value="">-- hinzufügen --</option>
+                                <option value="armor">Rüstung</option><option value="attack">Angriff</option><option value="damage">Schaden</option><option value="save">Rettungswurf</option><option value="ac">RK</option><option value="kmb">KMB</option><option value="kmv">KMV</option><option value="custom">Custom</option>
+                              </select>
+                            </label>
+                          </div>
+                          {item.jewelryBonus?.map((bonus, idx) => (
+                            <div key={bonus.id} className="flex items-center gap-1 mt-0.5">
+                              <select value={bonus.type} onChange={(e) => updateInventoryItem(item.id, { jewelryBonus: item.jewelryBonus!.map((b, i) => i === idx ? { ...b, type: e.target.value as any } : b) })} className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-zinc-400 px-0.5 py-0">
+                                <option value="armor">Rüstung</option><option value="attack">Angriff</option><option value="damage">Schaden</option><option value="save">Rettungswurf</option><option value="ac">RK</option><option value="kmb">KMB</option><option value="kmv">KMV</option><option value="custom">Custom</option>
+                              </select>
+                              <input type="number" value={bonus.value} onChange={(e) => updateInventoryItem(item.id, { jewelryBonus: item.jewelryBonus!.map((b, i) => i === idx ? { ...b, value: Number(e.target.value) } : b) })} className="w-12 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-[9px] text-white font-mono" />
+                              <button onClick={() => updateInventoryItem(item.id, { jewelryBonus: item.jewelryBonus!.filter((_, i) => i !== idx) })} className="text-red-400 hover:text-red-300 text-[9px]">×</button>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                      <label className="flex items-center gap-1 text-[9px] font-mono text-zinc-400"><input type="checkbox" checked={!!item.charges} onChange={(e) => updateInventoryItem(item.id, { charges: e.target.checked ? { max: 1, current: 1, rechargeType: "rest" } : undefined })} /> Ladungen</label>
+                      {item.charges && (
+                        <div className="flex items-center gap-1 text-[9px] font-mono text-zinc-400">
+                          <span>Max</span>
+                          <input type="number" value={item.charges.max} onChange={(e) => updateInventoryItem(item.id, { charges: { ...item.charges!, max: Number(e.target.value) } })} className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                          <select value={item.charges.rechargeType} onChange={(e) => updateInventoryItem(item.id, { charges: { ...item.charges!, rechargeType: e.target.value as any } })} className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-white">
+                            <option value="rest">Rast</option><option value="manual">Manuell</option><option value="none">Dauerhaft</option>
+                          </select>
+                        </div>
+                      )}
+                      <div><label className="block text-[9px] text-zinc-500">Kategorie</label><select value={item.category || "gear"} onChange={(e) => updateInventoryItem(item.id, { category: e.target.value })} className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-white font-mono px-0.5 py-0">
+                        <option value="weapon">Waffe</option><option value="armor">Rüstung</option><option value="consumable">Trank</option><option value="jewelry">Schmuck</option><option value="gear">Sonstiges</option>
+                      </select></div>
+                      <div><span className="text-[9px] uppercase text-zinc-500 font-mono">Referenz</span><div className="mt-0.5"><SourceReferenceEditor value={item.sourceReference} onChange={(v) => updateInventoryItem(item.id, { sourceReference: v })} /></div></div>
+                      <div><label className="block text-[9px] text-zinc-400 font-mono mb-0.5">Notizen</label><textarea value={item.notes || ""} onChange={(e) => updateInventoryItem(item.id, { notes: e.target.value || undefined })} placeholder="Notizen" className="w-full bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-[9px] text-white font-mono min-h-[40px]" /></div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-4">
+        <CurrencyHistoryCard title="Vermögen" balanceDisplay={character.systemData.currencyBalance !== undefined ? `${character.systemData.currencyBalance} ${currencyUnit}` : undefined} entries={(character.systemData.currencyHistory as any[]) || []} />
+        <PartyCard party={character.party} isEditing={isEditing} onUpdate={onUpdate as any} />
       </div>
     </div>
   );
@@ -946,412 +894,7 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
 // ═══════════════════════════════════════════════════════════
 // TALENTE & FÄHIGKEITEN-REITER
 // ═══════════════════════════════════════════════════════════
-const PathfinderTalentsView: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
-  const abilities = character.abilities || [];
-  const updateAbility = (index: number, patch: Partial<Ability>) => {
-    onUpdate({ abilities: abilities.map((a, i) => (i === index ? { ...a, ...patch } : a)) });
-  };
-  const setAbilityUse = (index: number, newCurrent: number) => {
-    const ability = abilities[index];
-    const max = ability.maxUses ?? parseDailyUses(ability.usage) ?? 0;
-    if (max <= 0) return;
-    updateAbility(index, { maxUses: max, currentUses: Math.min(max, Math.max(0, newCurrent)) });
-  };
-  const groups: Record<string, Ability[]> = {};
-  abilities.forEach((a) => {
-    const key = a.type || "other";
-    (groups[key] = groups[key] || []).push(a);
-  });
-  const orderedKeys = ["class", "talent", "race", "gnome", "item", "other"].filter((k) => groups[k]?.length);
-  Object.keys(groups).forEach((k) => {
-    if (!orderedKeys.includes(k)) orderedKeys.push(k);
-  });
-  if (abilities.length === 0) {
-    return <p className="text-xs text-zinc-600 font-mono">Keine Talente oder Fähigkeiten hinterlegt.</p>;
-  }
-  return (
-    <div className="space-y-6">
-      {orderedKeys.map((key) => (
-        <div key={key} className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
-          <div className="text-xs font-mono font-bold text-zinc-300">{TYPE_LABELS[key] || key}</div>
-          <div className="space-y-2">
-            {groups[key].map((ability) => {
-              const globalIndex = abilities.indexOf(ability);
-              const max = ability.maxUses ?? parseDailyUses(ability.usage);
-              const current = ability.currentUses ?? max;
-              return (
-                <div key={globalIndex} className="p-2.5 bg-black/40 border border-zinc-800 rounded-lg space-y-1.5">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="text-sm font-bold text-white">{ability.name}</span>
-                    <div className="flex items-center gap-1.5">
-                      {ability.usage && <ValueBadge label="Nutzung" value={ability.usage} color="text-purple-300" />}
-                      <SourceReferenceBadges value={ability.sourceReference} />
-                    </div>
-                  </div>
-                  {ability.effect && (
-                    <p className="text-xs text-zinc-400 font-mono">{ability.effect}</p>
-                  )}
-                  {max !== undefined && max > 0 && (
-                    <ChargeTracker
-                      current={current ?? max}
-                      max={max}
-                      onToggle={(newCurrent) => setAbilityUse(globalIndex, newCurrent)}
-                    />
-                  )}
-                  {isEditing && (
-                    <SourceReferenceEditor
-                      value={ability.sourceReference}
-                      onChange={(v) => updateAbility(globalIndex, { sourceReference: v })}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
 
-// ═══════════════════════════════════════════════════════════
-// CHARAKTERBOGEN-REITER
-// ═══════════════════════════════════════════════════════════
-const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
-  const attrs = getAttrs(character);
-  const level = getLevel(character);
-  const classId = getClassId(character);
-  const raceId = getRaceId(character);
-  const cls = classId ? PATHFINDER_CLASSES[classId] : undefined;
-  const race = raceId ? PATHFINDER_RACES[raceId] : undefined;
-  const sneakAttackActive = Boolean(character.systemData.sneakAttackActive);
-  const charModifiers = getCharModifiers(character);
-  const bab = calculateBAB(level, cls?.babProgression ?? "threeFourths");
-  const iteratives = getBabIteratives(bab);
-  const saves = calculateSavingThrows(attrs, level, classId);
-  const maneuver = calculateCombatManeuver(attrs, level, classId, raceId);
-  const armorBonus = getEquippedArmorBonus(character.inventory);
-  const jewelryArmorBonus = getJewelryArmorBonus(character.inventory);
-  const ac = calculateArmorClass(attrs, armorBonus, jewelryArmorBonus, raceId);
-  const hp = character.resources.hp || { current: 0, max: 0 };
-  const activeWeapons = character.inventory.filter(
-    (i) => i.category === "weapon" && i.location === "equipped" && i.isActiveWeapon
-  );
-  const primaryWeapon = activeWeapons.find((w) => w.weaponData?.weaponSlot === "primary" || !w.weaponData?.weaponSlot) || activeWeapons[0];
-  const offHandWeapon = activeWeapons.find((w) => w.weaponData?.weaponSlot === "offHand" && w !== primaryWeapon);
-  const isTwoWeaponMode = !!primaryWeapon && !!offHandWeapon;
-  const miscBonuses = sumMiscCombatBonuses(charModifiers, isTwoWeaponMode ? ["twoWeaponFightingOnly"] : []);
-  const hasDefensiveTwoWeaponFighting = Boolean(character.systemData.hasDefensiveTwoWeaponFighting);
-  const hasDodge = Boolean(character.systemData.hasDodge);
-  const talentAcBonus = getTalentAcBonus(hasDefensiveTwoWeaponFighting, hasDodge, isTwoWeaponMode);
-  const totalArmorClass = ac.armorClass + miscBonuses.acBonus + talentAcBonus;
-  const sneakDice = getSneakAttackDice(classId, level);
-  const fortNote = (character.systemData.fortitudeNote as string) || "";
-  const refNote = (character.systemData.reflexNote as string) || "";
-  const willNote = (character.systemData.willNote as string) || "";
-  const updateSystemData = (key: string, value: unknown) => onUpdate({ systemData: { ...character.systemData, [key]: value } });
-  const handlePrint = () => window.print();
-  const handleMarkdownExport = () =>
-    downloadCharacterAsMarkdown(character, { attributeLabels: ATTR_LABELS, systemLabel: "Pathfinder 1e" });
-  const singleResults = !isTwoWeaponMode
-    ? activeWeapons.map((item) => ({
-        item,
-        result: calculateWeaponGripVariants(
-          {
-            name: item.name,
-            isMelee: item.weaponData?.isMelee ?? true,
-            isFinesse: item.weaponData?.isFinesse,
-            magicBonus: item.weaponData?.magicBonus,
-            baseDice: item.weaponData?.baseDice,
-            damageAttribute: item.weaponData?.damageAttribute,
-            extraDamage: item.weaponData?.extraDamage,
-            supportsOneHanded: item.weaponData?.supportsOneHanded,
-            supportsTwoHanded: item.weaponData?.supportsTwoHanded,
-            modifiers: item.weaponData?.modifiers,
-            sneakAttackBonusAttack: item.weaponData?.sneakAttackBonusAttack,
-            sneakAttackBonusDamage: item.weaponData?.sneakAttackBonusDamage,
-          },
-          attrs, level, classId, raceId, charModifiers, sneakAttackActive
-        ),
-      }))
-    : [];
-  return (
-    <div className="space-y-4">
-      <div className="no-print flex flex-wrap gap-2 p-3 bg-zinc-900 border border-zinc-800 rounded-xl">
-        <button onClick={handlePrint} className="flex items-center gap-2 px-3 py-1.5 bg-orange-500 hover:bg-orange-400 text-black font-mono font-bold rounded-lg text-xs">
-          <Printer size={14} /> Als PDF drucken / exportieren
-        </button>
-        <button onClick={handleMarkdownExport} className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 font-mono font-bold rounded-lg text-xs">
-          <Download size={14} /> Als Obsidian-Markdown exportieren
-        </button>
-      </div>
-      <div className="printable-sheet print-page bg-white text-black p-6 rounded-xl space-y-4 font-serif">
-        <div className="border-b-2 border-black pb-2 avoid-break">
-          <h1 className="text-2xl font-bold">{character.name}</h1>
-          <p className="text-sm">
-            {race?.name || "–"} · {cls?.name || "–"} · Stufe {level}
-            {character.subTitle ? ` · ${character.subTitle}` : ""}
-          </p>
-        </div>
-        <table className="w-full text-sm avoid-break">
-          <thead>
-            <tr>{ATTR_KEYS.map((k) => (<th key={k} className="border px-2 py-1 text-center">{k}</th>))}</tr>
-          </thead>
-          <tbody>
-            <tr>
-              {ATTR_KEYS.map((k) => (
-                <td key={k} className="border px-2 py-1 text-center">
-                  {attrs[k]} ({formatModifier(calculateModifier(attrs[k]))})
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
-        <table className="w-full text-sm avoid-break">
-          <thead>
-            <tr>
-              <th className="border px-2 py-1">TP</th>
-              <th className="border px-2 py-1">RK</th>
-              <th className="border px-2 py-1">Berührung</th>
-              <th className="border px-2 py-1">Flat-Footed</th>
-              <th className="border px-2 py-1">KMB</th>
-              <th className="border px-2 py-1">KMV</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td className="border px-2 py-1 text-center">{hp.current} / {hp.max ?? "–"}</td>
-              <td className="border px-2 py-1 text-center">{totalArmorClass}</td>
-              <td className="border px-2 py-1 text-center">{ac.touchAc}</td>
-              <td className="border px-2 py-1 text-center">{ac.flatFootedAc}</td>
-              <td className="border px-2 py-1 text-center">{formatModifier(maneuver.kmb)}</td>
-              <td className="border px-2 py-1 text-center">{maneuver.kmv}</td>
-            </tr>
-          </tbody>
-        </table>
-        <table className="w-full text-sm avoid-break">
-          <thead>
-            <tr>
-              <th className="border px-2 py-1">Zähigkeit</th>
-              <th className="border px-2 py-1">Reflex</th>
-              <th className="border px-2 py-1">Wille</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td className="border px-2 py-1 text-center">{formatModifier(saves.fortitude.total)}</td>
-              <td className="border px-2 py-1 text-center">{formatModifier(saves.reflex.total)}</td>
-              <td className="border px-2 py-1 text-center">{formatModifier(saves.will.total)}</td>
-            </tr>
-          </tbody>
-        </table>
-        {isEditing ? (
-          <div className="grid grid-cols-3 gap-2 text-xs no-print">
-            <input value={fortNote} onChange={(e) => updateSystemData("fortitudeNote", e.target.value)} placeholder="Sondernotiz Zähigkeit" className="border px-1 py-0.5" />
-            <input value={refNote} onChange={(e) => updateSystemData("reflexNote", e.target.value)} placeholder="Sondernotiz Reflex" className="border px-1 py-0.5" />
-            <input value={willNote} onChange={(e) => updateSystemData("willNote", e.target.value)} placeholder="Sondernotiz Wille" className="border px-1 py-0.5" />
-          </div>
-        ) : (
-          (fortNote || refNote || willNote) && (
-            <p className="text-xs italic">{[fortNote, refNote, willNote].filter(Boolean).join(" · ")}</p>
-          )
-        )}
-        <div className="avoid-break">
-          <h2 className="font-bold border-b border-black">Fertigkeiten</h2>
-          {character.skills.length === 0 ? (
-            <p className="text-xs italic">Keine Fertigkeiten hinterlegt.</p>
-          ) : (
-            <table className="w-full text-sm mt-1">
-              <thead>
-                <tr><th className="border px-2 py-1 text-left">Fertigkeit</th><th className="border px-2 py-1">Wert</th><th className="border px-2 py-1">Geübt</th></tr>
-              </thead>
-              <tbody>
-                {character.skills.map((s, idx) => (
-                  <tr key={idx}>
-                    <td className="border px-2 py-1">{s.name}</td>
-                    <td className="border px-2 py-1 text-center">{s.value}</td>
-                    <td className="border px-2 py-1 text-center">{(s as any).trained ? "✓" : ""}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-        <div className="avoid-break">
-          <h2 className="font-bold border-b border-black">Waffen</h2>
-          {activeWeapons.length === 0 ? (
-            <p className="text-xs italic">Keine aktive Waffe.</p>
-          ) : (
-            <table className="w-full text-sm mt-1">
-              <thead>
-                <tr><th className="border px-2 py-1">Waffe</th><th className="border px-2 py-1">Angriff</th><th className="border px-2 py-1">Schaden</th></tr>
-              </thead>
-              <tbody>
-                {!isTwoWeaponMode && singleResults.map(({ item, result }) => {
-                  const grip = result.grips[0];
-                  return (
-                    <tr key={item.id}>
-                      <td className="border px-2 py-1">{item.name}</td>
-                      <td className="border px-2 py-1">{grip.attack}</td>
-                      <td className="border px-2 py-1">{grip.damage}{grip.extraDamageParts.length ? ` ${grip.extraDamageParts.join(" ")}` : ""}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-        {activeWeapons.length > 0 && (
-          <div className="avoid-break">
-            <h2 className="font-bold border-b border-black">Angriffsablauf</h2>
-            <table className="w-full text-sm mt-1">
-              <thead>
-                <tr><th className="border px-2 py-1">Angriff</th><th className="border px-2 py-1">Hand</th><th className="border px-2 py-1">GAB</th><th className="border px-2 py-1">Schaden</th></tr>
-              </thead>
-              <tbody>
-                {iteratives.map((b, idx) => (
-                  <tr key={idx}>
-                    <td className="border px-2 py-1">{idx + 1}.</td>
-                    <td className="border px-2 py-1">{primaryWeapon?.name || "–"}</td>
-                    <td className="border px-2 py-1">{formatModifier(b)}</td>
-                    <td className="border px-2 py-1">{singleResults[0]?.result.grips[0]?.damage || "–"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {sneakAttackActive && sneakDice > 0 && singleResults[0]?.result.grips[0]?.sneakAttack && (
-          <div className="avoid-break">
-            <h2 className="font-bold border-b border-black">Hinterhältiger Angriff</h2>
-            <table className="w-full text-sm mt-1">
-              <thead>
-                <tr><th className="border px-2 py-1">Angriff</th><th className="border px-2 py-1">Schaden gesamt</th></tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="border px-2 py-1">{singleResults[0].result.grips[0].sneakAttack!.attack}</td>
-                  <td className="border px-2 py-1">{singleResults[0].result.grips[0].sneakAttack!.damage}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-        <div className="force-page-break avoid-break">
-          <h2 className="font-bold border-b border-black">Talente & Fähigkeiten</h2>
-          <ul className="text-sm list-disc pl-5">
-            {character.abilities.map((a, idx) => (
-              <li key={idx}><strong>{a.name}</strong>{a.usage ? ` (${a.usage})` : ""}{a.effect ? ` — ${a.effect}` : ""}</li>
-            ))}
-          </ul>
-        </div>
-        <div className="avoid-break">
-          <h2 className="font-bold border-b border-black">Besitz & Ausrüstung</h2>
-          <ul className="text-sm list-disc pl-5">
-            {character.inventory.map((item) => (
-              <li key={item.id}><strong>{item.name}</strong>{item.quantity !== undefined ? ` ×${item.quantity}` : ""}{item.notes ? ` — ${item.notes}` : ""}</li>
-            ))}
-          </ul>
-        </div>
-        {character.party.length > 0 && (
-          <div className="avoid-break">
-            <h2 className="font-bold border-b border-black">Gruppe</h2>
-            <table className="w-full text-sm mt-1">
-              <thead>
-                <tr><th className="border px-2 py-1">Name</th><th className="border px-2 py-1">Spieler</th><th className="border px-2 py-1">Rasse / Rolle</th></tr>
-              </thead>
-              <tbody>
-                {character.party.map((p, idx) => (
-                  <tr key={idx}>
-                    <td className="border px-2 py-1">{p.name}</td>
-                    <td className="border px-2 py-1">{p.playerName || ""}</td>
-                    <td className="border px-2 py-1">{[p.race, p.occupation].filter(Boolean).join(" / ")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {(character.systemData.currencyBalance !== undefined || (character.systemData.currencyHistory as any[])?.length > 0) && (
-          <div className="avoid-break">
-            <h2 className="font-bold border-b border-black">Finanzen</h2>
-            <p className="text-sm">Guthaben: {character.systemData.currencyBalance as number} {(character.systemData.currencyUnit as string) || "GM"}</p>
-            <ul className="text-xs list-disc pl-5">
-              {((character.systemData.currencyHistory as any[]) || []).slice(0, 10).map((h: any) => (
-                <li key={h.id}>{h.description}{h.detail ? ` (${h.detail})` : ""}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ═══════════════════════════════════════════════════════════
-// FERTIGKEITEN-REITER
-// ═══════════════════════════════════════════════════════════
-const PathfinderSkillsView: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
-  const attrs = getAttrs(character);
-  const attrMods: Record<string, number> = {
-    ST: calculateModifier(attrs.ST),
-    GE: calculateModifier(attrs.GE),
-    KO: calculateModifier(attrs.KO),
-    IN: calculateModifier(attrs.IN),
-    WE: calculateModifier(attrs.WE),
-    CH: calculateModifier(attrs.CH),
-  };
-  const mergedSkills = React.useMemo(() => {
-    return PATHFINDER_SKILLS.map((def) => {
-      const existing = character.skills.find((s) => {
-        const sName = (s?.name || "").toLowerCase().trim();
-        const defName = def.name.toLowerCase().trim();
-        if (sName === defName) return true;
-        if (def.aliases?.some((a) => a.toLowerCase().trim() === sName)) return true;
-        return false;
-      });
-      const attrMod = attrMods[def.attr] ?? 0;
-      const rawVal = existing ? existing.value : 0;
-      const ranks = typeof rawVal === "number"
-        ? rawVal
-        : parseInt(String(rawVal).replace(/[^0-9-]/g, ""), 10) || 0;
-      const isClassSkill = existing?.trained ?? false;
-      const classBonus = isClassSkill && ranks > 0 ? 3 : 0;
-      const totalBonus = attrMod + ranks + classBonus + (existing?.miscBonus ?? 0);
-      return { ...def, ranks, isClassSkill, classBonus, attrMod, totalBonus, miscBonus: existing?.miscBonus ?? 0 };
-    });
-  }, [character.skills, attrMods]);
-
-  const handleUpdateSkillRanks = (skillName: string, newRanks: number) => {
-    const current = [...character.skills];
-    const idx = current.findIndex((s) => (s?.name || "").toLowerCase() === skillName.toLowerCase());
-    if (idx >= 0) current[idx] = { ...current[idx], value: newRanks };
-    else current.push({ name: skillName, value: newRanks, trained: false });
-    onUpdate({ skills: current });
-  };
-  const handleToggleClassSkill = (skillName: string) => {
-    const current = [...character.skills];
-    const idx = current.findIndex((s) => (s?.name || "").toLowerCase() === skillName.toLowerCase());
-    if (idx >= 0) current[idx] = { ...current[idx], trained: !current[idx].trained };
-    else current.push({ name: skillName, value: 0, trained: true });
-    onUpdate({ skills: current });
-  };
-  return (
-    <div className="space-y-4">
-      <PathfinderSkillsBlock
-        mergedSkills={mergedSkills}
-        isEditable={isEditing}
-        onUpdateSkillRanks={handleUpdateSkillRanks}
-        onToggleClassSkill={handleToggleClassSkill}
-        printMode={false}
-      />
-    </div>
-  );
-};
-
-// ═══════════════════════════════════════════════════════════
-// PLUGIN-DEFINITION
-// ═══════════════════════════════════════════════════════════
 export const PathfinderPlugin: SystemPlugin = {
   id: "pathfinder",
   name: "Pathfinder 1e",
