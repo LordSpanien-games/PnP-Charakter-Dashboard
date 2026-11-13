@@ -101,6 +101,15 @@ export interface ArmorItemData {
   armorBonus: number;
 }
 
+/** Ein bonus, den ein Schmuck-Item verleihen kann (z.B. Amulett der Natürlichen Rüstung +1). */
+export interface JewelryBonus {
+  id: string;
+  type: 'armor' | 'attack' | 'damage' | 'save' | 'ac' | 'kmb' | 'kmv' | 'custom';
+  value: number;
+  label?: string;
+  sourceReference?: SourceReference;
+}
+
 export interface InventorySubItem {
   id: string;
   name: string;
@@ -121,6 +130,8 @@ export interface InventoryItem {
   charges?: ItemCharges;
   sourceReference?: SourceReference;
   subItems?: InventorySubItem[];
+  /** Optionale Boni für Schmuck-Items (z.B. Amulett der Natürlichen Rüstung +1). */
+  jewelryBonus?: JewelryBonus[];
   [extra: string]: unknown;
 }
 

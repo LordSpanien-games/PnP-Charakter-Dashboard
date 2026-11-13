@@ -31,6 +31,8 @@ import {
   formatModifier,
   calculateSavingThrows,
   calculateArmorClass,
+  getEquippedArmorBonus,
+  getJewelryArmorBonus,
   calculateCombatManeuver,
   calculateWeaponGripVariants,
   calculateTwoWeaponFighting,
@@ -246,9 +248,9 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
   const sneakAttackActive = Boolean(character.systemData.sneakAttackActive);
   const charModifiers = getCharModifiers(character);
   const saves = calculateSavingThrows(attrs, level, classId);
-  const armorItem = character.inventory.find((i) => i.category === "armor" && i.location === "equipped");
-  const armorBonus = armorItem?.armorData?.armorBonus ?? 0;
-  const ac = calculateArmorClass(attrs, armorBonus, raceId);
+  const armorBonus = getEquippedArmorBonus(character.inventory);
+  const jewelryArmorBonus = getJewelryArmorBonus(character.inventory);
+  const ac = calculateArmorClass(attrs, armorBonus, jewelryArmorBonus, raceId);
   const hp = character.resources.hp || { current: 0, max: 0 };
   const activeWeapons = character.inventory.filter(
     (i) => i.category === "weapon" && i.location === "equipped" && i.isActiveWeapon
@@ -597,6 +599,85 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
                         {item.category === "armor" && (
                           <div><label className="block text-[9px] text-zinc-500">Rüstungsbonus</label><input type="number" value={item.armorData?.armorBonus ?? 0} onChange={(e) => updateInventoryItem(item.id, { armorData: { armorBonus: Number(e.target.value) } })} className="w-24 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" /></div>
                         )}
+                        {item.category === "jewelry" && (
+                          <>
+                            <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-zinc-400 mb-1">
+                              <label className="flex items-center gap-1.5">
+                                <span>Schmuck-Bonus:</span>
+                                <select
+                                  value=""
+                                  onChange={(e) => {
+                                    const type = e.target.value as any;
+                                    if (!type) return;
+                                    updateInventoryItem(item.id, {
+                                      jewelryBonus: [
+                                        ...(item.jewelryBonus || []),
+                                        { id: makeId(), type, value: 0, label: "Neuer Bonus" }
+                                      ]
+                                    });
+                                  }}
+                                  className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-zinc-400 px-1 py-0.5"
+                                >
+                                  <option value="">-- Bonus hinzufügen --</option>
+                                  <option value="armor">Rüstung</option>
+                                  <option value="attack">Angriff</option>
+                                  <option value="damage">Schaden</option>
+                                  <option value="save">Rettungswurf</option>
+                                  <option value="ac">RK (allgemein)</option>
+                                  <option value="kmb">KMB</option>
+                                  <option value="kmv">KMV</option>
+                                  <option value="custom">Benutzerdefiniert</option>
+                                </select>
+                              </label>
+                            </div>
+                            {item.jewelryBonus?.map((bonus, idx) => (
+                              <div key={bonus.id} className="flex items-center gap-2 mt-1">
+                                <select
+                                  value={bonus.type}
+                                  onChange={(e) => {
+                                    updateInventoryItem(item.id, {
+                                      jewelryBonus: item.jewelryBonus!.map((b, i) =>
+                                        i === idx ? { ...b, type: e.target.value as any } : b
+                                      )
+                                    });
+                                  }}
+                                  className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-zinc-400 px-1 py-0.5"
+                                >
+                                  <option value="armor">Rüstung</option>
+                                  <option value="attack">Angriff</option>
+                                  <option value="damage">Schaden</option>
+                                  <option value="save">Rettungswurf</option>
+                                  <option value="ac">RK (allgemein)</option>
+                                  <option value="kmb">KMB</option>
+                                  <option value="kmv">KMV</option>
+                                  <option value="custom">Benutzerdefiniert</option>
+                                </select>
+                                <input
+                                  type="number"
+                                  value={bonus.value}
+                                  onChange={(e) => {
+                                    updateInventoryItem(item.id, {
+                                      jewelryBonus: item.jewelryBonus!.map((b, i) =>
+                                        i === idx ? { ...b, value: Number(e.target.value) } : b
+                                      )
+                                    });
+                                  }}
+                                  className="w-16 bg-zinc-900 border border-zinc-700 rounded px-1 py-0.5 text-xs text-white font-mono"
+                                />
+                                <button
+                                  onClick={() => {
+                                    updateInventoryItem(item.id, {
+                                      jewelryBonus: item.jewelryBonus!.filter((_, i) => i !== idx)
+                                    });
+                                  }}
+                                  className="text-red-400 hover:text-red-300 text-xs"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </>
+                        )}
                         <label className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400"><input type="checkbox" checked={!!item.charges} onChange={(e) => updateInventoryItem(item.id, { charges: e.target.checked ? { max: 1, current: 1, rechargeType: "rest" } : undefined })} />Hat Ladungen</label>
                         {item.charges && (
                           <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
@@ -940,9 +1021,9 @@ const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, is
   const iteratives = getBabIteratives(bab);
   const saves = calculateSavingThrows(attrs, level, classId);
   const maneuver = calculateCombatManeuver(attrs, level, classId, raceId);
-  const armorItem = character.inventory.find((i) => i.category === "armor" && i.location === "equipped");
-  const armorBonus = armorItem?.armorData?.armorBonus ?? 0;
-  const ac = calculateArmorClass(attrs, armorBonus, raceId);
+  const armorBonus = getEquippedArmorBonus(character.inventory);
+  const jewelryArmorBonus = getJewelryArmorBonus(character.inventory);
+  const ac = calculateArmorClass(attrs, armorBonus, jewelryArmorBonus, raceId);
   const hp = character.resources.hp || { current: 0, max: 0 };
   const activeWeapons = character.inventory.filter(
     (i) => i.category === "weapon" && i.location === "equipped" && i.isActiveWeapon

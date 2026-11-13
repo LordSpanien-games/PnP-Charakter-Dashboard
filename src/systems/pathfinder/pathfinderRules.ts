@@ -1,4 +1,4 @@
-import { CombatModifier, CombatModifierContext } from "../../core/types";
+import { CombatModifier, CombatModifierContext, InventoryItem } from "../../core/types";
 import { PATHFINDER_CLASSES } from "../../utils/levelUpRules";
 
 export type BabProgression = "full" | "threeFourths" | "half";
@@ -132,15 +132,16 @@ export const calculateSavingThrows = (
 export const calculateArmorClass = (
   attrs: PathfinderAttributes,
   armorBonus: number,
+  jewelryArmorBonus: number,
   raceId: string | undefined
 ): { armorClass: number; touchAc: number; flatFootedAc: number } => {
   const geMod   = calculateModifier(attrs.GE);
   const race    = raceId ? PATHFINDER_RACES[raceId] : undefined;
   const sizeMod = SIZE_MODIFIERS[race?.size ?? "medium"].attackAndAc;
   return {
-    armorClass:    10 + geMod + armorBonus + sizeMod,
+    armorClass:    10 + geMod + armorBonus + jewelryArmorBonus + sizeMod,
     touchAc:       10 + geMod + sizeMod,
-    flatFootedAc:  10 + armorBonus + sizeMod,
+    flatFootedAc:  10 + armorBonus + jewelryArmorBonus + sizeMod,
   };
 };
 
@@ -423,3 +424,39 @@ export const parseMagicBonusFromName = (name: string): number => {
 
 export const makeModifierId = (): string =>
   `mod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+export const makeId = (): string =>
+  `item_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+/**
+ * Ermittelt den höchsten Rüstungsbonus aller ausgerüsteten Rüstungs-Items.
+ * In Pathfinder darf nur eine Rüstung getragen werden; falls mehrere im
+ * Inventar als "equipped" markiert sind, gewinnt der höchste Bonus.
+ */
+export const getEquippedArmorBonus = (inventory: InventoryItem[]): number => {
+  const armors = inventory.filter(
+    (i) => i.category === "armor" && i.location === "equipped" && i.armorData
+  );
+  if (armors.length === 0) return 0;
+  return Math.max(...armors.map((i) => i.armorData!.armorBonus));
+};
+
+/**
+ * Ermittelt die Summe aller Rüstungs-Boni von ausgerüstetem Schmuck
+ * (z.B. Amulett der Natürlichen Rüstung).
+ */
+export const getJewelryArmorBonus = (inventory: InventoryItem[]): number => {
+  const jewelry = inventory.filter(
+    (i) => i.category === "jewelry" && i.location === "equipped" && i.jewelryBonus
+  );
+  return jewelry.reduce((sum: number, item: InventoryItem) => {
+    return (
+      sum +
+      (item.jewelryBonus || []).reduce(
+        (subSum: number, b: { type: string; value: number }) =>
+          b.type === "armor" ? subSum + b.value : subSum,
+        0
+      )
+    );
+  }, 0);
+};
