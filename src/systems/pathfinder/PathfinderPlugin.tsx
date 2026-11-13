@@ -501,6 +501,7 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
 const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
   const [rolledValues, setRolledValues] = useState<Record<number, number>>({});
   const [critValues, setCritValues] = useState<Record<number, number>>({});
+  const [attackAttribute, setAttackAttribute] = useState<"ST" | "GE">("GE");
 
   const setRolled = (idx: number, val: number) => {
     setRolledValues({ ...rolledValues, [idx]: val });
@@ -662,6 +663,17 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                 <input type="checkbox" checked={hasDodge} onChange={(e) => updateSystemData("hasDodge", e.target.checked)} className="accent-emerald-500" />
                 <span className="text-xs text-white">Ausweichen (+1 RK)</span>
               </label>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <span className="text-xs text-zinc-400 font-mono">Angriffs-Attribut:</span>
+                <select
+                  value={attackAttribute}
+                  onChange={(e) => setAttackAttribute(e.target.value as "ST" | "GE")}
+                  className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-white font-mono px-0.5 py-0"
+                >
+                  <option value="ST">ST</option>
+                  <option value="GE">GE</option>
+                </select>
+              </label>
             </>
           )}
           {!isEditing && (
@@ -767,8 +779,7 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                     const magicBonus = item.weaponData?.magicBonus ?? 0;
                     const stMod = calculateModifier(attrs.ST);
                     const geMod = calculateModifier(attrs.GE);
-                    // Als Rogue wird GE statt ST für Angriffswert verwendet
-                    const dmgMod = geMod;
+                    const dmgMod = attackAttribute === "GE" ? geMod : stMod;
                     const weaponAttackBonus = item.weaponData?.modifiers?.reduce(
                       (sum, m) => sum + (m.context === "always" || (sneakAttackActive && m.context === "sneakAttackOnly") ? m.attackBonus ?? 0 : 0), 0
                     ) ?? 0;
@@ -838,8 +849,7 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                       const magicBonus = weapon?.weaponData?.magicBonus ?? 0;
                       const stMod = calculateModifier(attrs.ST);
                       const geMod = calculateModifier(attrs.GE);
-                      // Als Rogue wird GE statt ST für Angriffswert verwendet
-                      const dmgMod = geMod;
+                      const dmgMod = attackAttribute === "GE" ? geMod : stMod;
                       const weaponAttackBonus = weapon?.weaponData?.modifiers?.reduce(
                         (sum, m) => sum + (m.context === "always" || (sneakAttackActive && m.context === "sneakAttackOnly") ? m.attackBonus ?? 0 : 0), 0
                       ) ?? 0;
