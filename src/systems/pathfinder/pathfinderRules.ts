@@ -422,6 +422,17 @@ export const parseMagicBonusFromName = (name: string): number => {
   return match ? parseInt(match[1], 10) : 0;
 };
 
+export const getTalentAcBonus = (
+  hasDefensiveTwoWeaponFighting: boolean,
+  hasDodge: boolean,
+  isTwoWeaponMode: boolean
+): number => {
+  let bonus = 0;
+  if (hasDodge) bonus += 1;
+  if (hasDefensiveTwoWeaponFighting && isTwoWeaponMode) bonus += 1;
+  return bonus;
+};
+
 export const makeModifierId = (): string =>
   `mod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 

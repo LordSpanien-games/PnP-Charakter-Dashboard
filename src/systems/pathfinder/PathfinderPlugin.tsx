@@ -33,6 +33,7 @@ import {
   calculateArmorClass,
   getEquippedArmorBonus,
   getJewelryArmorBonus,
+  getTalentAcBonus,
   calculateCombatManeuver,
   calculateWeaponGripVariants,
   calculateTwoWeaponFighting,
@@ -103,6 +104,7 @@ const createBase = (name: string, subTitle: string | undefined, attrs: Record<st
     systemData: {
       level: 1, classId: "fighter", raceId: "human", sneakAttackActive: false,
       hasTwoWeaponFighting: false, hasImprovedTwoWeaponFighting: false, hasGreaterTwoWeaponFighting: false,
+      hasDefensiveTwoWeaponFighting: false, hasDodge: false,
       combatModifiers: [] as CombatModifier[],
     },
   };
@@ -259,7 +261,10 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
   const offHandWeapon = activeWeapons.find((w) => w.weaponData?.weaponSlot === "offHand" && w !== primaryWeapon);
   const isTwoWeaponMode = !!primaryWeapon && !!offHandWeapon;
   const miscBonuses = sumMiscCombatBonuses(charModifiers, isTwoWeaponMode ? ["twoWeaponFightingOnly"] : []);
-  const totalArmorClass = ac.armorClass + miscBonuses.acBonus;
+  const hasDefensiveTwoWeaponFighting = Boolean(character.systemData.hasDefensiveTwoWeaponFighting);
+  const hasDodge = Boolean(character.systemData.hasDodge);
+  const talentAcBonus = getTalentAcBonus(hasDefensiveTwoWeaponFighting, hasDodge, isTwoWeaponMode);
+  const totalArmorClass = ac.armorClass + miscBonuses.acBonus + talentAcBonus;
   const chaMod = calculateModifier(attrs.CH);
   const sneakDice = getSneakAttackDice(classId, level);
   const rageRounds = classId === "barbarian" ? getRageRounds(classId, calculateModifier(attrs.KO)) : 0;
@@ -796,6 +801,8 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
   const hasTwoWeaponFighting = Boolean(character.systemData.hasTwoWeaponFighting);
   const hasImprovedTwoWeaponFighting = Boolean(character.systemData.hasImprovedTwoWeaponFighting);
   const hasGreaterTwoWeaponFighting = Boolean(character.systemData.hasGreaterTwoWeaponFighting);
+  const hasDefensiveTwoWeaponFighting = Boolean(character.systemData.hasDefensiveTwoWeaponFighting);
+  const hasDodge = Boolean(character.systemData.hasDodge);
   const bab = calculateBAB(level, cls?.babProgression ?? "threeFourths");
   const iteratives = getBabIteratives(bab);
   const maneuver = calculateCombatManeuver(attrs, level, classId, raceId);
@@ -868,6 +875,8 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={hasTwoWeaponFighting} onChange={(e) => updateSystemData("hasTwoWeaponFighting", e.target.checked)} />Zweiwaffenkampf (Talent)</label>
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={hasImprovedTwoWeaponFighting} onChange={(e) => updateSystemData("hasImprovedTwoWeaponFighting", e.target.checked)} />Verbesserter Zweiwaffenkampf</label>
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={hasGreaterTwoWeaponFighting} onChange={(e) => updateSystemData("hasGreaterTwoWeaponFighting", e.target.checked)} />Meisterlicher Zweiwaffenkampf</label>
+            <label className="flex items-center gap-1.5"><input type="checkbox" checked={hasDefensiveTwoWeaponFighting} onChange={(e) => updateSystemData("hasDefensiveTwoWeaponFighting", e.target.checked)} />Verteidigung mit zwei Waffen (+1 RK)</label>
+            <label className="flex items-center gap-1.5"><input type="checkbox" checked={hasDodge} onChange={(e) => updateSystemData("hasDodge", e.target.checked)} />Ausweichen (+1 RK)</label>
           </div>
           <div>
             <span className="text-[10px] uppercase text-zinc-500 font-mono">
@@ -1031,6 +1040,11 @@ const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, is
   const primaryWeapon = activeWeapons.find((w) => w.weaponData?.weaponSlot === "primary" || !w.weaponData?.weaponSlot) || activeWeapons[0];
   const offHandWeapon = activeWeapons.find((w) => w.weaponData?.weaponSlot === "offHand" && w !== primaryWeapon);
   const isTwoWeaponMode = !!primaryWeapon && !!offHandWeapon;
+  const miscBonuses = sumMiscCombatBonuses(charModifiers, isTwoWeaponMode ? ["twoWeaponFightingOnly"] : []);
+  const hasDefensiveTwoWeaponFighting = Boolean(character.systemData.hasDefensiveTwoWeaponFighting);
+  const hasDodge = Boolean(character.systemData.hasDodge);
+  const talentAcBonus = getTalentAcBonus(hasDefensiveTwoWeaponFighting, hasDodge, isTwoWeaponMode);
+  const totalArmorClass = ac.armorClass + miscBonuses.acBonus + talentAcBonus;
   const sneakDice = getSneakAttackDice(classId, level);
   const fortNote = (character.systemData.fortitudeNote as string) || "";
   const refNote = (character.systemData.reflexNote as string) || "";
@@ -1107,7 +1121,7 @@ const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({ character, is
           <tbody>
             <tr>
               <td className="border px-2 py-1 text-center">{hp.current} / {hp.max ?? "–"}</td>
-              <td className="border px-2 py-1 text-center">{ac.armorClass}</td>
+              <td className="border px-2 py-1 text-center">{totalArmorClass}</td>
               <td className="border px-2 py-1 text-center">{ac.touchAc}</td>
               <td className="border px-2 py-1 text-center">{ac.flatFootedAc}</td>
               <td className="border px-2 py-1 text-center">{formatModifier(maneuver.kmb)}</td>
