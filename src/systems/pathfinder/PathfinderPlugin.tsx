@@ -793,7 +793,7 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
               { res: twfResult.offHand, label: "Nebenhand", key: "offHand" },
             ].map(({ res, label, key }) => {
               const iteratives = res.attacks;
-              const hasSneak = !!iteratives[0]?.attack.includes("Hinterhalt") || sneakAttackActive;
+              const hasSneak = sneakAttackActive;
               return (
                 <div key={key} className="pb-2 border-b border-zinc-800 last:border-b-0 space-y-1">
                   <div className="flex items-center gap-2 mb-1">
@@ -827,7 +827,7 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                               <input type="checkbox" className="accent-emerald-500" />
                             </td>
                             <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-zinc-400">
-                              {att.attacks?.[0]?.damage || att.damage || "\u2013"}
+                              {att.damage || "–"}
                             </td>
                             {hasSneak && (
                               <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-emerald-400">
