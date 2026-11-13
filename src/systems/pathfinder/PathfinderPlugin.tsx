@@ -499,6 +499,31 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
 // ═══════════════════════════════════════════════════════════
 
 const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing, onUpdate }) => {
+  const [rolledValues, setRolledValues] = useState<Record<number, number>>({});
+  const [critValues, setCritValues] = useState<Record<number, number>>({});
+
+  const setRolled = (idx: number, val: number) => {
+    setRolledValues({ ...rolledValues, [idx]: val });
+  };
+  const setCrit = (idx: number, val: number) => {
+    setCritValues({ ...critValues, [idx]: val });
+  };
+
+  const calculateDamage = (
+    weaponDamageBonus: number,
+    sneakDamageBonus: number,
+    sneakDiceCount: number,
+    rolled: number,
+    crit: number
+  ): number => {
+    let total = rolled || 0;
+    if (crit && crit > 0) total += crit;
+    total += weaponDamageBonus || 0;
+    total += sneakDamageBonus || 0;
+    return total;
+  };
+
+
   const attrs = getAttrs(character);
   const level = getLevel(character);
   const classId = getClassId(character);
@@ -768,10 +793,22 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                           {totalAttack >= 0 ? "+" : ""}{totalAttack}
                         </td>
                         <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
-                          <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={critValues[idx] || ""}
+                            onChange={(e) => setCrit(idx, Number(e.target.value))}
+                            className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center"
+                          />
                         </td>
                         <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
-                          <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={rolledValues[idx] || ""}
+                            onChange={(e) => setRolled(idx, Number(e.target.value))}
+                            className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center"
+                          />
                         </td>
                         <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
                           <select className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-white px-0.5 py-0">
@@ -781,7 +818,9 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                             <option value="vergiftet">Vergiftet</option>
                           </select>
                         </td>
-                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">0</td>
+                        <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">
+                          {calculateDamage(weaponDamageBonus, sneakDamageBonus, sneakDiceCount, rolledValues[idx], critValues[idx])}
+                        </td>
                       </tr>
                     );
                   });
@@ -825,10 +864,22 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                               {baseAttack >= 0 ? "+" : ""}{baseAttack}
                             </td>
                             <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
-                              <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                              <input
+                                type="number"
+                                placeholder="0"
+                                value={critValues[globalIdx] || ""}
+                                onChange={(e) => setCrit(globalIdx, Number(e.target.value))}
+                                className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center"
+                              />
                             </td>
                             <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
-                              <input type="number" placeholder="0" className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                              <input
+                                type="number"
+                                placeholder="0"
+                                value={rolledValues[globalIdx] || ""}
+                                onChange={(e) => setRolled(globalIdx, Number(e.target.value))}
+                                className="w-10 bg-zinc-900 border border-zinc-700 rounded px-0.5 py-0 text-white text-center"
+                              />
                             </td>
                             <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">
                               <select className="bg-zinc-900 border border-zinc-700 rounded text-[9px] text-white px-0.5 py-0">
@@ -838,7 +889,9 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                                 <option value="vergiftet">Vergiftet</option>
                               </select>
                             </td>
-                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">0</td>
+                            <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white font-bold">
+                              {calculateDamage(weaponDamageBonus, sneakDamageBonus, sneakDiceCount, rolledValues[globalIdx], critValues[globalIdx])}
+                            </td>
                           </tr>
                         );
                       });
