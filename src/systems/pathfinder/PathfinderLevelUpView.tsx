@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { PluginViewProps } from "../../core/SystemPlugin";
 import { PATHFINDER_CLASSES } from "../../utils/levelUpRules";
 import { PATHFINDER_SKILLS } from "../../data/skills/pathfinderSkills";
+import { makeId } from "./pathfinderRules";
 
 // ── Hilfsfunktionen ───────────────────────────────────────
 const calculateModifier = (score: number): number => Math.floor((score - 10) / 2);
@@ -51,6 +52,11 @@ export const PathfinderLevelUpView: React.FC<PluginViewProps> = ({
   // Skill-Punkte Vergabe: merkt sich welche Skills +1 bekommen haben
   const [skillIncreases, setSkillIncreases] = useState<Record<string, boolean>>({});
 
+  // XP Eingabe
+  const currentXp = Number(character.systemData?.experiencePoints) || 0;
+  const [xpToAdd, setXpToAdd] = useState<number | "">("");
+  const newTotalXp = currentXp + (typeof xpToAdd === "number" ? xpToAdd : 0);
+
   // Neue Klassenmerkmale auf diesem Level [2]
   const newFeatures: string[] = useMemo(() => {
     if (!cls?.keyFeaturesByLevel) return [];
@@ -99,6 +105,21 @@ export const PathfinderLevelUpView: React.FC<PluginViewProps> = ({
   const handleConfirmLevelUp = () => {
     if (hpRoll === "") return;
 
+    // XP hinzufügen
+    const currentXp = Number(character.systemData?.experiencePoints) || 0;
+    const xpToAddNum = typeof xpToAdd === "number" ? xpToAdd : 0;
+    const newTotalXp = currentXp + xpToAddNum;
+    const updatedXpHistory = [
+      ...(character.systemData?.experienceHistory || []),
+      {
+        id: makeId(),
+        amount: xpToAddNum,
+        totalAfter: newTotalXp,
+        date: new Date().toISOString(),
+        reason: "Level-Up",
+      },
+    ];
+
     // HP erhöhen
     const currentHp = character.resources?.hp || { current: 0, max: 0 };
     const newMax = (currentHp.max || 0) + (hpGain ?? 0);
@@ -124,9 +145,14 @@ export const PathfinderLevelUpView: React.FC<PluginViewProps> = ({
       updatedAttributes[chosenAttr] = (Number(updatedAttributes[chosenAttr]) || 10) + 1;
     }
 
-    // Level erhöhen
+    // Level und XP erhöhen
     onUpdate({
-      systemData: { ...character.systemData, level: newLevel },
+      systemData: {
+        ...character.systemData,
+        level: newLevel,
+        experiencePoints: newTotalXp,
+        experienceHistory: updatedXpHistory,
+      },
       resources: { ...character.resources, hp: { current: newCurrent, max: newMax } },
       skills: updatedSkills,
       attributes: updatedAttributes,
@@ -168,6 +194,46 @@ export const PathfinderLevelUpView: React.FC<PluginViewProps> = ({
             </span>
           </div>
         </div>
+      </div>
+
+      {/* SCHRITT 0: ERFAHRUNGSPUNKTE */}
+      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl space-y-3">
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+          <span className="text-xs font-black uppercase text-yellow-400 tracking-wide">
+            Schritt 0 – Erfahrungspunkte
+          </span>
+        </div>
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex-1 max-w-xs">
+            <label className="text-[10px] text-zinc-500 uppercase font-mono block mb-1">
+              Aktuelle Erfahrungspunkte
+            </label>
+            <div className="bg-zinc-950 border border-zinc-700 rounded-xl font-mono font-bold text-lg text-white px-2 py-2 outline-none">
+              {currentXp} XP
+            </div>
+          </div>
+          <div className="flex-1 max-w-xs">
+            <label className="text-[10px] text-zinc-500 uppercase font-mono block mb-1">
+              Neue XP hinzufügen
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={xpToAdd === "" ? "" : xpToAdd}
+              onChange={(e) => setXpToAdd(e.target.value === "" ? "" : Number(e.target.value))}
+              placeholder="+500"
+              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl font-mono font-black text-lg text-white outline-none focus:border-amber-500 py-2 text-center"
+            />
+          </div>
+          <div className="flex-1 max-w-xs flex items-end">
+            <div className="text-2xl font-black text-yellow-400">
+              {newTotalXp} XP
+            </div>
+          </div>
+        </div>
+        <p className="text-[10px] text-zinc-600 font-mono italic">
+          Trage die erhaltenen Erfahrungspunkte ein. Sie werden zum aktuellen Wert addiert.
+        </p>
       </div>
 
       {/* SCHRITT 1: HP */}
@@ -400,6 +466,40 @@ export const PathfinderLevelUpView: React.FC<PluginViewProps> = ({
         </details>
 
       </div>
+
+      {/* XP-HISTORIE */}
+      {character.systemData?.experienceHistory?.length > 0 && (
+        <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase text-purple-400 tracking-wide">
+              XP-Historie
+            </span>
+            <span className="text-[10px] text-zinc-500 font-mono">
+              {character.systemData.experienceHistory.length} Einträge
+            </span>
+          </div>
+          <div className="max-h-[200px] overflow-y-auto space-y-1">
+            {character.systemData.experienceHistory
+              .slice()
+              .reverse()
+              .map((entry: any, idx: number) => (
+                <div key={entry.id || idx} className="flex justify-between px-2 py-1 rounded-lg border border-zinc-800/50">
+                  <span className="text-[9px] text-zinc-400 font-mono">
+                    {new Date(entry.date).toLocaleDateString("de-DE")}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-yellow-400 font-mono">
+                      +{entry.amount} XP
+                    </span>
+                    <span className="text-[9px] text-zinc-600 font-mono">
+                      → {entry.totalAfter} XP
+                    </span>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* BESTÄTIGEN BUTTON */}
       <div className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-2xl flex-wrap gap-3">

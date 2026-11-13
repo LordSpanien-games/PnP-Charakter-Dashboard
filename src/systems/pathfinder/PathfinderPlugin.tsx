@@ -53,6 +53,7 @@ import {
 } from "./pathfinderRules";
 import { PATHFINDER_CLASSES } from "../../utils/levelUpRules";
 import { PathfinderCharacterSheetView } from "./PathfinderCharacterSheet";
+import { PathfinderLevelUpView } from "./PathfinderLevelUpView";
 
 const ATTR_KEYS = ["ST", "GE", "KO", "IN", "WE", "CH"] as const;
 const ATTR_LABELS: Record<string, string> = {
@@ -108,6 +109,8 @@ const createBase = (name: string, subTitle: string | undefined, attrs: Record<st
       hasTwoWeaponFighting: false, hasImprovedTwoWeaponFighting: false, hasGreaterTwoWeaponFighting: false,
       hasDefensiveTwoWeaponFighting: false, hasDodge: false,
       combatModifiers: [] as CombatModifier[],
+      experiencePoints: 0,
+      experienceHistory: [],
     },
   };
 };
@@ -1398,5 +1401,6 @@ export const PathfinderPlugin: SystemPlugin = {
     { id: "combat", label: "Kampf", Component: PathfinderCombatView },
     { id: "inventory", label: "Inventar", Component: PathfinderInventory },
     { id: "sheet", label: "Charakterbogen", Component: PathfinderCharacterSheetView },
+    { id: "levelup", label: "⬆ Level-Up", Component: PathfinderLevelUpView },
   ],
 };
