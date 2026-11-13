@@ -767,8 +767,8 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                     const magicBonus = item.weaponData?.magicBonus ?? 0;
                     const stMod = calculateModifier(attrs.ST);
                     const geMod = calculateModifier(attrs.GE);
-                    const dmgAttr = item.weaponData?.damageAttribute ?? "ST";
-                    const dmgMod = dmgAttr === "GE" ? geMod : stMod;
+                    // Als Rogue wird GE statt ST für Angriffswert verwendet
+                    const dmgMod = geMod;
                     const weaponAttackBonus = item.weaponData?.modifiers?.reduce(
                       (sum, m) => sum + (m.context === "always" || (sneakAttackActive && m.context === "sneakAttackOnly") ? m.attackBonus ?? 0 : 0), 0
                     ) ?? 0;
@@ -838,7 +838,8 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
                       const magicBonus = weapon?.weaponData?.magicBonus ?? 0;
                       const stMod = calculateModifier(attrs.ST);
                       const geMod = calculateModifier(attrs.GE);
-                      const dmgMod = stMod;
+                      // Als Rogue wird GE statt ST für Angriffswert verwendet
+                      const dmgMod = geMod;
                       const weaponAttackBonus = weapon?.weaponData?.modifiers?.reduce(
                         (sum, m) => sum + (m.context === "always" || (sneakAttackActive && m.context === "sneakAttackOnly") ? m.attackBonus ?? 0 : 0), 0
                       ) ?? 0;
