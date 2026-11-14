@@ -1149,6 +1149,10 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
         </div>
       )}
 
+    </div>
+  );
+};
+
 // ═══════════════════════════════════════════════════════════
 // INVENTAR-REITER (eigene Ansicht)
 // ═══════════════════════════════════════════════════════════
