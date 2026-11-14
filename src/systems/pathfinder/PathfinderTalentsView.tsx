@@ -208,3 +208,4 @@ export default function PathfinderTalentsView({ character, onUpdate }: Pathfinde
     </div>
   );
 }
+
