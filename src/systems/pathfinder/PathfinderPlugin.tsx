@@ -1176,9 +1176,13 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
               <option value="gelegenheitsangriff">Gelegenheitsangriff (-2 RK)</option>
             </select>
           </div>
-        </div>
+        )}
       )}
-      {!isEditing && charModifiers.length > 0 && (
+      {/* Talente & Fähigkeiten im Kampf */}
+      {character.abilities?.filter((a: Ability) => Boolean(a.showInCombat)).length > 0 && (
+        <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono font-bold text-zinc-300">
         <div className="p-3 bg-black/30 border border-zinc-800 rounded-xl space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold text-zinc-300">Aktive Statuseffekte</span>

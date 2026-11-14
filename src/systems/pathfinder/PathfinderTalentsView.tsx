@@ -244,6 +244,21 @@ export const PathfinderTalentsView: React.FC<PluginViewProps> = ({
                             <option value="other">Sonstige</option>
                           </select>
                         </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-[9px] text-zinc-500 font-mono block">Kampf-Reiter</label>
+                          <label className="flex items-center gap-1">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(ability.showInCombat)}
+                              onChange={(e) =>
+                                updateAbility(ability.id, { showInCombat: e.target.checked })
+                              }
+                              className="accent-amber-500"
+                            />
+                            <span className="text-[9px] text-white font-mono">Im Kampf anzeigen</span>
+                          </label>
+                        </div>
                         <div>
                           <SourceReferenceEditor
                             value={ability.sourceReference}
