@@ -27,27 +27,23 @@ export default function PathfinderTalentsView({ character, onUpdate }: Pathfinde
   const abilities = character.abilities || [];
 
   const groupedAbilities = useMemo(() => {
-    const groups: Record<string, Ability[]> = {};
-    abilities.forEach((a) => {
+    const groups: Record<string, { ability: Ability; globalIndex: number }[]> = {};
+    abilities.forEach((a, globalIndex) => {
       const key = a.type || "other";
       if (!groups[key]) groups[key] = [];
-      groups[key].push(a);
+      groups[key].push({ ability: a, globalIndex });
     });
     return groups;
   }, [abilities]);
 
-  const updateAbility = (id: string, patch: Partial<Ability>) => {
-    onUpdate({
-      abilities: abilities.map((a) => (a.id === id ? { ...a, ...patch } : a)),
-    });
+  const updateAbility = (globalIndex: number, patch: Partial<Ability>) => {
+    const next = [...abilities];
+    next[globalIndex] = { ...next[globalIndex], ...patch };
+    onUpdate({ abilities: next });
   };
 
-  const removeAbility = (index: number, groupKey: string) => {
-    const group = groupedAbilities[groupKey];
-    if (!group) return;
-    const abilityToRemove = group[index];
-    if (!abilityToRemove) return;
-    const next = abilities.filter((a) => a.id !== abilityToRemove.id);
+  const removeAbility = (globalIndex: number) => {
+    const next = abilities.filter((_, i) => i !== globalIndex);
     onUpdate({ abilities: next });
   };
 
@@ -98,9 +94,9 @@ export default function PathfinderTalentsView({ character, onUpdate }: Pathfinde
           </div>
 
           <div className="space-y-1">
-            {group.map((ability, index) => (
+            {group.map(({ ability, globalIndex }) => (
               <div
-                key={ability.id}
+                key={globalIndex}
                 className={`p-2 border rounded-lg ${
                   isEditing ? "bg-zinc-800 border-zinc-700" : "bg-zinc-900/50 border-zinc-800/50"
                 }`}
@@ -110,11 +106,11 @@ export default function PathfinderTalentsView({ character, onUpdate }: Pathfinde
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <input
                         value={ability.name}
-                        onChange={(e) => updateAbility(ability.id, { name: e.target.value })}
+                        onChange={(e) => updateAbility(globalIndex, { name: e.target.value })}
                         className="flex-1 bg-zinc-900 border border-zinc-600 rounded text-[9px] text-white font-mono px-1 py-0.5"
                       />
                       <button
-                        onClick={() => removeAbility(index, groupKey)}
+                        onClick={() => removeAbility(globalIndex)}
                         className="text-red-400 hover:text-red-300 text-[9px]"
                       >
                         ×
@@ -125,7 +121,7 @@ export default function PathfinderTalentsView({ character, onUpdate }: Pathfinde
                         <label className="text-[8px] text-zinc-500 font-mono block mb-0.5">Effekt</label>
                         <input
                           value={ability.effect || ""}
-                          onChange={(e) => updateAbility(ability.id, { effect: e.target.value || undefined })}
+                          onChange={(e) => updateAbility(globalIndex, { effect: e.target.value || undefined })}
                           className="w-full bg-zinc-900 border border-zinc-700 rounded text-[8px] text-white font-mono px-1 py-0.5"
                           placeholder="Effektbeschreibung"
                         />
@@ -134,7 +130,7 @@ export default function PathfinderTalentsView({ character, onUpdate }: Pathfinde
                         <label className="text-[8px] text-zinc-500 font-mono block mb-0.5">Nutzung</label>
                         <input
                           value={ability.usage || ""}
-                          onChange={(e) => updateAbility(ability.id, { usage: e.target.value || undefined })}
+                          onChange={(e) => updateAbility(globalIndex, { usage: e.target.value || undefined })}
                           className="w-full bg-zinc-900 border border-zinc-700 rounded text-[8px] text-white font-mono px-1 py-0.5"
                           placeholder="z.B. 1x/Tag"
                         />
@@ -144,7 +140,7 @@ export default function PathfinderTalentsView({ character, onUpdate }: Pathfinde
                         <input
                           type="number"
                           value={ability.maxUses ?? ""}
-                          onChange={(e) => updateAbility(ability.id, { maxUses: e.target.value ? Number(e.target.value) : undefined })}
+                          onChange={(e) => updateAbility(globalIndex, { maxUses: e.target.value ? Number(e.target.value) : undefined })}
                           className="w-full bg-zinc-900 border border-zinc-700 rounded text-[8px] text-white font-mono px-1 py-0.5 text-center"
                         />
                       </div>
@@ -152,7 +148,7 @@ export default function PathfinderTalentsView({ character, onUpdate }: Pathfinde
                         <label className="text-[8px] text-zinc-500 font-mono block mb-0.5">Typ</label>
                         <select
                           value={ability.type || "other"}
-                          onChange={(e) => updateAbility(ability.id, { type: e.target.value as any })}
+                          onChange={(e) => updateAbility(globalIndex, { type: e.target.value as any })}
                           className="w-full bg-zinc-900 border border-zinc-700 rounded text-[8px] text-white font-mono px-1 py-0.5"
                         >
                           <option value="class">Klasse</option>
@@ -167,7 +163,7 @@ export default function PathfinderTalentsView({ character, onUpdate }: Pathfinde
                         <input
                           type="checkbox"
                           checked={Boolean(ability.showInCombat)}
-                          onChange={(e) => updateAbility(ability.id, { showInCombat: e.target.checked })}
+                          onChange={(e) => updateAbility(globalIndex, { showInCombat: e.target.checked })}
                           className="accent-amber-500"
                         />
                         <span className="text-[8px] text-white font-mono">Kampf</span>
@@ -175,7 +171,7 @@ export default function PathfinderTalentsView({ character, onUpdate }: Pathfinde
                     </div>
                     <SourceReferenceEditor
                       value={ability.sourceReference}
-                      onChange={(v) => updateAbility(ability.id, { sourceReference: v })}
+                      onChange={(v) => updateAbility(globalIndex, { sourceReference: v })}
                     />
                   </>
                 ) : (
