@@ -54,6 +54,7 @@ import {
 import { PATHFINDER_CLASSES } from "../../utils/levelUpRules";
 import { PathfinderCharacterSheetView } from "./PathfinderCharacterSheet";
 import { PathfinderLevelUpView } from "./PathfinderLevelUpView";
+import { PathfinderTalentsView } from "./PathfinderTalentsView";
 
 const ATTR_KEYS = ["ST", "GE", "KO", "IN", "WE", "CH"] as const;
 const ATTR_LABELS: Record<string, string> = {
@@ -1580,5 +1581,6 @@ export const PathfinderPlugin: SystemPlugin = {
     { id: "inventory", label: "Inventar", Component: PathfinderInventory },
     { id: "sheet", label: "Charakterbogen", Component: PathfinderCharacterSheetView },
     { id: "levelup", label: "⬆ Level-Up", Component: PathfinderLevelUpView },
+    { id: "talents", label: "Talente & Fähigkeiten", Component: PathfinderTalentsView },
   ],
 };
