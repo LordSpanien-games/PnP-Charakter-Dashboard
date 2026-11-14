@@ -109,7 +109,7 @@ export const PathfinderTalentsView: React.FC<PluginViewProps> = ({
                 {TYPE_LABELS[key] || key}
               </div>
               <div className="space-y-1">
-                {groups[key].map((ability) => (
+                {groups[key].map((ability, index) => (
                   <div
                     key={ability.id}
                     className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2"
@@ -134,7 +134,7 @@ export const PathfinderTalentsView: React.FC<PluginViewProps> = ({
                       </div>
                       {isEditing && (
                         <button
-                          onClick={() => removeAbility(ability.id)}
+                          onClick={() => removeAbility(index)}
                           className="text-red-400 hover:text-red-300 text-xs"
                         >
                           <X size={14} />
