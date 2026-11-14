@@ -511,19 +511,28 @@ const PathfinderOverview: React.FC<PluginViewProps> = ({ character, isEditing, o
                 </tr>
               </thead>
               <tbody>
-                {character.skills.map((s, idx) => (
-                  <tr key={idx} className="border-b border-zinc-800">
-                    <td className="border border-zinc-800 px-1 py-0.5 text-xs text-white">{s.name}</td>
-                    <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{isEditing ? (
-                      <input type="number" value={s.value} onChange={(e) => {
-                        const next = [...character.skills];
-                        next[idx] = { ...next[idx], value: Number(e.target.value) };
-                        onUpdate({ skills: next });
-                      }} className="w-10 bg-black border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
-                    ) : s.value}</td>
-                    <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-zinc-400">{ (s as any).trained ? "✓" : "" }</td>
-                  </tr>
-                ))}
+              {character.skills
+                .slice()
+                .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+                .map((s) => {
+                  const idx = character.skills.findIndex((x) => x.name === s.name);
+                  return (
+                    <tr key={s.name} className="border-b border-zinc-800">
+                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-white">{s.name}</td>
+                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-white">{isEditing ? (
+                        <input type="number" value={s.value} onChange={(e) => {
+                          const next = [...character.skills];
+                          const targetIdx = next.findIndex((x) => x.name === s.name);
+                          if (targetIdx >= 0) {
+                            next[targetIdx] = { ...next[targetIdx], value: Number(e.target.value) };
+                          }
+                          onUpdate({ skills: next });
+                        }} className="w-10 bg-black border border-zinc-700 rounded px-0.5 py-0 text-white text-center" />
+                      ) : s.value}</td>
+                      <td className="border border-zinc-800 px-1 py-0.5 text-xs text-center text-zinc-400">{ (s as any).trained ? "✓" : "" }</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
