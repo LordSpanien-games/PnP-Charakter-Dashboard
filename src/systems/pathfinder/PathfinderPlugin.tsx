@@ -1182,23 +1182,30 @@ const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isEditing,
       {character.abilities?.filter((a: Ability) => Boolean(a.showInCombat)).length > 0 && (
         <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-bold text-zinc-300">
-        <div className="p-3 bg-black/30 border border-zinc-800 rounded-xl space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-bold text-zinc-300">Aktive Statuseffekte</span>
-            <ShieldAlert size={14} className="text-zinc-500" />
+            <span className="text-xs font-mono font-bold text-zinc-300">Talente & Fähigkeiten im Kampf</span>
+            <Sword size={14} className="text-zinc-500" />
           </div>
-          {charModifiers.map((mod) => (
-            <div key={mod.id} className="flex items-center gap-2 p-1 bg-black/20 rounded">
-              <span className="text-[9px] text-zinc-400 font-mono">{mod.label}</span>
-              <span className="text-[9px] text-amber-400 font-mono">
-                {mod.attackBonus !== 0 ? `Angriff ${mod.attackBonus > 0 ? "+" : ""}${mod.attackBonus} · ` : ""}
-                {mod.damageBonus !== 0 ? `Schaden ${mod.damageBonus > 0 ? "+" : ""}${mod.damageBonus} · ` : ""}
-                {mod.acBonus !== 0 ? `RK ${mod.acBonus > 0 ? "+" : ""}${mod.acBonus}` : ""}
-                {mod.extraDamageDice ? `Zusatz: ${mod.extraDamageDice}` : ""}
-              </span>
-            </div>
-          ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {character.abilities
+              .filter((a: Ability) => Boolean(a.showInCombat))
+              .map((ability) => (
+                <div key={ability.id} className="p-2 bg-zinc-800 border border-zinc-700 rounded-lg">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-sm font-bold text-white">{ability.name}</span>
+                    {ability.effect && (
+                      <span className="text-[9px] text-zinc-400 font-mono text-truncate max-w-[200px]">
+                        — {ability.effect}
+                      </span>
+                    )}
+                  </div>
+                  {ability.usage && (
+                    <div className="text-[9px] text-zinc-400 font-mono">
+                      {ability.usage}
+                    </div>
+                  )}
+                </div>
+              ))}
+          </div>
         </div>
       )}
     </div>
