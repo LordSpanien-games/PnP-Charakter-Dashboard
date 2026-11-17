@@ -3,6 +3,20 @@ import { AttributeDefinition, ResourceDefinition, GenericCharacter } from "./typ
 
 export type GenerationMode = "blank" | "auto" | "manual";
 
+/** Props, die allen Plugin-Ansichten (Dashboard + secondaryViews) übergeben werden. */
+export interface PluginViewProps {
+  character: GenericCharacter;
+  isEditing: boolean;
+  onUpdate: (updates: Partial<GenericCharacter>) => void;
+}
+
+/** Eine Zusatz-Ansicht (Reiter) innerhalb des Dashboards. */
+export interface SecondaryView {
+  id: string;
+  label: string;
+  Component: FC<PluginViewProps>;
+}
+
 export interface AttributePool {
   /** Rohe Würfelergebnisse in Wurf-Reihenfolge (für manuelle Zuordnung). */
   values: number[];
@@ -53,9 +67,8 @@ export interface SystemPlugin {
   recalculate: (character: GenericCharacter) => GenericCharacter;
 
   /** Haupt-Dashboard-UI für dieses System. */
-  DashboardComponent: FC<{
-    character: GenericCharacter;
-    isEditing: boolean;
-    onUpdate: (updates: Partial<GenericCharacter>) => void;
-  }>;
+  DashboardComponent: FC<PluginViewProps>;
+
+  /** Optionale Zusatz-Reiter (Kampf, Inventar, Charakterbogen, …). */
+  secondaryViews?: SecondaryView[];
 }
