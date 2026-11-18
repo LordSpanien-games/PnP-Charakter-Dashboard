@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+
+# Lokale Backups der Code-Änderungen
+backup_pnp_*/
+backup_*/
