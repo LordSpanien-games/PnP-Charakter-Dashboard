@@ -13,7 +13,6 @@ import {
   getEquippedArmorBonus,
   getJewelryArmorBonus,
   calculateCombatManeuver,
-  calculateWeaponGripVariants,
   calculateBAB,
   formatIteratives,
   getBabIteratives,
@@ -21,6 +20,8 @@ import {
   PATHFINDER_RACES,
 } from "./pathfinderRules";
 import { PATHFINDER_CLASSES } from "../../utils/levelUpRules";
+import { buildAttackProfile, buildAttackSequence, getTwoWeaponPenalties } from "./pathfinderAttackProfile";
+import { normalizeWeaponData } from "./pathfinderWeaponModel";
 
 const ATTR_KEYS = ["ST", "GE", "KO", "IN", "WE", "CH"] as const;
 const ATTR_LABELS: Record<string, string> = {
@@ -105,33 +106,34 @@ export const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({
       systemLabel: "Pathfinder 1e",
     });
 
-  const singleResults = !isTwoWeaponMode
-    ? activeWeapons.map((item) => ({
-        item,
-        result: calculateWeaponGripVariants(
-          {
-            name: item.name,
-            isMelee: item.weaponData?.isMelee ?? true,
-            isFinesse: item.weaponData?.isFinesse,
-            magicBonus: item.weaponData?.magicBonus,
-            baseDice: item.weaponData?.baseDice,
-            damageAttribute: item.weaponData?.damageAttribute,
-            extraDamage: item.weaponData?.extraDamage,
-            supportsOneHanded: item.weaponData?.supportsOneHanded,
-            supportsTwoHanded: item.weaponData?.supportsTwoHanded,
-            modifiers: item.weaponData?.modifiers,
-            sneakAttackBonusAttack: item.weaponData?.sneakAttackBonusAttack,
-            sneakAttackBonusDamage: item.weaponData?.sneakAttackBonusDamage,
-          },
-          attrs,
-          level,
-          classId,
-          raceId,
-          charModifiers,
-          sneakAttackActive
-        ),
-      }))
-    : [];
+  // Gemeinsames Angriffsprofil – identische Berechnung wie im Kampf-Reiter.
+  const offHandIsLight = !!offHandWeapon?.weaponData?.isLight;
+  const twfPenalties = getTwoWeaponPenalties(
+    Boolean(character.systemData.hasTwoWeaponFighting),
+    offHandIsLight
+  );
+  const buildContext = {
+    attributes: attrs,
+    level,
+    classId,
+    raceId,
+    sizeMod: { attackAndAc: 0, cmbAndCmd: 0 },
+    sneakAttackActive,
+    twoWeaponFighting: isTwoWeaponMode,
+    attackAttribute: "GE" as "ST" | "GE",
+    characterModifiers: charModifiers,
+    activeConditions: (character.systemData.activeConditions as string[]) || [],
+    activeWeapons,
+    inventory: character.inventory,
+  };
+  const profiles = activeWeapons.map((item) => {
+    const isOffHand = item.weaponData?.weaponSlot === "offHand" && item !== primaryWeapon;
+    return buildAttackProfile(item, buildContext, {
+      isOffHand,
+      penalty: isTwoWeaponMode ? (isOffHand ? twfPenalties.offHand : twfPenalties.primary) : 0,
+    });
+  });
+  const attackSequence = buildAttackSequence(profiles, iteratives.length, isTwoWeaponMode);
 
   return (
     <div className="space-y-4">
@@ -294,19 +296,19 @@ export const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {!isTwoWeaponMode && singleResults.map(({ item, result }) => {
-                  const grip = result.grips[0];
-                  return (
-                    <tr key={item.id}>
-                      <td className="border px-2 py-1">{item.name}</td>
-                      <td className="border px-2 py-1">{grip.attack}</td>
-                      <td className="border px-2 py-1">
-                        {grip.damage}
-                        {grip.extraDamageParts.length ? ` ${grip.extraDamageParts.join(" ")}` : ""}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {profiles.map((profile) => (
+                  <tr key={profile.item.id}>
+                    <td className="border px-2 py-1">
+                      {profile.name}
+                      {profile.rangeText ? ` (${profile.rangeText})` : ""}
+                    </td>
+                    <td className="border px-2 py-1">{profile.attackString}</td>
+                    <td className="border px-2 py-1">
+                      {profile.damageSummary}
+                      <span className="text-xs italic"> · Krit ab {profile.criticalThreshold}: {profile.criticalSummary}</span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
@@ -325,16 +327,14 @@ export const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {iteratives.map((b, idx) => (
-                  <tr key={idx}>
-                    <td className="border px-2 py-1">{idx + 1}.</td>
+                {attackSequence.map((entry) => (
+                  <tr key={entry.key}>
+                    <td className="border px-2 py-1">{entry.index}.</td>
                     <td className="border px-2 py-1">
-                      {primaryWeapon?.name || "–"}
+                      {entry.profile.name} ({entry.handLabel})
                     </td>
-                    <td className="border px-2 py-1">{formatModifier(b)}</td>
-                    <td className="border px-2 py-1">
-                      {singleResults[0]?.result.grips[0]?.damage || "–"}
-                    </td>
+                    <td className="border px-2 py-1">{formatModifier(entry.attack)}</td>
+                    <td className="border px-2 py-1">{entry.profile.damageSummary}</td>
                   </tr>
                 ))}
               </tbody>
@@ -342,25 +342,25 @@ export const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({
           </div>
         )}
 
-        {sneakAttackActive && sneakDice > 0 && singleResults[0]?.result.grips[0]?.sneakAttack && (
+        {sneakAttackActive && sneakDice > 0 && profiles.length > 0 && (
           <div className="avoid-break">
             <h2 className="font-bold border-b border-black">Hinterhältiger Angriff</h2>
             <table className="w-full text-sm mt-1">
               <thead>
                 <tr>
+                  <th className="border px-2 py-1">Waffe</th>
                   <th className="border px-2 py-1">Angriff</th>
                   <th className="border px-2 py-1">Schaden gesamt</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td className="border px-2 py-1">
-                    {singleResults[0].result.grips[0].sneakAttack!.attack}
-                  </td>
-                  <td className="border px-2 py-1">
-                    {singleResults[0].result.grips[0].sneakAttack!.damage}
-                  </td>
-                </tr>
+                {profiles.map((profile) => (
+                  <tr key={profile.item.id}>
+                    <td className="border px-2 py-1">{profile.name}</td>
+                    <td className="border px-2 py-1">{profile.attackString}</td>
+                    <td className="border px-2 py-1">{profile.damageSummary}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
