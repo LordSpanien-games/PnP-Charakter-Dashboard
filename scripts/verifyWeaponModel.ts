@@ -301,6 +301,45 @@ check(
 check("Migration: magicBonus -> enhancement", legacy.enhancement, 2);
 check("Migration: kritische Schwelle standard 20", legacy.criticalThreshold, 20);
 
+// ── 10) Legacy-IDs sind stabil (sonst werden Wuerfelwerte bei jedem Render verworfen) ──
+const legacyA = normalizeWeaponData({ isMelee: true, baseDice: "1W8", magicBonus: 2 });
+const legacyB = normalizeWeaponData({ isMelee: true, baseDice: "1W8", magicBonus: 2 });
+check(
+  "Migration: Komponenten-IDs sind ueber zwei Aufrufe identisch",
+  legacyA.damageComponents?.map((c) => c.id),
+  legacyB.damageComponents?.map((c) => c.id)
+);
+check(
+  "Migration: Wuerfel-Key bleibt ueber zwei Aufrufe stabil",
+  rollValueKey("w1::0", legacyA.damageComponents?.[0]?.id ?? ""),
+  rollValueKey("w1::0", legacyB.damageComponents?.[0]?.id ?? "")
+);
+check(
+  "Migration: Schadenszeilen behalten ihre ID (Eingabefelder bleiben befuellt)",
+  buildAttackProfile(
+    {
+      id: "w1",
+      name: "Altschwert",
+      category: "weapon",
+      location: "equipped",
+      isActiveWeapon: true,
+      weaponData: { isMelee: true, baseDice: "1W6", magicBonus: 2, damageAttribute: "ST" },
+    },
+    ctxBase
+  ).damageLines.map((l) => l.id),
+  buildAttackProfile(
+    {
+      id: "w1",
+      name: "Altschwert",
+      category: "weapon",
+      location: "equipped",
+      isActiveWeapon: true,
+      weaponData: { isMelee: true, baseDice: "1W6", magicBonus: 2, damageAttribute: "ST" },
+    },
+    ctxBase
+  ).damageLines.map((l) => l.id)
+);
+
 console.log("");
 if (failed === 0) {
   console.log("ALLE PRUEFUNGEN BESTANDEN");
