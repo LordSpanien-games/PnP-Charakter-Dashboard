@@ -57,6 +57,18 @@ export const sortDamageComponents = (components: DamageComponent[]): DamageCompo
     return 0;
   });
 
+/**
+ * Feste IDs fuer die aus Legacy-Feldern abgeleiteten Komponenten.
+ * Diese MUESSEN deterministisch sein: normalizeWeaponData() laeuft bei jedem
+ * Render. Zufaellige IDs wuerden die ID jeder Schadenszeile veraendern und
+ * damit die eingegebenen Wuerfelwerte im State verwerfen.
+ */
+const LEGACY_IDS = {
+  native: "legacy-native",
+  magic: "legacy-magic",
+  sneak: "legacy-sneak",
+};
+
 /** Wandelt alte Waffenfelder in das neue Komponentenmodell. */
 export const normalizeWeaponData = (weapon: WeaponItemData | undefined): WeaponItemData => {
   const wd: WeaponItemData = { ...(weapon || { isMelee: true }) };
@@ -65,7 +77,7 @@ export const normalizeWeaponData = (weapon: WeaponItemData | undefined): WeaponI
   // baseDice -> native
   if (wd.baseDice && !wd.damageComponents?.some((c) => c.kind === "native")) {
     legacy.push({
-      id: makeComponentId(),
+      id: LEGACY_IDS.native,
       label: "Nativ",
       kind: "native",
       dice: wd.baseDice,
@@ -76,7 +88,7 @@ export const normalizeWeaponData = (weapon: WeaponItemData | undefined): WeaponI
   // extraDamage -> magic (altes Feld war "Magieschaden")
   if (wd.extraDamage && !wd.damageComponents?.some((c) => c.kind === "magic")) {
     legacy.push({
-      id: makeComponentId(),
+      id: LEGACY_IDS.magic,
       label: "Magisch",
       kind: "magic",
       dice: wd.extraDamage,
@@ -90,7 +102,7 @@ export const normalizeWeaponData = (weapon: WeaponItemData | undefined): WeaponI
     !wd.damageComponents?.some((c) => c.condition === "sneakAttack")
   ) {
     legacy.push({
-      id: makeComponentId(),
+      id: LEGACY_IDS.sneak,
       label: "Hinterhalt",
       kind: "situational",
       flat: wd.sneakAttackBonusDamage || 0,
