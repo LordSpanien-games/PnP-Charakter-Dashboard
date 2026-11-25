@@ -67,6 +67,8 @@ const LEGACY_IDS = {
   native: "legacy-native",
   magic: "legacy-magic",
   sneak: "legacy-sneak",
+  /** Bedingter Standardschaden der Waffe, z.B. "+4 bei Hinterhältig". */
+  sneakConditional: "legacy-sneak-conditional",
 };
 
 /** Wandelt alte Waffenfelder in das neue Komponentenmodell. */
@@ -85,8 +87,21 @@ export const normalizeWeaponData = (weapon: WeaponItemData | undefined): WeaponI
     });
   }
 
-  // extraDamage -> magic (altes Feld war "Magieschaden")
-  if (wd.extraDamage && !wd.damageComponents?.some((c) => c.kind === "magic")) {
+  // extraDamage: entweder Magieschaden ("1W6 Eis") oder bedingter
+  // Standardschaden der Waffe ("+4 bei Hinterhältig", z.B. Schurkenschwert).
+  const extraConditional = /^([+-]?\d+)\s*bei\s+hinterh/i.exec(wd.extraDamage || "");
+  if (extraConditional && !wd.damageComponents?.some((c) => c.condition === "sneakAttack")) {
+    legacy.push({
+      id: LEGACY_IDS.sneakConditional,
+      label: "Bei Hinterhältig",
+      kind: "situational",
+      flat: parseInt(extraConditional[1], 10) || 0,
+      condition: "sneakAttack",
+      // Waffeneigener Standardschaden: gehört zum Schaden der Waffe und
+      // zählt deshalb beim kritischen Treffer mit.
+      criticalApplies: true,
+    });
+  } else if (wd.extraDamage && !extraConditional && !wd.damageComponents?.some((c) => c.kind === "magic")) {
     legacy.push({
       id: LEGACY_IDS.magic,
       label: "Magisch",
@@ -143,17 +158,6 @@ export const countDice = (dice: string | undefined): number => {
   }, 0);
 };
 
-/** Verdoppelt die Würfel einer Würfelangabe (für kritische Treffer):
- *  "1W6" -> "2W6", "1W6+1W8" -> "2W6+2W8", "1W6+2" -> "2W6+2". */
-export const doubleDice = (dice: string | undefined): string | undefined => {
-  if (!dice) return undefined;
-  return dice.replace(/(\d*)\s*([wW])\s*(\d+)/g, (_m, count, w, sides) => {
-    const n = parseInt(count, 10);
-    const factor = isNaN(n) || n === 0 ? 2 : n * 2;
-    return `${factor}${w}${sides}`;
-  });
-};
-
 /** Formatiert einen flachen Bonus mit Vorzeichen. */
 export const formatFlat = (value: number | undefined): string => {
   const v = value || 0;
@@ -184,7 +188,8 @@ export const splitDiceAndFlat = (dice: string | undefined): { dice: string; flat
 };
 
 /** Wandelt eine Komponente in eine Schadenszeile: Würfel und flacher Rest werden getrennt,
- *  damit der flache Anteil in die Fest-Summen eingeht und bei Krit nicht verdoppelt wird. */
+ *  damit der flache Anteil in die Fest-Summen eingeht. Beim Krit-Zusatzwurf werden
+ *  Würfel und Festanteile der Standardschaden-Zeilen ein zweites Mal verrechnet. */
 const componentToLine = (
   c: DamageComponent,
   ctx: { sneakAttackActive: boolean; twoWeaponFighting: boolean; activeConditions: string[] },
@@ -239,7 +244,8 @@ export interface DamageLine {
   condition: DamageCondition;
   /** Gilt die Zeile im aktuellen Zustand? */
   active: boolean;
-  /** Wird bei kritischem Treffer verdoppelt? */
+  /** Gehört die Zeile zum Standardschaden und damit auch zum Krit-Zusatzwurf?
+   *  false z.B. beim Klassen-Hinterhaltwürfel. */
   criticalApplies: boolean;
   /** Herkunft: Waffe, Munition oder Charakter-Modifikator. */
   source: "weapon" | "ammo" | "modifier";
@@ -383,11 +389,34 @@ export const sumFixed = (
   return { native, magic, situational, total: native + magic + situational };
 };
 
-/** Kritische Zeilen: Würfel verdoppeln, flache Boni bleiben. */
+/** ID-Suffix für die Zeilen des kritischen Zusatzwurfs. Muss stabil sein,
+ *  weil die Eingabefelder über rollValueKey(rowKey, lineId) adressiert werden. */
+export const CRITICAL_LINE_SUFFIX = "__krit";
+
+/**
+ * Kritischer Treffer als ZUSATZWURF statt als Ersatz des Normalwurfs.
+ *
+ * Der normale Schadenswurf bleibt unverändert bestehen; bei einem kritischen
+ * Treffer kommt ein zweiter Standardschadenswurf mit derselben Waffe dazu.
+ * Würfel und flache Anteile werden dabei NICHT verdoppelt – sie werden
+ * schlicht ein zweites Mal gewürfelt und verrechnet (Normalwurf + Zusatzwurf).
+ *
+ * Nur Zeilen mit `criticalApplies` gehören zum Standardschaden. Der
+ * Klassen-Hinterhaltwürfel (criticalApplies: false) fällt weg, ein
+ * waffeneigener bedingter Standardschaden (z.B. "+4 bei Hinterhältig",
+ * criticalApplies: true) bleibt dagegen Teil des Zusatzwurfs.
+ *
+ * Die Zeilen bekommen eine eigene ID (`<id>__krit`), damit ihre Eingabefelder
+ * nicht mit denen des Normalwurfs kollidieren.
+ */
 export const buildCriticalLines = (lines: DamageLine[]): DamageLine[] =>
   lines
     .filter((l) => l.active && l.criticalApplies)
-    .map((l) => ({ ...l, dice: doubleDice(l.dice), condition: "critical" as DamageCondition }));
+    .map((l) => ({
+      ...l,
+      id: `${l.id}${CRITICAL_LINE_SUFFIX}`,
+      condition: "critical" as DamageCondition,
+    }));
 
 /** Kurzfassung eines Schadensprofils, z.B. "1W6+2 +1W6".
  *  Die flachen Anteile stehen bereits in den Zeilen – sie werden hier NICHT
