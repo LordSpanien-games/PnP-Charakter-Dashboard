@@ -11,7 +11,6 @@ import {
   rollValueKey,
 } from "../src/systems/pathfinder/pathfinderAttackProfile";
 import {
-  doubleDice,
   formatProfile,
   normalizeWeaponData,
   splitDiceAndFlat,
@@ -44,7 +43,7 @@ const ctxBase = {
   inventory: [] as InventoryItem[],
 };
 
-// ── 1) Waffe +2: +2 Angriff, +2 Schaden, flach (nicht verdoppelt bei Krit) ──
+// ── 1) Waffe +2: +2 Angriff, +2 Schaden (Krit = Zusatzwurf, keine Verdopplung) ──
 const swordPlus2: InventoryItem = {
   id: "w1",
   name: "Kurzschwert +2",
@@ -68,7 +67,7 @@ const swordPlus2: InventoryItem = {
 const p1 = buildAttackProfile(swordPlus2, ctxBase);
 check("+2 Waffe: Angriff +2 auf den Basis-BAB", p1.attackRolls[0], 7); // BAB 3 + GE 2 + ENH 2
 check("+2 Waffe: Schaden 1W6+5 (ST 3 + ENH 2)", p1.damageSummary, "1W6+5");
-check("+2 Waffe: Krit verdoppelt nur die Würfel", p1.criticalSummary, "2W6+5");
+check("+2 Waffe: Krit-Zusatzwurf = Standardschaden (nicht verdoppelt)", p1.criticalSummary, "1W6+5");
 check("+2 Waffe: kritische Schwelle 20", p1.criticalThreshold, 20);
 
 // ── 2) Magischer Schaden als eigene Würfelzeile, Reihenfolge nativ → magic ──
@@ -88,7 +87,7 @@ const magicSword: InventoryItem = {
 const p2 = buildAttackProfile(magicSword, ctxBase);
 check("Magie: Wurfplan nativ vor magisch", formatRollPlan(p2), "1W6+4 · 1W6 (Magisch)");
 check("Magie: Fest-Anteile getrennt", [p2.fixed.native, p2.fixed.magic], [4, 0]);
-check("Magie: Krit verdoppelt beide Würfelgruppen", p2.criticalSummary, "2W6+4 2W6");
+check("Magie: Krit-Zusatzwurf enthält beide Würfelgruppen", p2.criticalSummary, "1W6+4 1W6");
 
 // ── 3) Hinterhalt: situativer Anteil, nur aktiv bei Hinterhalt, nicht bei Krit ──
 const ctxSneak = { ...ctxBase, sneakAttackActive: true };
@@ -99,9 +98,9 @@ check(
   "1W6+4 · 1W6 (Magisch) · 3W6 (Hinterhalt (Klasse))"
 );
 check(
-  "Hinterhalt: Klassenwürfel werden bei Krit NICHT verdoppelt",
+  "Hinterhalt: Klassenwürfel fehlen im Krit-Zusatzwurf",
   p3.criticalSummary,
-  "2W6+4 2W6"
+  "1W6+4 1W6"
 );
 
 // Waffenspezifischer Hinterhalt-Bonus (z.B. Schurkenzahn)
@@ -138,9 +137,9 @@ check(
   [3, 0]
 );
 check(
-  "Hinterhalt-Bonus: nicht im kritischen Schaden",
+  "Hinterhalt-Bonus (criticalApplies false): nicht im Krit-Zusatzwurf",
   p3b.criticalSummary,
-  "2W6+3"
+  "1W6+3"
 );
 
 // ── 4) Munition: native Komponente ersetzt Waffenschaden, situative kommen dazu ──
@@ -267,10 +266,27 @@ check(
   computeRowDamage(p2, rolled, false, rowA),
   4 + 0 + 4 + 3
 );
+// Krit = Normalwurf + Zusatzwurf (nicht: verdoppelte Würfel statt Normalwurf)
+const critRolled = {
+  [rollValueKey(rowA, "c-n")]: 4,
+  [rollValueKey(rowA, "c-m")]: 3,
+  [rollValueKey(rowA, "c-n__krit")]: 5,
+  [rollValueKey(rowA, "c-m__krit")]: 2,
+};
 check(
-  "Zeilenschaden kritisch: Würfel verdoppelt, Fest bleibt",
-  computeRowDamage(p2, { [rollValueKey(rowA, "c-n")]: 8, [rollValueKey(rowA, "c-m")]: 7 }, true, rowA),
-  4 + 0 + 8 + 7
+  "Zeilenschaden kritisch: Normalwurf + Fest + Zusatzwurf + Krit-Fest",
+  computeRowDamage(p2, critRolled, true, rowA),
+  4 + 0 + 4 + 3 + 4 + 0 + 5 + 2
+);
+check(
+  "Zeilenschaden kritisch: ohne Zusatzwurf-Eingaben zählt nur der Normalwurf",
+  computeRowDamage(p2, rolled, true, rowA),
+  4 + 0 + 4 + 3 + 4 + 0
+);
+check(
+  "Krit-Zeilen haben eigene IDs (Eingabefelder kollidieren nicht)",
+  p2.criticalLines.map((l) => l.id),
+  ["c-n__krit", "c-m__krit"]
 );
 check(
   "Zeilenschaden: Werte verschiedener Zeilen vermischen sich nicht",
@@ -279,8 +295,6 @@ check(
 );
 
 // ── 8) Hilfsfunktionen ──
-check("doubleDice 1W6 -> 2W6", doubleDice("1W6"), "2W6");
-check("doubleDice 1W6+1W8 -> 2W6+2W8", doubleDice("1W6+1W8"), "2W6+2W8");
 check("splitDiceAndFlat 1W6+2", splitDiceAndFlat("1W6+2"), { dice: "1W6", flat: 2 });
 check("splitDiceAndFlat 1W6", splitDiceAndFlat("1W6"), { dice: "1W6", flat: 0 });
 
@@ -338,6 +352,105 @@ check(
     },
     ctxBase
   ).damageLines.map((l) => l.id)
+);
+
+// ── 11) Migration: extraDamage als bedingter Waffen-Standardschaden ──
+// Schurkenschwert: "+4 bei Hinterhältig" ist Teil des STANDARD-Schadens der
+// Waffe und gehoert deshalb auch in den Krit-Zusatzwurf.
+const rogueSwordLegacy = normalizeWeaponData({
+  isMelee: true,
+  baseDice: "1W6",
+  extraDamage: "+4 bei Hinterhältig",
+  magicBonus: 1,
+  damageAttribute: "ST",
+});
+check(
+  "Migration: '+4 bei Hinterhältig' wird situativer Flachbonus, kein Magiewürfel",
+  rogueSwordLegacy.damageComponents?.map((c) => `${c.id}:${c.kind}:${c.flat ?? 0}:${c.condition ?? "always"}`),
+  ["legacy-native:native:0:always", "legacy-sneak-conditional:situational:4:sneakAttack"]
+);
+check(
+  "Migration: bedingter Waffenbonus zaehlt zum Standardschaden (criticalApplies true)",
+  rogueSwordLegacy.damageComponents?.find((c) => c.id === "legacy-sneak-conditional")?.criticalApplies,
+  true
+);
+
+const rogueSwordItem: InventoryItem = {
+  id: "w-rogue",
+  name: "Schurkenschwert",
+  category: "weapon",
+  location: "equipped",
+  isActiveWeapon: true,
+  weaponData: {
+    isMelee: true,
+    baseDice: "1W6",
+    extraDamage: "+4 bei Hinterhältig",
+    magicBonus: 1,
+    damageAttribute: "ST",
+  },
+};
+const pRogueSneak = buildAttackProfile(rogueSwordItem, ctxSneak);
+check(
+  "Schurkenschwert: Normalwurf enthaelt bedingten Bonus und Klassenwuerfel",
+  formatRollPlan(pRogueSneak),
+  "1W6+4 · +4 (Bei Hinterhältig) · 3W6 (Hinterhalt (Klasse))"
+);
+check(
+  "Schurkenschwert: Krit-Zusatzwurf MIT bedingtem Bonus, OHNE Klassenwuerfel",
+  pRogueSneak.criticalSummary,
+  "1W6+4 +4"
+);
+check(
+  "Schurkenschwert: Krit-Fest enthaelt den bedingten Bonus",
+  pRogueSneak.criticalFixed.total,
+  4 + 4
+);
+const pRogueNoSneak = buildAttackProfile(rogueSwordItem, ctxBase);
+check(
+  "Schurkenschwert: ohne Hinterhalt kein bedingter Bonus im Zusatzwurf",
+  pRogueNoSneak.criticalSummary,
+  "1W6+4"
+);
+
+// Gegenprobe: extraDamage als Wuerfelangabe bleibt magischer Schaden.
+const iceSwordLegacy = normalizeWeaponData({
+  isMelee: true,
+  baseDice: "1W6",
+  extraDamage: "1W6 Eis",
+});
+check(
+  "Migration: '1W6 Eis' bleibt Magieschaden (kein bedingter Bonus)",
+  iceSwordLegacy.damageComponents?.map((c) => `${c.id}:${c.kind}:${c.dice ?? ""}`),
+  ["legacy-native:native:1W6", "legacy-magic:magic:1W6 Eis"]
+);
+check(
+  "Migration: beide Legacy-Zweige nutzen unterschiedliche IDs",
+  new Set([
+    ...(rogueSwordLegacy.damageComponents || []),
+    ...(iceSwordLegacy.damageComponents || []),
+  ].map((c) => c.id)).size,
+  3
+);
+
+// ── 12) Krit-ID-Stabilitaet: Zusatzwurf-Keys bleiben ueber Render stabil ──
+const critKeyA = buildAttackProfile(rogueSwordItem, ctxSneak).criticalLines.map((l) =>
+  rollValueKey("w-rogue::0", l.id)
+);
+const critKeyB = buildAttackProfile(rogueSwordItem, ctxSneak).criticalLines.map((l) =>
+  rollValueKey("w-rogue::0", l.id)
+);
+check("Krit-Zusatzwurf: Wuerfel-Keys sind ueber zwei Aufrufe identisch", critKeyA, critKeyB);
+check(
+  "Krit-Zusatzwurf: Keys ueberschneiden sich nicht mit dem Normalwurf",
+  critKeyA.some((k) =>
+    pRogueSneak.damageLines.some((l) => rollValueKey("w-rogue::0", l.id) === k)
+  ),
+  false
+);
+check(
+  "Wurfplan mit Krit zeigt Normalwurf UND Zusatzwurf",
+  formatRollPlan(p2, true),
+  "1W6+4 · 1W6 (Magisch) + Krit: 1W6+4 · 1W6 (Magisch)"
 );
 
 console.log("");
