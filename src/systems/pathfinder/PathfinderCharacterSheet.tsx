@@ -305,7 +305,7 @@ export const PathfinderCharacterSheetView: React.FC<PluginViewProps> = ({
                     <td className="border px-2 py-1">{profile.attackString}</td>
                     <td className="border px-2 py-1">
                       {profile.damageSummary}
-                      <span className="text-xs italic"> · Krit ab {profile.criticalThreshold}: {profile.criticalSummary}</span>
+                      <span className="text-xs italic"> · Krit ab {profile.criticalThreshold}: +{profile.criticalSummary}</span>
                     </td>
                   </tr>
                 ))}
