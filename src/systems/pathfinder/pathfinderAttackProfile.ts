@@ -47,9 +47,11 @@ export interface AttackProfile {
   fixed: { native: number; magic: number; situational: number; total: number };
   /** Kritischer Treffer */
   criticalThreshold: number;
+  /** Zeilen des ZUSATZWURFS bei kritischem Treffer (Standardschaden der Waffe,
+   *  ohne Klassen-Hinterhaltwürfel). Ersetzt den Normalwurf NICHT. */
   criticalLines: DamageLine[];
   criticalFixed: { native: number; magic: number; situational: number; total: number };
-  /** Kurzfassung des kritischen Schadens, z.B. "2W6+3". */
+  /** Kurzfassung des Zusatzwurfs, z.B. "1W6+3". */
   criticalSummary: string;
   /** Kurzfassung des normalen Schadens, z.B. "1W6+2". */
   damageSummary: string;
@@ -324,8 +326,17 @@ export const buildAttackSequence = (
  *  dieselbe Waffe in mehreren Angriffszeilen keine Werte vermischt. */
 export const rollValueKey = (rowKey: string, lineId: string): string => `${rowKey}::${lineId}`;
 
+/** Schlüssel für den Gesamt-Würfelwert einer Angriffszeile im Modus "gesamt". */
+export const TOTAL_ROLL_ID = "__total__";
+/** Schlüssel für den Gesamt-Würfelwert des Krit-Zusatzwurfs im Modus "gesamt". */
+export const CRITICAL_TOTAL_ROLL_ID = "__krit_total__";
+
 /** Summiert die gewürfelten Werte einer Zeile inklusive fester Boni.
- *  `rolledValues` ist zeilenspezifisch zu lesen (Schlüssel: rollValueKey). */
+ *  `rolledValues` ist zeilenspezifisch zu lesen (Schlüssel: rollValueKey).
+ *
+ *  Kritischer Treffer = Normalwurf + Zusatzwurf. Der Normalwurf wird IMMER
+ *  verrechnet; bei `critical` kommen die Festanteile und Würfelwerte des
+ *  Zusatzwurfs (criticalLines, eigene IDs mit Suffix "__krit") hinzu. */
 export const computeRowDamage = (
   profile: AttackProfile,
   rolledValues: Record<string, number>,
@@ -333,45 +344,62 @@ export const computeRowDamage = (
   rowKey = "",
   extraFlat = 0
 ): number => {
-  const lines = critical ? profile.criticalLines : profile.damageLines;
-  const fixed = critical ? profile.criticalFixed : profile.fixed;
-  let sum = fixed.total + extraFlat;
-  lines.forEach((l) => {
+  let sum = profile.fixed.total + extraFlat;
+  profile.damageLines.forEach((l) => {
     if (!l.active) return;
     const value = rolledValues[rollValueKey(rowKey, l.id)];
     if (value) sum += value;
   });
+  if (critical) {
+    sum += profile.criticalFixed.total;
+    profile.criticalLines.forEach((l) => {
+      const value = rolledValues[rollValueKey(rowKey, l.id)];
+      if (value) sum += value;
+    });
+  }
   return sum;
 };
 
 /** Summiert die gewürfelten Werte einer Zeile, wenn die Werte flach (ohne
- *  Zeilenschlüssel) abgelegt sind – z.B. für die Gesamtsumme über alle Zeilen. */
+ *  Zeilenschlüssel) abgelegt sind – z.B. für die Gesamtsumme über alle Zeilen.
+ *  Gleiche Krit-Semantik wie computeRowDamage: Normalwurf + Zusatzwurf. */
 export const computeRowDamageFlat = (
   profile: AttackProfile,
   rolledValues: Record<string, number>,
   critical: boolean
 ): number => {
-  const lines = critical ? profile.criticalLines : profile.damageLines;
-  const fixed = critical ? profile.criticalFixed : profile.fixed;
-  let sum = fixed.total;
-  lines.forEach((l) => {
+  let sum = profile.fixed.total;
+  profile.damageLines.forEach((l) => {
     if (!l.active) return;
     const value = rolledValues[l.id];
     if (value) sum += value;
   });
+  if (critical) {
+    sum += profile.criticalFixed.total;
+    profile.criticalLines.forEach((l) => {
+      const value = rolledValues[l.id];
+      if (value) sum += value;
+    });
+  }
   return sum;
 };
 
-/** Formatiert den Wurfplan als Textzeile, z.B. "1W6+2 · 1W6 (Magisch) · 1W6 (Hinterhalt)". */
+/** Formatiert den Wurfplan als Textzeile, z.B. "1W6+2 · 1W6 (Magisch) · 1W6 (Hinterhalt)".
+ *  Bei `critical` wird der Zusatzwurf angehängt: "… + Krit: 1W6+2 · 1W6 (Magisch)". */
 export const formatRollPlan = (profile: AttackProfile, critical = false): string => {
-  const lines = critical ? profile.criticalLines : profile.damageLines;
-  return lines
-    .filter((l) => l.active && (l.dice || l.flat))
-    .map((l) => {
-      const dice = l.dice || "";
-      const flat = l.flat ? formatFlat(l.flat) : "";
-      const combined = dice && flat ? `${dice}${flat}` : dice || flat;
-      return l.label && l.label !== "Nativ" ? `${combined} (${l.label})` : combined;
-    })
-    .join(" · ");
+  const plan = (lines: DamageLine[]): string =>
+    lines
+      .filter((l) => l.active && (l.dice || l.flat))
+      .map((l) => {
+        const dice = l.dice || "";
+        const flat = l.flat ? formatFlat(l.flat) : "";
+        const combined = dice && flat ? `${dice}${flat}` : dice || flat;
+        return l.label && l.label !== "Nativ" ? `${combined} (${l.label})` : combined;
+      })
+      .join(" · ");
+  const base = plan(profile.damageLines);
+  if (!critical) return base;
+  const crit = plan(profile.criticalLines);
+  if (!crit) return base;
+  return base ? `${base} + Krit: ${crit}` : `Krit: ${crit}`;
 };
