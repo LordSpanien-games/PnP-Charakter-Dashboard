@@ -1,6 +1,12 @@
 import React, { useState } from "react";
 import { Activity, Target } from "lucide-react";
-import { AttackProfile, AttackSequenceEntry, rollValueKey } from "./pathfinderAttackProfile";
+import {
+  AttackProfile,
+  AttackSequenceEntry,
+  CRITICAL_TOTAL_ROLL_ID,
+  rollValueKey,
+  TOTAL_ROLL_ID,
+} from "./pathfinderAttackProfile";
 import { formatFlat } from "./pathfinderWeaponModel";
 
 /**
@@ -11,6 +17,10 @@ import { formatFlat } from "./pathfinderWeaponModel";
  * Zwei Eingabemodi:
  *  - "einzeln": je Würfelzeile ein Feld (① 1W6 → 4, ② 1W6 → 3, …)
  *  - "gesamt":  ein Feld je Angriff für das gesamte Würfelergebnis
+ *
+ * Kritischer Treffer: der Normalwurf mit seinen Eingabewerten bleibt bestehen,
+ * zusätzlich erscheint ein Zusatzwurf mit dem Standardschaden der Waffe
+ * (ohne Klassen-Hinterhaltwürfel). Zeilensumme = Normalwurf + Zusatzwurf.
  */
 
 export type DiceInputMode = "einzeln" | "gesamt";
@@ -51,23 +61,32 @@ export const DiceOverview: React.FC<{
   const getState = (key: string): DiceRowState =>
     states[key] || { rolled: {}, critical: false, status: "" };
 
-  const totalDamage = entries.reduce((sum, entry) => {
-    const state = getState(entry.key);
-    const lines = state.critical ? entry.profile.criticalLines : entry.profile.damageLines;
-    const fixed = state.critical ? entry.profile.criticalFixed : entry.profile.fixed;
-    let rowSum = fixed.total;
-    lines.forEach((l) => {
-      if (!l.active) return;
-      const value = state.rolled[rollValueKey(entry.key, l.id)];
-      if (value) rowSum += value;
-    });
-    if (mode === "gesamt") {
-      // Im Gesamtmodus wird der gesamte Würfelwert in einem Feld gepflegt.
-      const totalRoll = state.rolled[rollValueKey(entry.key, "__total__")] || 0;
-      rowSum = fixed.total + totalRoll;
+  /** Schaden einer Angriffszeile: Festanteile + Normalwurf (+ Krit-Zusatzwurf). */
+  const sumRow = (entry: AttackSequenceEntry, state: DiceRowState): number => {
+    const profile = entry.profile;
+    const normalRoll =
+      mode === "gesamt"
+        ? state.rolled[rollValueKey(entry.key, TOTAL_ROLL_ID)] || 0
+        : profile.damageLines.reduce(
+            (sum, l) =>
+              l.active ? sum + (state.rolled[rollValueKey(entry.key, l.id)] || 0) : sum,
+            0
+          );
+    let sum = profile.fixed.total + normalRoll;
+    if (state.critical) {
+      const critRoll =
+        mode === "gesamt"
+          ? state.rolled[rollValueKey(entry.key, CRITICAL_TOTAL_ROLL_ID)] || 0
+          : profile.criticalLines.reduce(
+              (s, l) => s + (state.rolled[rollValueKey(entry.key, l.id)] || 0),
+              0
+            );
+      sum += profile.criticalFixed.total + critRoll;
     }
-    return sum + rowSum;
-  }, 0);
+    return sum;
+  };
+
+  const totalDamage = entries.reduce((sum, entry) => sum + sumRow(entry, getState(entry.key)), 0);
 
   return (
     <div className="space-y-2">
@@ -90,8 +109,9 @@ export const DiceOverview: React.FC<{
 
       <p className="text-[9px] text-zinc-500 font-mono">
         Eine Zeile pro Schlag. Die Ziffern zeigen die Reihenfolge der Würfel. "Fest" sind die
-        Schadenspunkte ohne Würfel (Attribut, Verbesserung, Flachboni) – sie werden bei einem
-        kritischen Treffer nicht verdoppelt.
+        Schadenspunkte ohne Würfel (Attribut, Verbesserung, Flachboni). Bei "Krit" bleibt der
+        Normalwurf erhalten und ein zusätzlicher Standardschadenswurf kommt dazu – ohne
+        Klassen-Hinterhaltwürfel, aber inklusive Festanteilen.
         {mode === "gesamt" && " Im Modus gesamt trägst du das komplette Würfelergebnis je Angriff ein."}
       </p>
 
@@ -104,18 +124,15 @@ export const DiceOverview: React.FC<{
           {entries.map((entry) => {
             const state = getState(entry.key);
             const profile = entry.profile;
-            const lines = state.critical ? profile.criticalLines : profile.damageLines;
-            const fixed = state.critical ? profile.criticalFixed : profile.fixed;
-            const activeLines = lines.filter((l) => l.active && (l.dice || l.flat));
+            const fixed = profile.fixed;
+            // Der Normalwurf bleibt immer sichtbar – auch bei aktivem Krit.
+            const activeLines = profile.damageLines.filter((l) => l.active && (l.dice || l.flat));
+            const critLines = state.critical
+              ? profile.criticalLines.filter((l) => l.dice || l.flat)
+              : [];
             const isOpen = expanded[entry.key] ?? true;
 
-            const rowDamage =
-              mode === "gesamt"
-                ? fixed.total + (state.rolled[rollValueKey(entry.key, "__total__")] || 0)
-                : activeLines.reduce(
-                    (sum, l) => sum + (state.rolled[rollValueKey(entry.key, l.id)] || 0),
-                    fixed.total
-                  );
+            const rowDamage = sumRow(entry, state);
 
             return (
               <div key={entry.key} className="bg-black/40 border border-zinc-800 rounded-lg overflow-hidden">
@@ -142,7 +159,7 @@ export const DiceOverview: React.FC<{
                       checked={state.critical}
                       onChange={(e) => onChange(entry.key, { critical: e.target.checked })}
                       className="accent-rose-500"
-                      title="Kritischer Treffer: Würfel verdoppeln, flache Boni bleiben"
+                      title="Kritischer Treffer: Normalwurf bleibt, zusätzlicher Standardschadenswurf kommt dazu (ohne Klassen-Hinterhalt)"
                     />
                     Krit
                   </label>
@@ -179,7 +196,7 @@ export const DiceOverview: React.FC<{
                       </span>
                       {state.critical && (
                         <span className="text-rose-400">
-                          (Krit ab {profile.criticalThreshold}: {profile.criticalSummary})
+                          (Krit-Fest {flatText(profile.criticalFixed.total) || "0"} zusätzlich)
                         </span>
                       )}
                     </div>
@@ -201,12 +218,12 @@ export const DiceOverview: React.FC<{
                         <span className="text-[10px] font-mono text-zinc-500">→</span>
                         <input
                           type="number"
-                          value={state.rolled[rollValueKey(entry.key, "__total__")] || ""}
+                          value={state.rolled[rollValueKey(entry.key, TOTAL_ROLL_ID)] || ""}
                           onChange={(e) =>
                             onChange(entry.key, {
                               rolled: {
                                 ...state.rolled,
-                                [rollValueKey(entry.key, "__total__")]: Number(e.target.value) || 0,
+                                [rollValueKey(entry.key, TOTAL_ROLL_ID)]: Number(e.target.value) || 0,
                               },
                             })
                           }
@@ -243,6 +260,82 @@ export const DiceOverview: React.FC<{
                           </div>
                         );
                       })
+                    )}
+
+                    {/* Krit-Zusatzwurf: der Normalwurf oben bleibt erhalten,
+                        hier kommt der zweite Standardschadenswurf dazu. */}
+                    {state.critical && (
+                      <div className="mt-1 pt-1 border-t border-rose-900/50 space-y-1">
+                        <div className="flex flex-wrap items-center gap-1 text-[9px] font-mono">
+                          <span className="uppercase font-bold text-rose-400">Krit-Zusatzwurf</span>
+                          <span className="text-zinc-500">
+                            (ab {profile.criticalThreshold}, Standardschaden ohne Klassen-Hinterhalt)
+                          </span>
+                          <span className="text-rose-300">{profile.criticalSummary}</span>
+                        </div>
+                        {critLines.length === 0 ? (
+                          <p className="text-[9px] text-zinc-500 font-mono">
+                            Keine Würfel im Zusatzwurf – nur Festanteile.
+                          </p>
+                        ) : mode === "gesamt" ? (
+                          <div className="flex flex-wrap items-center gap-1">
+                            {critLines.map((l, i) => (
+                              <span
+                                key={l.id}
+                                className={`text-[10px] font-mono ${KIND_COLOR[l.kind] || "text-zinc-300"}`}
+                              >
+                                {i + 1}. {l.dice || ""}{flatText(l.flat)}
+                                {l.label && l.label !== "Nativ" ? ` (${l.label})` : ""}
+                              </span>
+                            ))}
+                            <span className="text-[10px] font-mono text-zinc-500">→</span>
+                            <input
+                              type="number"
+                              value={state.rolled[rollValueKey(entry.key, CRITICAL_TOTAL_ROLL_ID)] || ""}
+                              onChange={(e) =>
+                                onChange(entry.key, {
+                                  rolled: {
+                                    ...state.rolled,
+                                    [rollValueKey(entry.key, CRITICAL_TOTAL_ROLL_ID)]:
+                                      Number(e.target.value) || 0,
+                                  },
+                                })
+                              }
+                              placeholder="0"
+                              className="w-14 bg-zinc-900 border border-rose-800 rounded px-0.5 py-0.5 text-[10px] text-white font-mono text-center"
+                            />
+                            <span className="text-[9px] font-mono text-zinc-500">Krit-Würfel gesamt</span>
+                          </div>
+                        ) : (
+                          critLines.map((l, i) => {
+                            const key = rollValueKey(entry.key, l.id);
+                            return (
+                              <div key={l.id} className="flex items-center gap-1.5">
+                                <span className="text-[10px] font-mono text-rose-500 w-4 text-center">
+                                  K{i + 1}.
+                                </span>
+                                <span className={`text-[10px] font-mono ${KIND_COLOR[l.kind] || "text-zinc-300"}`}>
+                                  {l.dice || "–"}{flatText(l.flat)}
+                                </span>
+                                <span className="text-[9px] font-mono text-zinc-500 truncate max-w-[110px]">
+                                  {l.label}
+                                </span>
+                                <input
+                                  type="number"
+                                  value={state.rolled[key] || ""}
+                                  onChange={(e) =>
+                                    onChange(entry.key, {
+                                      rolled: { ...state.rolled, [key]: Number(e.target.value) || 0 },
+                                    })
+                                  }
+                                  placeholder="0"
+                                  className="w-12 bg-zinc-900 border border-rose-800 rounded px-0.5 py-0.5 text-[10px] text-white font-mono text-center"
+                                />
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
@@ -302,7 +395,7 @@ export const WeaponProfileCard: React.FC<{
           <strong className="text-amber-300">{profile.criticalThreshold}</strong>
         </span>
         <span className="px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded">
-          <span className="text-zinc-500 uppercase mr-1">Krit-Schaden:</span>
+          <span className="text-zinc-500 uppercase mr-1">Krit-Zusatzwurf:</span>
           <strong className="text-amber-200">{profile.criticalSummary}</strong>
         </span>
       </div>
