@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Activity, Shield, Sword, Target } from "lucide-react";
+import { Activity, ScrollText, Shield, Sword, Target } from "lucide-react";
 import { PluginViewProps } from "../../core/SystemPlugin";
 import {
   Ability,
@@ -34,6 +34,15 @@ import {
   getTwoWeaponPenalties,
 } from "./pathfinderAttackProfile";
 import { normalizeWeaponData } from "./pathfinderWeaponModel";
+import {
+  appendCombatHistory,
+  CombatHistoryEntry,
+  formatCombatHistoryLabel,
+  formatCombatHistoryTime,
+  makeCombatHistoryEntry,
+  readCombatHistory,
+  sumCombatHistory,
+} from "./pathfinderCombatHistory";
 import { makeId } from "./pathfinderRules";
 import { DiceOverview, DiceInputMode, DiceRowState, WeaponProfileCard } from "./PathfinderDiceOverview";
 import { WeaponEditor } from "./PathfinderWeaponEditor";
@@ -239,6 +248,32 @@ export const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isE
       ...prev,
       [key]: { ...(prev[key] || { rolled: {}, critical: false, status: "" }), ...patch },
     }));
+
+  // Kampfhistorie liegt am Charakter, damit sie einen Reload übersteht.
+  const [history, setHistory] = useState<CombatHistoryEntry[]>(() =>
+    readCombatHistory(character)
+  );
+
+  // Beim Wechsel auf einen anderen Charakter die Historie neu ziehen.
+  // (GenericCharacter hat keine id; der Name dient hier als Wechsel-Signal.)
+  React.useEffect(() => {
+    setHistory(readCombatHistory(character));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [character.name]);
+
+  /** Einträge lokal und am Charakter aktualisieren – beides synchron halten. */
+  const persistHistory = (next: CombatHistoryEntry[]) => {
+    setHistory(next);
+    onUpdate({ systemData: { ...character.systemData, combatHistory: next } });
+  };
+
+  const logHit = (input: Parameters<typeof makeCombatHistoryEntry>[0]) =>
+    persistHistory(appendCombatHistory(history, makeCombatHistoryEntry(input)));
+
+  const clearHistory = () => persistHistory([]);
+
+  const removeHistoryEntry = (id: string) =>
+    persistHistory(history.filter((e) => e.id !== id));
 
   return (
     <div className="space-y-4">
@@ -455,7 +490,74 @@ export const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isE
           onChange={setRowState}
           mode={diceMode}
           onModeChange={setDiceMode}
+          onLogHit={logHit}
         />
+      </div>
+
+      {/* Kampfhistorie: geführte Schläge mit Schadenssumme */}
+      <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-mono font-bold text-zinc-300">Kampf-Historie</span>
+          <div className="flex items-center gap-2">
+            {history.length > 0 && (
+              <button
+                onClick={clearHistory}
+                title="Kampfhistorie leeren"
+                className="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white border border-zinc-700/50 rounded text-[9px] font-mono transition-colors"
+              >
+                Leeren
+              </button>
+            )}
+            <ScrollText size={14} className="text-zinc-500" />
+          </div>
+        </div>
+
+        {history.length === 0 ? (
+          <p className="text-[9px] text-zinc-600 font-mono">
+            Noch kein Schlag festgehalten. Über das Symbol in der Würfel-Übersicht wird ein
+            ausgewürfelter Angriff hier protokolliert.
+          </p>
+        ) : (
+          <>
+            <ul className="space-y-1">
+              {history.map((entry) => (
+                <li
+                  key={entry.id}
+                  className="flex items-center gap-2 px-2 py-1 bg-black/40 border border-zinc-800 rounded text-[10px] font-mono"
+                >
+                  <span className="text-zinc-500">{formatCombatHistoryTime(entry.timestamp)}</span>
+                  <span className="text-white flex-1 truncate">
+                    {formatCombatHistoryLabel(entry)}
+                  </span>
+                  {entry.critical && (
+                    <span className="text-rose-400" title="Kritischer Treffer">Krit</span>
+                  )}
+                  {entry.status && (
+                    <span className="text-amber-400 capitalize">{entry.status}</span>
+                  )}
+                  <span className="text-emerald-400 font-bold min-w-[28px] text-right">
+                    {entry.damage}
+                  </span>
+                  <button
+                    onClick={() => removeHistoryEntry(entry.id)}
+                    title="Eintrag entfernen"
+                    className="text-zinc-600 hover:text-red-400"
+                  >
+                    <X size={11} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-center justify-between px-2 py-1.5 bg-emerald-950/20 border border-emerald-900/40 rounded-lg">
+              <span className="text-[10px] font-mono font-bold text-emerald-300">
+                Summe aller Schläge
+              </span>
+              <span className="text-sm font-mono font-bold text-emerald-400">
+                {sumCombatHistory(history)}
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Talente & Fähigkeiten im Kampf */}
