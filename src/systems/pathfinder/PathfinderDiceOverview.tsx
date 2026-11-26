@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Activity, Target } from "lucide-react";
+import { Activity, ScrollText, Target } from "lucide-react";
 import {
   AttackProfile,
   AttackSequenceEntry,
@@ -7,6 +7,7 @@ import {
   rollValueKey,
   TOTAL_ROLL_ID,
 } from "./pathfinderAttackProfile";
+import { CombatHistoryInput } from "./pathfinderCombatHistory";
 import { formatFlat } from "./pathfinderWeaponModel";
 
 /**
@@ -55,7 +56,9 @@ export const DiceOverview: React.FC<{
   /** Gesamtmodus: Eingabe des kompletten Würfelergebnisses je Angriff. */
   mode: DiceInputMode;
   onModeChange: (mode: DiceInputMode) => void;
-}> = ({ entries, states, onChange, mode, onModeChange }) => {
+  /** Meldet einen geführten Schlag an die Kampfhistorie. */
+  onLogHit?: (input: CombatHistoryInput) => void;
+}> = ({ entries, states, onChange, mode, onModeChange, onLogHit }) => {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const getState = (key: string): DiceRowState =>
@@ -177,6 +180,25 @@ export const DiceOverview: React.FC<{
                   <span className="text-xs font-mono font-bold text-emerald-400 min-w-[34px] text-right">
                     {rowDamage}
                   </span>
+
+                  {onLogHit && (
+                    <button
+                      onClick={() =>
+                        onLogHit({
+                          weaponName: profile.name,
+                          handLabel: entry.handLabel,
+                          attackBonus: entry.attack,
+                          damage: rowDamage,
+                          critical: state.critical,
+                          status: state.status,
+                        })
+                      }
+                      title="Diesen Schlag in die Kampf-Historie übernehmen"
+                      className="px-1 py-0.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded text-[9px] font-mono transition-colors"
+                    >
+                      <ScrollText size={11} />
+                    </button>
+                  )}
                 </div>
 
                 {/* Wurfplan */}
