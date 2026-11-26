@@ -438,7 +438,16 @@ export const PathfinderCombatView: React.FC<PluginViewProps> = ({ character, isE
       <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-mono font-bold text-zinc-300">Würfel-Übersicht</span>
-          <Activity size={14} className="text-zinc-500" />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setRowStates({})}
+              title="Alle eingegebenen Würfelwerte, Krit-Markierungen und Trefferstatus entfernen"
+              className="px-2 py-0.5 bg-rose-900/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 rounded text-[9px] font-mono transition-colors"
+            >
+              Alles löschen
+            </button>
+            <Activity size={14} className="text-zinc-500" />
+          </div>
         </div>
         <DiceOverview
           entries={sequence}
