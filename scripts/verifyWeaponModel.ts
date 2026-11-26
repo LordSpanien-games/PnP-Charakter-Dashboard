@@ -15,7 +15,15 @@ import {
   normalizeWeaponData,
   splitDiceAndFlat,
 } from "../src/systems/pathfinder/pathfinderWeaponModel";
-import { InventoryItem } from "../src/core/types";
+import { GenericCharacter, InventoryItem } from "../src/core/types";
+import {
+  appendCombatHistory,
+  formatCombatHistoryLabel,
+  formatCombatHistoryTime,
+  makeCombatHistoryEntry,
+  readCombatHistory,
+  sumCombatHistory,
+} from "../src/systems/pathfinder/pathfinderCombatHistory";
 
 let failed = 0;
 const check = (label: string, actual: unknown, expected: unknown) => {
@@ -452,6 +460,44 @@ check(
   formatRollPlan(p2, true),
   "1W6+4 · 1W6 (Magisch) + Krit: 1W6+4 · 1W6 (Magisch)"
 );
+
+// ── 13) Kampfhistorie ──
+const hitA = makeCombatHistoryEntry(
+  { weaponName: "Schurkenschwert", handLabel: "Haupthand", attackBonus: 7, damage: 18, critical: false, status: "" },
+  "2026-11-26T13:30:00.000Z"
+);
+const hitB = makeCombatHistoryEntry(
+  { weaponName: "Schurkenschwert", handLabel: "Haupthand", attackBonus: 2, damage: 24, critical: true, status: "blutend" },
+  "2026-11-26T13:31:00.000Z"
+);
+check("Kampfhistorie: neuer Eintrag hat ID und Zeitpunkt", [typeof hitA.id === "string" && hitA.id.length > 0, hitA.timestamp], [true, "2026-11-26T13:30:00.000Z"]);
+const hist = appendCombatHistory(appendCombatHistory([], hitA), hitB);
+check("Kampfhistorie: neueste Schläge stehen vorn", hist.map((h) => h.id), [hitB.id, hitA.id]);
+check("Kampfhistorie: Schadenssumme", sumCombatHistory(hist), 42);
+check(
+  "Kampfhistorie: Label mit Angriffsbonus und Schaden",
+  formatCombatHistoryLabel(hitA),
+  "Schurkenschwert +7 · 18 Schaden"
+);
+check(
+  "Kampfhistorie: Label bei negativem Bonus ohne doppeltes Vorzeichen",
+  formatCombatHistoryLabel(makeCombatHistoryEntry({ weaponName: "Keule", handLabel: "Haupthand", attackBonus: -2, damage: 4, critical: false, status: "" })),
+  "Keule -2 · 4 Schaden"
+);
+check("Kampfhistorie: leere Liste summiert zu 0", sumCombatHistory([]), 0);
+check("Kampfhistorie: Zeitformat HH:MM", /^([01]\d|2[0-3]):[0-5]\d$/.test(formatCombatHistoryTime(hitA.timestamp)), true);
+check("Kampfhistorie: kaputter Zeitstempel wird nicht angezeigt", formatCombatHistoryTime("kaputt"), "--:--");
+
+// Persistenz am Charakter
+const charWithHistory = {
+  systemData: { combatHistory: hist },
+} as unknown as GenericCharacter;
+check("Kampfhistorie: Lesen aus den Systemdaten", readCombatHistory(charWithHistory).length, 2);
+const charWithoutHistory = { systemData: {} } as unknown as GenericCharacter;
+check("Kampfhistorie: alter Charakter ohne Feld liefert leere Liste", readCombatHistory(charWithoutHistory), []);
+const charWithBrokenHistory = { systemData: { combatHistory: "kaputt" } } as unknown as GenericCharacter;
+check("Kampfhistorie: kaputte Systemdaten liefern leere Liste", readCombatHistory(charWithBrokenHistory), []);
+check("Kampfhistorie: Eintrag mit Krit und Status bleibt erhalten", [hist[0].critical, hist[0].status], [true, "blutend"]);
 
 console.log("");
 if (failed === 0) {
