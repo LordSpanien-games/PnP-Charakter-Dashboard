@@ -1,6 +1,8 @@
 /**
  * Verifikation des neuen Waffenmodells (Pathfinder 1e).
  * Ausführen:  npx tsx scripts/verifyWeaponModel.ts
+ *
+ * Enthält auch Prüfungen für die Kampfhistorie (Abschnitt 13).
  */
 import {
   buildAttackProfile,
