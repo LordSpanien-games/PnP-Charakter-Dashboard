@@ -219,7 +219,9 @@ export const PathfinderSheet: FC<SheetProps> = ({
       const ranks = typeof rawVal === 'number' ? rawVal : (parseInt(String(rawVal).replace(/[^0-9-]/g, ''), 10) || 0);
       const isClassSkill = existing?.trained ?? false;
       const classBonus = (isClassSkill && ranks > 0) ? 3 : 0;
-      const totalBonus = attrMod + ranks + classBonus + (existing?.miscBonus ?? 0);
+      // miscBonus ist ein optionales Zusatzfeld einzelner Charaktere (kein Pflichtfeld im Skill-Typ).
+      const miscBonus = (existing as { miscBonus?: number } | undefined)?.miscBonus ?? 0;
+      const totalBonus = attrMod + ranks + classBonus + miscBonus;
       return {
         ...def,
         ranks,
@@ -227,7 +229,7 @@ export const PathfinderSheet: FC<SheetProps> = ({
         classBonus,
         attrMod,
         totalBonus,
-        miscBonus: existing?.miscBonus ?? 0,
+        miscBonus,
         note: existing?.note || ""
       };
     });
