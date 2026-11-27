@@ -18,26 +18,22 @@ export const CoCDevelopmentView: React.FC<PluginViewProps> = ({
   }[]>([]);
 
   // ── Attribute auslesen ─────────────────────────────────
+  // Attribute liegen im aktuellen Modell in character.attributes.
+  // Die alte Fallback-Liste character.characteristics existiert nicht mehr.
   const getAttr = (key: string, def = 50): number => {
     const found = (character.attributes || {})[key];
     if (found !== undefined) return Number(found);
-    const fromChars = (character.characteristics || []).find(
-      (c) => (c.label || "").toUpperCase() === key.toUpperCase()
-    );
-    return Number(fromChars?.value ?? def);
+    return def;
   };
 
   const ge = getAttr("GE", 50);
   const bi = getAttr("BI", 50);
 
-  // Stabilität aus stats lesen
-  const sanityEntry = (character.stats || []).find(
-    (s) => (s.label || "").toLowerCase().includes("stabi")
-      || (s.label || "").toLowerCase() === "san"
-      || (s.label || "").toLowerCase().includes("sanity")
-  );
-  const sanity    = Number(sanityEntry?.value ?? Math.floor(bi * 0.9));
-  const sanityMax = Number(sanityEntry?.value ?? Math.floor(bi * 0.9));
+  // Stabilität liegt im Ressourcen-Modell (resources.sanity),
+  // nicht mehr in einer stats-Liste. Siehe CthulhuPlugin.migrateLegacy.
+  const sanityResource = character.resources.sanity;
+  const sanity    = Number(sanityResource?.current ?? Math.floor(bi * 0.9));
+  const sanityMax = Number(sanityResource?.max ?? Math.floor(bi * 0.9));
 
   const mythosSkill = character.skills.find(
     (s) => (s.name || "").toLowerCase().includes("mythos")
@@ -144,19 +140,16 @@ export const CoCDevelopmentView: React.FC<PluginViewProps> = ({
 
   // ── Stabilität ändern ─────────────────────────────────
   const handleSanityChange = (delta: number) => {
-    const statIdx = (character.stats || []).findIndex(
-      (s) => (s.label || "").toLowerCase().includes("stabi")
-        || (s.label || "").toLowerCase() === "san"
-    );
-    const newStats = [...(character.stats || [])];
-    if (statIdx >= 0) {
-      const current = Number(newStats[statIdx].value || 0);
-      newStats[statIdx] = {
-        ...newStats[statIdx],
-        value: Math.min(maxSanity, Math.max(0, current + delta))
-      };
-      onUpdate({ stats: newStats });
-    }
+    const resource = character.resources.sanity;
+    if (!resource) return;
+    const current = Number(resource.current || 0);
+    const next = Math.min(maxSanity, Math.max(0, current + delta));
+    onUpdate({
+      resources: {
+        ...character.resources,
+        sanity: { ...resource, current: next },
+      },
+    });
   };
 
   const tabs: { id: TabId; label: string }[] = [
