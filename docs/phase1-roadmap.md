@@ -36,6 +36,9 @@ Commit auf `erledigt in <Hash>` gesetzt.
 - Kein ESLint, kein Prettier, kein Vitest, kein Storybook. Kein `test`-Skript.
 - CI (`Build and Deploy`): nur `npm install` → `npm run build` → Pages-Deploy. Keine Tests, kein Lint.
 - Bestehender Test-Harness: `scripts/verifyWeaponModel.ts` (55 Prüfungen, manuell gestartet, nicht in CI).
+- **Stand nach Schritt 2:** `npx tsc --noEmit` meldet **45** Fehler – alle echt, keine aus den
+  Backup-Ordnern mehr. `exclude` in der `tsconfig.json` muss `node_modules` und `dist` mit enthalten,
+  sonst prüft `tsc` beim Setzen von `exclude` diese Verzeichnisse mit.
 
 ## Phasen und Schritte
 
@@ -44,8 +47,8 @@ Gate: `npx tsc --noEmit` meldet **0 Fehler**
 
 | # | Datei | Änderung | Commit-Betreff | Status |
 |---|-------|----------|----------------|--------|
-| 1 | `docs/phase1-roadmap.md` | Diese Datei anlegen | `Docs: Roadmap Phase 1 (Infrastruktur & DX)` | in Arbeit |
-| 2 | `tsconfig.json` | `exclude` für `backup_pnp_*` → Fehler 99 auf 45 | `Chore: Backup-Ordner aus der TypeScript-Pruefung ausnehmen` | offen |
+| 1 | `docs/phase1-roadmap.md` | Diese Datei anlegen | `Docs: Roadmap Phase 1 (Infrastruktur & DX)` | erledigt in 49c7ed7 |
+| 2 | `tsconfig.json` | `exclude` für `backup_pnp_*` → Fehler 99 auf 45 | `Chore: Backup-Ordner aus der TypeScript-Pruefung ausnehmen` | in Arbeit |
 | 3 | `src/types.ts` | 2 Verweise auf nicht existierende Module (`./services/characterStorageService`, `./services/aiService`) entfernen | `Fix: Tote Modulverweise in types.ts entfernen` | offen |
 | 4 | `src/systems/shadowrun/ShadowrunPlugin.tsx` | 26 Typfehler | `Fix(shadowrun): Typfehler in ShadowrunPlugin beheben` | offen |
 | 5 | `src/systems/shadowrun/ShadowrunSkillsBlock.tsx` | 1 Typfehler | `Fix(shadowrun): Typfehler in ShadowrunSkillsBlock beheben` | offen |
