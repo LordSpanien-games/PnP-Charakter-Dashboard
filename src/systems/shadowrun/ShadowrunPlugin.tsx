@@ -27,6 +27,7 @@ import {
   calculateWeaponPool,
   makeId,
   ShadowrunCyberdeck,
+  ShadowrunWeaponData,
   MATRIX_ATTR_ORDER,
   MATRIX_ATTR_LABELS,
   MODE_LABELS,
@@ -340,7 +341,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
         <div className="text-xs font-mono font-bold text-zinc-300">Waffen</div>
         {activeWeapons.length === 0 && <p className="text-xs text-zinc-600 font-mono">Keine Waffe am Mann.</p>}
         {activeWeapons.map((item) => {
-          const w = item.srWeapon;
+          const w = item.srWeapon as ShadowrunWeaponData | undefined;
           if (!w) return null;
           const skillVal = Number(getWeaponSkillValue(w.skillName));
           const attrVal = w.attackAttribute === "none" ? 0 : attrs[w.attackAttribute as keyof ShadowrunAttributes];
@@ -479,13 +480,13 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
                     <ValueBadge label="Ort" value={item.location === "equipped" ? "Am Mann" : "Eingelagert"} color={item.location === "equipped" ? "text-emerald-400" : "text-amber-400"} />
                     {item.category === "weapon" && item.srWeapon && (
                       <>
-                        <ValueBadge label="Schaden" value={item.srWeapon.damageCode} color="text-rose-400" />
-                        <ValueBadge label="AP" value={item.srWeapon.ap || "0"} color="text-zinc-200" />
+                        <ValueBadge label="Schaden" value={(item.srWeapon as ShadowrunWeaponData).damageCode} color="text-rose-400" />
+                        <ValueBadge label="AP" value={(item.srWeapon as ShadowrunWeaponData).ap || "0"} color="text-zinc-200" />
                       </>
                     )}
                     {item.category === "armor" && <ValueBadge label="Panzerung" value={item.armorData?.armorBonus ?? 0} color="text-cyan-300" />}
                     {(item.category === "cyberware" || item.category === "bioware") && item.essenceCost !== undefined && (
-                      <ValueBadge label="Essenzkosten" value={item.essenceCost} color="text-indigo-300" />
+                      <ValueBadge label="Essenzkosten" value={item.essenceCost as number} color="text-indigo-300" />
                     )}
                     {item.charges && <ValueBadge label="Ladungen" value={`${item.charges.current}/${item.charges.max}`} color="text-purple-300" />}
                     {item.quantity !== undefined && item.category !== "weapon" && item.category !== "armor" && <ValueBadge label="Anzahl" value={`${item.quantity}x`} color="text-zinc-200" />}
@@ -539,25 +540,25 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
                         {item.category === "weapon" && (
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             <div><label className="block text-[9px] text-zinc-500">Verknüpfte Fertigkeit</label>
-                              <input value={item.srWeapon?.skillName || ""} onChange={(e) => updateInventoryItem(item.id, { srWeapon: { ...item.srWeapon!, skillName: e.target.value } })}
+                              <input value={(item.srWeapon as ShadowrunWeaponData)?.skillName || ""} onChange={(e) => updateInventoryItem(item.id, { srWeapon: { ...(item.srWeapon as ShadowrunWeaponData), skillName: e.target.value } })}
                                 className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
                             </div>
                             <div><label className="block text-[9px] text-zinc-500">Attribut</label>
-                              <select value={item.srWeapon?.attackAttribute || "GES"} onChange={(e) => updateInventoryItem(item.id, { srWeapon: { ...item.srWeapon!, attackAttribute: e.target.value as any } })}
+                              <select value={(item.srWeapon as ShadowrunWeaponData)?.attackAttribute || "GES"} onChange={(e) => updateInventoryItem(item.id, { srWeapon: { ...(item.srWeapon as ShadowrunWeaponData), attackAttribute: e.target.value as any } })}
                                 className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono">
                                 <option value="GES">GES</option><option value="STR">STR</option><option value="LOG">LOG</option><option value="none">keins</option>
                               </select>
                             </div>
                             <div><label className="block text-[9px] text-zinc-500">Schadenscode (z.B. 8P)</label>
-                              <input value={item.srWeapon?.damageCode || ""} onChange={(e) => updateInventoryItem(item.id, { srWeapon: { ...item.srWeapon!, damageCode: e.target.value } })}
+                              <input value={(item.srWeapon as ShadowrunWeaponData)?.damageCode || ""} onChange={(e) => updateInventoryItem(item.id, { srWeapon: { ...(item.srWeapon as ShadowrunWeaponData), damageCode: e.target.value } })}
                                 className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
                             </div>
                             <div><label className="block text-[9px] text-zinc-500">Panzerbrechung (AP)</label>
-                              <input value={item.srWeapon?.ap || ""} onChange={(e) => updateInventoryItem(item.id, { srWeapon: { ...item.srWeapon!, ap: e.target.value } })}
+                              <input value={(item.srWeapon as ShadowrunWeaponData)?.ap || ""} onChange={(e) => updateInventoryItem(item.id, { srWeapon: { ...(item.srWeapon as ShadowrunWeaponData), ap: e.target.value } })}
                                 className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
                             </div>
                             <div><label className="block text-[9px] text-zinc-500">Pool-Bonus (Smartlink etc.)</label>
-                              <input type="number" value={item.srWeapon?.poolBonus ?? 0} onChange={(e) => updateInventoryItem(item.id, { srWeapon: { ...item.srWeapon!, poolBonus: Number(e.target.value) } })}
+                              <input type="number" value={(item.srWeapon as ShadowrunWeaponData)?.poolBonus ?? 0} onChange={(e) => updateInventoryItem(item.id, { srWeapon: { ...(item.srWeapon as ShadowrunWeaponData), poolBonus: Number(e.target.value) } })}
                                 className="w-full bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
                             </div>
                           </div>
@@ -570,7 +571,7 @@ const ShadowrunOverview: React.FC<PluginViewProps> = ({ character, isEditing, on
                         )}
                         {(item.category === "cyberware" || item.category === "bioware") && (
                           <div><label className="block text-[9px] text-zinc-500">Essenzkosten</label>
-                            <input type="number" step="0.1" value={item.essenceCost ?? 0} onChange={(e) => updateInventoryItem(item.id, { essenceCost: Number(e.target.value) })}
+                            <input type="number" step="0.1" value={(item.essenceCost as number) ?? 0} onChange={(e) => updateInventoryItem(item.id, { essenceCost: Number(e.target.value) })}
                               className="w-24 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-xs text-white font-mono" />
                           </div>
                         )}
@@ -683,7 +684,7 @@ const ShadowrunCombatView: React.FC<PluginViewProps> = ({ character }) => {
         <div className="text-xs font-mono font-bold text-zinc-300">Waffenpool-Herleitung</div>
         {activeWeapons.length === 0 && <p className="text-xs text-zinc-600 font-mono">Keine Waffe am Mann.</p>}
         {activeWeapons.map((item) => {
-          const w = item.srWeapon;
+          const w = item.srWeapon as ShadowrunWeaponData | undefined;
           if (!w) return null;
           const skillVal = Number(getWeaponSkillValue(w.skillName));
           const attrVal = w.attackAttribute === "none" ? 0 : attrs[w.attackAttribute as keyof ShadowrunAttributes];

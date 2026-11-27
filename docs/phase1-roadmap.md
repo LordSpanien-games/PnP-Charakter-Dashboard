@@ -49,8 +49,8 @@ Gate: `npx tsc --noEmit` meldet **0 Fehler**
 |---|-------|----------|----------------|--------|
 | 1 | `docs/phase1-roadmap.md` | Diese Datei anlegen | `Docs: Roadmap Phase 1 (Infrastruktur & DX)` | erledigt in 49c7ed7 |
 | 2 | `tsconfig.json` | `exclude` für `backup_pnp_*` → Fehler 99 auf 45 | `Chore: Backup-Ordner aus der TypeScript-Pruefung ausnehmen` | erledigt in 9aec2d5 |
-| 3 | `src/types.ts` | 2 Verweise auf nicht existierende Module (`./services/characterStorageService`, `./services/aiService`) entfernen | `Fix: Tote Modulverweise in types.ts entfernen` | in Arbeit |
-| 4 | `src/systems/shadowrun/ShadowrunPlugin.tsx` | 26 Typfehler | `Fix(shadowrun): Typfehler in ShadowrunPlugin beheben` | offen |
+| 3 | `src/types.ts` | 2 Verweise auf nicht existierende Module (`./services/characterStorageService`, `./services/aiService`) entfernen | `Fix: Tote Modulverweise in types.ts entfernen` | erledigt in 3d1b72a |
+| 4 | `src/systems/shadowrun/ShadowrunPlugin.tsx` | 26 Typfehler | `Fix(shadowrun): Typfehler in ShadowrunPlugin beheben` | in Arbeit |
 | 5 | `src/systems/shadowrun/ShadowrunSkillsBlock.tsx` | 1 Typfehler | `Fix(shadowrun): Typfehler in ShadowrunSkillsBlock beheben` | offen |
 | 6 | `src/systems/cthulhu/CoCDevelopmentView.tsx` | 5 Typfehler | `Fix(cthulhu): Typfehler in CoCDevelopmentView beheben` | offen |
 | 7 | `src/components/sheets/ShadowrunSheet.tsx` | 3 Typfehler | `Fix: Typfehler in ShadowrunSheet beheben` | offen |
