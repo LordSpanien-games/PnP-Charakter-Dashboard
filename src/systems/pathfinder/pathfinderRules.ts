@@ -215,6 +215,9 @@ export interface WeaponCalcInput {
   name: string;
   isMelee: boolean;
   isFinesse?: boolean;
+  /** Leichte Waffe (relevant für den Malus beim Zweiwaffenkampf).
+   *  Spiegelt WeaponItemData.isLight aus core/types.ts. */
+  isLight?: boolean;
   magicBonus?: number;
   baseDice?: string;
   damageAttribute?: "ST" | "GE" | "NONE";
