@@ -52,8 +52,8 @@ Gate: `npx tsc --noEmit` meldet **0 Fehler**
 | 3 | `src/types.ts` | 2 Verweise auf nicht existierende Module (`./services/characterStorageService`, `./services/aiService`) entfernen | `Fix: Tote Modulverweise in types.ts entfernen` | erledigt in 3d1b72a |
 | 4 | `src/systems/shadowrun/ShadowrunPlugin.tsx` | 26 Typfehler | `Fix(shadowrun): Typfehler in ShadowrunPlugin beheben` | erledigt in 4e1a31c |
 | 5 | `src/systems/shadowrun/ShadowrunSkillsBlock.tsx` | 1 Typfehler | `Fix(shadowrun): Typfehler in ShadowrunSkillsBlock beheben` | erledigt in ca123b3 |
-| 6 | `src/systems/cthulhu/CoCDevelopmentView.tsx` | 5 Typfehler | `Fix(cthulhu): Typfehler in CoCDevelopmentView beheben` | in Arbeit |
-| 7 | `src/components/sheets/ShadowrunSheet.tsx` | 3 Typfehler | `Fix: Typfehler in ShadowrunSheet beheben` | offen |
+| 6 | `src/systems/cthulhu/CoCDevelopmentView.tsx` | 5 Typfehler | `Fix(cthulhu): Typfehler in CoCDevelopmentView beheben` | erledigt in 462d5f0 |
+| 7 | `src/components/sheets/ShadowrunSheet.tsx` | 3 Typfehler | `Fix: Typfehler in ShadowrunSheet beheben` | in Arbeit |
 | 8 | `src/components/sheets/PathfinderSheet.tsx` | 2 Typfehler | `Fix: Typfehler in PathfinderSheet beheben` | offen |
 | 9 | `src/systems/pathfinder/PathfinderLevelUpView.tsx` | 5 Typfehler | `Fix(pathfinder): Typfehler in PathfinderLevelUpView beheben` | offen |
 | 10 | `src/systems/pathfinder/pathfinderRules.ts` | 1 Typfehler | `Fix(pathfinder): Typfehler in pathfinderRules beheben` | offen |

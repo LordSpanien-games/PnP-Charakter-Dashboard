@@ -154,13 +154,13 @@ export const ShadowrunSheet: FC<SheetProps> = ({
   }, [data.skills]);
 
   const knowledgeSkills = useMemo(() => {
-    return (data.skills || []).filter((s) => s.category === "knowledge");
+    return (data.skills || []).filter((s) => (s as { category?: string }).category === "knowledge");
   }, [data.skills]);
 
   const extraSkills = useMemo(() => {
     return (data.skills || []).filter(
       (s) =>
-        s.category !== "knowledge" &&
+        (s as { category?: string }).category !== "knowledge" &&
         !SR_ACTIVE_SKILLS.some((m) => m.name.toLowerCase() === (s.name || "").toLowerCase())
     );
   }, [data.skills]);
@@ -171,7 +171,7 @@ export const ShadowrunSheet: FC<SheetProps> = ({
     if (idx >= 0) {
       current[idx] = { ...current[idx], value };
     } else {
-      current.push({ name, value, category: "active" });
+      current.push({ name, value, category: "active" } as typeof current[number]);
     }
     onUpdateData({ skills: current });
   };
