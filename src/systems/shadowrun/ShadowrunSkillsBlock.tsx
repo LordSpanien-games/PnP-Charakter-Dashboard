@@ -114,7 +114,7 @@ export const ShadowrunSkillsBlock: React.FC<Props> = ({
                       s.hasValue ? "text-white" : "text-zinc-700"
                     }`}
                   >
-                    {s.value > 0 ? s.value : "—"}
+                    {Number(s.value) > 0 ? s.value : "—"}
                   </span>
                 )}
               </div>
