@@ -118,10 +118,6 @@ export interface PartyMember {
   synergyNote?: string;
 }
 
-export type { LocalCharacterMeta, SaveResult, CharacterHistoryVersion } from './services/characterStorageService';
-export type { AiConfig, AiProvider } from './services/aiService';
-
-
 export interface PathfinderCoins {
   pp: number; // Platin (Platinmünzen: 1 PM = 10 GM)
   gp: number; // Gold (Goldmünzen: 1 GM = 1 GM)
