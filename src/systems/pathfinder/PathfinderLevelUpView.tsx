@@ -7,6 +7,19 @@ import { makeId } from "./pathfinderRules";
 // ── Hilfsfunktionen ───────────────────────────────────────
 const calculateModifier = (score: number): number => Math.floor((score - 10) / 2);
 
+/** Eintrag der XP-Historie in systemData.experienceHistory. */
+interface XpHistoryEntry {
+  id: string;
+  amount: number;
+  totalAfter: number;
+  date: string;
+  reason: string;
+}
+
+/** Liest die XP-Historie aus den Systemdaten (Record<string, unknown>). */
+const readXpHistory = (character: any): XpHistoryEntry[] =>
+  (character.systemData?.experienceHistory as XpHistoryEntry[] | undefined) || [];
+
 const getAttrs = (character: any) => ({
   ST: Number(character.attributes?.ST) || 10,
   GE: Number(character.attributes?.GE) || 10,
@@ -110,7 +123,7 @@ export const PathfinderLevelUpView: React.FC<PluginViewProps> = ({
     const xpToAddNum = typeof xpToAdd === "number" ? xpToAdd : 0;
     const newTotalXp = currentXp + xpToAddNum;
     const updatedXpHistory = [
-      ...(character.systemData?.experienceHistory || []),
+      ...readXpHistory(character),
       {
         id: makeId(),
         amount: xpToAddNum,
@@ -241,7 +254,7 @@ export const PathfinderLevelUpView: React.FC<PluginViewProps> = ({
               const currentXp = Number(character.systemData?.experiencePoints) || 0;
               const newTotalXp = currentXp + xpToAdd;
               const updatedXpHistory = [
-                ...(character.systemData?.experienceHistory || []),
+                ...readXpHistory(character),
                 {
                   id: makeId(),
                   amount: xpToAdd,
@@ -498,21 +511,21 @@ export const PathfinderLevelUpView: React.FC<PluginViewProps> = ({
       </div>
 
       {/* XP-HISTORIE */}
-      {character.systemData?.experienceHistory?.length > 0 && (
+      {readXpHistory(character).length > 0 && (
         <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-black uppercase text-purple-400 tracking-wide">
               XP-Historie
             </span>
             <span className="text-[10px] text-zinc-500 font-mono">
-              {character.systemData.experienceHistory.length} Einträge
+              {readXpHistory(character).length} Einträge
             </span>
           </div>
           <div className="max-h-[200px] overflow-y-auto space-y-1">
-            {character.systemData.experienceHistory
+            {readXpHistory(character)
               .slice()
               .reverse()
-              .map((entry: any, idx: number) => (
+              .map((entry: XpHistoryEntry, idx: number) => (
                 <div key={entry.id || idx} className="flex justify-between px-2 py-1 rounded-lg border border-zinc-800/50">
                   <span className="text-[9px] text-zinc-400 font-mono">
                     {new Date(entry.date).toLocaleDateString("de-DE")}

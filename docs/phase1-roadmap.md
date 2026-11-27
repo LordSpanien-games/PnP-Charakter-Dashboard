@@ -54,8 +54,8 @@ Gate: `npx tsc --noEmit` meldet **0 Fehler**
 | 5 | `src/systems/shadowrun/ShadowrunSkillsBlock.tsx` | 1 Typfehler | `Fix(shadowrun): Typfehler in ShadowrunSkillsBlock beheben` | erledigt in ca123b3 |
 | 6 | `src/systems/cthulhu/CoCDevelopmentView.tsx` | 5 Typfehler | `Fix(cthulhu): Typfehler in CoCDevelopmentView beheben` | erledigt in 462d5f0 |
 | 7 | `src/components/sheets/ShadowrunSheet.tsx` | 3 Typfehler | `Fix: Typfehler in ShadowrunSheet beheben` | erledigt in 957e22f |
-| 8 | `src/components/sheets/PathfinderSheet.tsx` | 2 Typfehler | `Fix: Typfehler in PathfinderSheet beheben` | in Arbeit |
-| 9 | `src/systems/pathfinder/PathfinderLevelUpView.tsx` | 5 Typfehler | `Fix(pathfinder): Typfehler in PathfinderLevelUpView beheben` | offen |
+| 8 | `src/components/sheets/PathfinderSheet.tsx` | 2 Typfehler | `Fix: Typfehler in PathfinderSheet beheben` | erledigt in 3e90ba8 |
+| 9 | `src/systems/pathfinder/PathfinderLevelUpView.tsx` | 5 Typfehler | `Fix(pathfinder): Typfehler in PathfinderLevelUpView beheben` | in Arbeit |
 | 10 | `src/systems/pathfinder/pathfinderRules.ts` | 1 Typfehler | `Fix(pathfinder): Typfehler in pathfinderRules beheben` | offen |
 
 ### Phase B: Vitest + React Testing Library
